@@ -1,0 +1,71 @@
+{
+  "checklists": [
+    {
+      "id": "apresentacao_uniforme",
+      "titulo": "Apresentação e uniforme",
+      "descricao": "Conferir antes de sair de casa e na Sacristia. \"Somos vitrines\".",
+      "itens": [
+        "Jaleco branco (não bege), bem passado e limpo — vestir somente na Sacristia",
+        "Calça preta (homens e mulheres; não usar leggins)",
+        "Sapato/sandália preta, sem plataforma, salto seguro",
+        "Homens: camisa branca e gravata preta",
+        "Mulheres: camisa ou camiseta branca lisa (sem desenhos)",
+        "Mulheres: cabelos presos (elástico/presilha)",
+        "Mãos limpas e higienizadas; atenção a anéis e brincos",
+        "Maquiagem leve"
+      ]
+    },
+    {
+      "id": "recolher_santissimo",
+      "titulo": "Materiais para recolher o Santíssimo",
+      "descricao": "Separar antes pelos nrs 03 e 04.",
+      "itens": [
+        "Âmbula bojuda com o véu",
+        "Almofada",
+        "Véu para o ostensório",
+        "Corporal para a almofada",
+        "Mini lavabo",
+        "Manustérgio"
+      ]
+    },
+    {
+      "id": "preparo_purificacao",
+      "titulo": "Preparo da purificação na Capela",
+      "descricao": "Preparado pelos nrs 9, 10, 11 e 12 junto aos que recolhem.",
+      "itens": [
+        "Caixas de madeira com a quantidade de âmbulas definida pelos auxiliares",
+        "Corporal (novos e compridos — não precisa colocar sanguíneo por baixo)",
+        "Manustérgios",
+        "Véu",
+        "Sanguíneos",
+        "Purificar a tampa do cibório ao abri-lo (pode ser no final, mas não esquecer)",
+        "Secar o mini lavabo com o sanguíneo após o uso"
+      ]
+    },
+    {
+      "id": "cuidados_materiais",
+      "titulo": "Cuidados com os materiais litúrgicos",
+      "descricao": "Conservação das alfaias e objetos sagrados.",
+      "itens": [
+        "Sempre com as mãos limpas",
+        "Lavar as mãos após preparar a credência e a Capela (suor e poeira escurecem os manustérgios)",
+        "Cuidado com galhetas, cálice, patena e âmbulas",
+        "Não usar mais álcool para higienizar âmbulas (deixa ofuscadas/meladas)",
+        "Polir as âmbulas a cada dois meses para manter o brilho"
+      ]
+    },
+    {
+      "id": "credencia_altar",
+      "titulo": "Credência e montagem do altar",
+      "descricao": "Todos ajudam; auxiliares coordenam.",
+      "itens": [
+        "Seguir a sequência de montagem da credência já conhecida",
+        "Deixar somente o material que realmente será usado",
+        "Não mudar o que o padre e o diácono estão acostumados",
+        "Véu nas âmbulas: somente nas missas com o Pe. Flávio",
+        "Ser dinâmico; quem não for auxiliar também ajuda",
+        "Observar sempre o que o padre está necessitando"
+      ]
+    }
+  ]
+}

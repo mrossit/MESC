@@ -1,0 +1,40 @@
+{
+  "cores_liturgicas": [
+    {
+      "cor": "Branco",
+      "hex": "#f6f3ea",
+      "simbolismo": "Pureza",
+      "uso": "Tempos do Natal e da Páscoa; comemorações de Nosso Senhor (exceto as da Paixão), da Virgem Maria, dos Anjos e dos Santos não-mártires."
+    },
+    {
+      "cor": "Vermelho",
+      "hex": "#a1241f",
+      "simbolismo": "Fogo da caridade",
+      "uso": "Paixão do Senhor, Domingo de Pentecostes, festas dos Apóstolos e Evangelistas, celebrações dos Santos Mártires."
+    },
+    {
+      "cor": "Verde",
+      "hex": "#3f7d4e",
+      "simbolismo": "Esperança",
+      "uso": "Maior parte do ano, no Tempo Comum."
+    },
+    {
+      "cor": "Roxo",
+      "hex": "#5b3a72",
+      "simbolismo": "Penitência",
+      "uso": "Advento, e nos ofícios e missas pelos mortos."
+    },
+    {
+      "cor": "Preto",
+      "hex": "#1c1c1c",
+      "simbolismo": "Luto",
+      "uso": "Pode ser usado nas missas pelos mortos."
+    },
+    {
+      "cor": "Rosa",
+      "hex": "#d98aa6",
+      "simbolismo": "Alegria",
+      "uso": "Pode ser usado no III Domingo do Advento e no IV Domingo da Quaresma."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "nota": "A jaculatória recebe esse nome porque parece um jato ('jaculum', em latim, quer dizer 'jato') que lançamos a Deus do fundo do coração. As orações abaixo são rezadas pelos nrs 03 e 04 ao recolher o Santíssimo, com os demais acompanhando durante a procissão à Capela.",
+  "oracoes": [
+    {
+      "id": "jaculatoria_louvores",
+      "titulo": "Jaculatória de louvor (3x)",
+      "repeticoes": 3,
+      "texto": "Graças e louvores sejam dados a todo momento ao Santíssimo e Diviníssimo Sacramento.",
+      "complemento": "Glória ao Pai, ao Filho e ao Espírito Santo, como era no princípio, agora e sempre. Amém."
+    },
+    {
+      "id": "oracao_anjo_portugal",
+      "titulo": "Oração do Anjo de Portugal (3x)",
+      "repeticoes": 3,
+      "texto": "Meu Deus, eu creio, adoro, espero e amo-Vos. Peço-Vos perdão por aqueles que não creem, não adoram, não esperam e não Vos amam."
+    },
+    {
+      "id": "oracao_reparacao",
+      "titulo": "Oração de reparação (Santíssima Trindade)",
+      "repeticoes": 1,
+      "texto": "Santíssima Trindade, Pai, Filho e Espírito Santo, adoro-Vos profundamente e ofereço-Vos o preciosíssimo Corpo, Sangue, Alma e Divindade de Jesus Cristo, presente em todos os sacrários da terra, em reparação dos ultrajes, sacrilégios e indiferenças com que Ele mesmo é ofendido. E pelos méritos infinitos do Seu Santíssimo Coração e do Coração Imaculado de Maria, peço-Vos a conversão dos pobres pecadores. Amém."
+    },
+    {
+      "id": "encerramento_capela",
+      "titulo": "Encerramento na Capela",
+      "repeticoes": 1,
+      "texto": "Estivemos e continuaremos reunidos em nome do Pai, do Filho e do Espírito Santo. Amém."
+    }
+  ],
+  "oracao_na_roda": "No momento da roda de orientações, reza-se UMA oração de proteção do servir: uma Ave-Maria, OU um Pai-Nosso, OU um Vinde Espírito Santo. As entregas (padre, assembleia, intenções) são feitas na Capela, enquanto se recolhe Jesus."
+}

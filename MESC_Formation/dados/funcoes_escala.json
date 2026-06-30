@@ -1,0 +1,203 @@
+{
+  "descricao": "Funções da escala dos Ministros Extraordinários da Sagrada Comunhão (MESC) no Santuário São Judas Tadeu. Cada número da escala corresponde a um conjunto de responsabilidades. Em missas maiores (10h, 19h, Cura e Libertação) os Auxiliares 1 e 2 distribuem funções adicionais conforme a necessidade.",
+  "fase_legenda": {
+    "preparacao": "Antes da Missa",
+    "durante": "Durante a Missa",
+    "encerramento": "Após a Comunhão / fim da Missa"
+  },
+  "funcoes": [
+    {
+      "numero": 1,
+      "papel": "Auxiliar 1",
+      "categoria": "auxiliar",
+      "resumo": "Líder do horário da Missa.",
+      "responsabilidades": [
+        "Comanda todos os ministros e distribui as funções do dia.",
+        "É o elo com a Liturgia e com os acólitos.",
+        "Decide o número de partículas a consagrar e quantas âmbulas serão montadas.",
+        "Pode alterar posições para o melhor andamento do serviço.",
+        "Junto com o nr 02, é o único que pode sair do altar em caso de necessidade.",
+        "Faz o checklist de tudo antes da Missa."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 2,
+      "papel": "Auxiliar 2",
+      "categoria": "auxiliar",
+      "resumo": "Serve diretamente com o Auxiliar 1 no controle da Missa.",
+      "responsabilidades": [
+        "Ajuda o nr 01 no controle da Missa.",
+        "Coloca a folha de música para o padre.",
+        "Apoia na distribuição de funções e no checklist."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 3,
+      "papel": "Recolher o Santíssimo",
+      "categoria": "santissimo",
+      "resumo": "Recolhe o Santíssimo e prepara o material da Capela.",
+      "responsabilidades": [
+        "Prepara e recolhe o Santíssimo: separa almofada e corporal para embalar o ostensório, corporal e véu para embalar a âmbula.",
+        "Prepara o material levado à Capela: caixas, âmbulas, corporal, manustérgio, sanguíneos, véu e toalhas (guardar no armário da Capela).",
+        "Faz a jaculatória e as orações de recolhimento junto ao nr 04.",
+        "Ao término da Missa, fica com os nrs 1 e 2 para guardar o material na Sacristia."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 4,
+      "papel": "Recolher o Santíssimo",
+      "categoria": "santissimo",
+      "resumo": "Recolhe o Santíssimo junto ao nr 03.",
+      "responsabilidades": [
+        "Prepara e recolhe o Santíssimo junto ao nr 03.",
+        "Reza a jaculatória e as orações da Capela.",
+        "Distribui os pãezinhos para as crianças na escada em frente ao altar.",
+        "A purificação deve ser feita sobre o corporal; deixar os mini sanguíneos junto no altar."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 5,
+      "papel": "Velas",
+      "categoria": "velas",
+      "resumo": "Responsável pelas velas, castiçais e cruz do altar.",
+      "responsabilidades": [
+        "Coloca simetricamente no altar os castiçais, as velas e a cruz.",
+        "Acende as velas cerca de 15 minutos antes da Missa.",
+        "Ao final da Missa, recolhe e guarda as velas (caixa no armário da Sacristia).",
+        "Após o término, troca as velas e prepara para a exposição do Santíssimo."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 6,
+      "papel": "Velas",
+      "categoria": "velas",
+      "resumo": "Responsável pelas velas junto ao nr 05.",
+      "responsabilidades": [
+        "Coloca simetricamente castiçais, velas e cruz no altar.",
+        "Recolhe e guarda as velas ao final da Missa.",
+        "Após recolher o Santíssimo, pode voltar para a troca das velas."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 7,
+      "papel": "Fila do padre / Adoração",
+      "categoria": "apoio",
+      "resumo": "Cuida da fila de atendimento do padre.",
+      "responsabilidades": [
+        "Responsável por cuidar da fila de atendimento do padre.",
+        "Nas missas das 08h, fica em Adoração ao Santíssimo das 07:00 às 07:30, quando o Santíssimo é recolhido.",
+        "À noite, após a exposição do Santíssimo, entra em Adoração até as 21:00, quando chega o Adorador."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 8,
+      "papel": "Fila do padre / Adoração",
+      "categoria": "apoio",
+      "resumo": "Cuida da fila de atendimento do padre junto ao nr 07.",
+      "responsabilidades": [
+        "Responsável por cuidar da fila de atendimento do padre.",
+        "Mesmos turnos de Adoração do nr 07."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 9,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purifica as âmbulas e expõe o Santíssimo.",
+      "responsabilidades": [
+        "Após a Missa, purifica as âmbulas com zelo e em silêncio.",
+        "Prepara o material para purificar: caixas de madeira com a quantidade de âmbulas definida pelos auxiliares, corporal, manustérgios, véu e sanguíneos.",
+        "Recolhe todo o material da Capela e, junto aos nrs 13, 14 e 15, leva para a Sacristia.",
+        "Expõe o Santíssimo na presença de todos."
+      ],
+      "fases": ["encerramento"]
+    },
+    {
+      "numero": 10,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purificação junto aos nrs 9, 11 e 12.",
+      "responsabilidades": [
+        "Combina entre os colegas quem coloca as comunhões no cibório, quem purifica e quem guarda nas caixas.",
+        "Cuida com respeito e silêncio das âmbulas e manustérgios."
+      ],
+      "fases": ["encerramento"]
+    },
+    {
+      "numero": 11,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purificação junto aos nrs 9, 10 e 12.",
+      "responsabilidades": [
+        "Purifica âmbulas e recolhe o material da Capela.",
+        "Os homens levam as caixas para a Sacristia."
+      ],
+      "fases": ["encerramento"]
+    },
+    {
+      "numero": 12,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purificação; fecha o portão da Sacristia.",
+      "responsabilidades": [
+        "Purifica âmbulas e recolhe o material da Capela.",
+        "Responsável por fechar o portão da Sacristia antes de recolher o Santíssimo.",
+        "Guardar a chave do Sacrário no armário da Sacristia; conferir o jaleco antes de ir embora."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 13,
+      "papel": "Mezanino",
+      "categoria": "mezanino",
+      "resumo": "Serve a comunhão no mezanino.",
+      "responsabilidades": [
+        "Sai na hora do 'Cordeiro de Deus' e sobe ao mezanino para distribuir a comunhão.",
+        "Ao final, ajuda a levar o material para a Sacristia."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 14,
+      "papel": "Mezanino",
+      "categoria": "mezanino",
+      "resumo": "Serve a comunhão no mezanino junto ao nr 13.",
+      "responsabilidades": [
+        "Sai na hora do 'Cordeiro de Deus' e sobe ao mezanino.",
+        "Ajuda a levar o material para a Sacristia."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 15,
+      "papel": "Mezanino",
+      "categoria": "mezanino",
+      "resumo": "Serve a comunhão no mezanino junto aos nrs 13 e 14.",
+      "responsabilidades": [
+        "Sai na hora do 'Cordeiro de Deus' e sobe ao mezanino.",
+        "Ajuda a levar o material para a Sacristia."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 16,
+      "papel": "Liturgia (missas cheias)",
+      "categoria": "extra",
+      "resumo": "Nas missas das 10h, a Liturgia entra como 16º ministro.",
+      "responsabilidades": [
+        "Nas missas das 10h, quem estiver na Liturgia do dia entra como 16º ministro, por causa do aglomerado nos corredores em frente à Capela.",
+        "Em missas maiores, os Auxiliares 1 e 2 distribuem demais funções conforme a necessidade."
+      ],
+      "fases": ["durante"]
+    }
+  ],
+  "observacao_geral": "Independente da função, todos ajudam a montar a credência (água nas jarras, taças, ambão, sineta, montagem do cálice). Os auxiliares coordenam para que o trabalho fique leve e não pese sobre um só — somos um grupo."
+}

@@ -1,0 +1,52 @@
+{
+  "capacidade_igreja": 1200,
+  "regra_calculo_particulas": "O número de partículas a consagrar segue a capacidade da igreja (1200 lugares). A missa das 10h costuma ser a mais cheia, por isso consagra-se mais; às 19h conta-se com 1200. Os Auxiliares 1 e 2 confirmam a quantidade do dia.",
+  "horarios": {
+    "domingo": ["08:00", "10:00", "19:00"],
+    "diaria": ["06:30 (06:30 às 07:00)"],
+    "sao_judas_tadeu_dia_28": {
+      "dia_de_semana": ["07:00", "15:00", "19:30"],
+      "sabado": ["07:00", "15:00", "19:00"],
+      "domingo": ["08:00", "10:00", "15:00", "19:00"]
+    },
+    "cura_e_libertacao": "1ª quinta-feira do mês — 19:30",
+    "sagrado_coracao_de_jesus": "1ª sexta-feira do mês — 06:30",
+    "sagrado_coracao_de_maria": "1º sábado do mês — 06:30"
+  },
+  "adoracao_ao_santissimo": "Segundas-feiras, das 22:00 às 23:00 e das 23:00 às 00:00.",
+  "antecedencia_chegada": {
+    "missa_comum": "1 hora antes",
+    "missa_diaria": "45 minutos antes",
+    "cura_e_libertacao": "1h30 antes"
+  },
+  "escala_por_missa": [
+    {
+      "missa": "Domingo 08:00",
+      "ministros": 15,
+      "eucaristias": 1200,
+      "mapa": "assets/mapa-missa-domingo.png",
+      "observacao": "Escala base de 15 ministros."
+    },
+    {
+      "missa": "Domingo 10:00",
+      "ministros": 18,
+      "eucaristias": 1400,
+      "mapa": "assets/mapa-missa-domingo.png",
+      "observacao": "Missa mais cheia; a Liturgia entra como 16º ministro."
+    },
+    {
+      "missa": "Domingo 19:00",
+      "ministros": 20,
+      "eucaristias": 1400,
+      "mapa": "assets/mapa-missa-domingo.png",
+      "observacao": "Auxiliares distribuem funções adicionais."
+    },
+    {
+      "missa": "Cura e Libertação",
+      "ministros": 26,
+      "eucaristias": 2500,
+      "mapa": "assets/mapa-missa-cura.png",
+      "observacao": "Todos saem do altar após a Consagração (e não após o Pai Nosso)."
+    }
+  ]
+}

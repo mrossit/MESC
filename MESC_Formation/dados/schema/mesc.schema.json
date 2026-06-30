@@ -1,0 +1,232 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mesc.saojudas/schema/mesc.schema.json",
+  "title": "MESC — esquema dos dados de conteúdo",
+  "description": "Esquema dos arquivos em dados/. Cada $def corresponde a um arquivo JSON. Os arquivos são a fonte da verdade do conteúdo do app.",
+  "$defs": {
+    "manifest": {
+      "type": "object",
+      "required": ["titulo", "subtitulo", "versao", "descricao", "modulos"],
+      "additionalProperties": false,
+      "properties": {
+        "titulo": { "type": "string" },
+        "subtitulo": { "type": "string" },
+        "versao": { "type": "string" },
+        "descricao": { "type": "string" },
+        "modulos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "titulo", "icone", "resumo", "conteudo", "secoes"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "titulo": { "type": "string" },
+              "icone": { "type": "string" },
+              "resumo": { "type": "string" },
+              "conteudo": { "type": "string" },
+              "dados": { "type": "array", "items": { "type": "string" } },
+              "secoes": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "funcoes_escala": {
+      "type": "object",
+      "required": ["descricao", "fase_legenda", "funcoes", "observacao_geral"],
+      "additionalProperties": false,
+      "properties": {
+        "descricao": { "type": "string" },
+        "fase_legenda": {
+          "type": "object",
+          "required": ["preparacao", "durante", "encerramento"],
+          "additionalProperties": false,
+          "properties": {
+            "preparacao": { "type": "string" },
+            "durante": { "type": "string" },
+            "encerramento": { "type": "string" }
+          }
+        },
+        "funcoes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["numero", "papel", "categoria", "resumo", "responsabilidades", "fases"],
+            "additionalProperties": false,
+            "properties": {
+              "numero": { "type": "integer", "minimum": 1 },
+              "papel": { "type": "string" },
+              "categoria": {
+                "type": "string",
+                "enum": ["auxiliar", "santissimo", "velas", "apoio", "purificacao", "mezanino", "extra"]
+              },
+              "resumo": { "type": "string" },
+              "responsabilidades": { "type": "array", "items": { "type": "string" } },
+              "fases": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["preparacao", "durante", "encerramento"] }
+              }
+            }
+          }
+        },
+        "observacao_geral": { "type": "string" }
+      }
+    },
+    "missas_e_particulas": {
+      "type": "object",
+      "required": ["capacidade_igreja", "regra_calculo_particulas", "horarios", "adoracao_ao_santissimo", "antecedencia_chegada", "escala_por_missa"],
+      "additionalProperties": false,
+      "properties": {
+        "capacidade_igreja": { "type": "integer" },
+        "regra_calculo_particulas": { "type": "string" },
+        "horarios": {
+          "type": "object",
+          "required": ["domingo", "diaria", "sao_judas_tadeu_dia_28", "cura_e_libertacao", "sagrado_coracao_de_jesus", "sagrado_coracao_de_maria"],
+          "additionalProperties": false,
+          "properties": {
+            "domingo": { "type": "array", "items": { "type": "string" } },
+            "diaria": { "type": "array", "items": { "type": "string" } },
+            "sao_judas_tadeu_dia_28": {
+              "type": "object",
+              "required": ["dia_de_semana", "sabado", "domingo"],
+              "additionalProperties": false,
+              "properties": {
+                "dia_de_semana": { "type": "array", "items": { "type": "string" } },
+                "sabado": { "type": "array", "items": { "type": "string" } },
+                "domingo": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "cura_e_libertacao": { "type": "string" },
+            "sagrado_coracao_de_jesus": { "type": "string" },
+            "sagrado_coracao_de_maria": { "type": "string" }
+          }
+        },
+        "adoracao_ao_santissimo": { "type": "string" },
+        "antecedencia_chegada": {
+          "type": "object",
+          "required": ["missa_comum", "missa_diaria", "cura_e_libertacao"],
+          "additionalProperties": false,
+          "properties": {
+            "missa_comum": { "type": "string" },
+            "missa_diaria": { "type": "string" },
+            "cura_e_libertacao": { "type": "string" }
+          }
+        },
+        "escala_por_missa": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["missa", "ministros", "eucaristias", "mapa", "observacao"],
+            "additionalProperties": false,
+            "properties": {
+              "missa": { "type": "string" },
+              "ministros": { "type": "integer" },
+              "eucaristias": { "type": "integer" },
+              "mapa": { "type": "string" },
+              "observacao": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "checklists": {
+      "type": "object",
+      "required": ["checklists"],
+      "additionalProperties": false,
+      "properties": {
+        "checklists": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "titulo", "descricao", "itens"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "titulo": { "type": "string" },
+              "descricao": { "type": "string" },
+              "itens": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "oracoes": {
+      "type": "object",
+      "required": ["nota", "oracoes", "oracao_na_roda"],
+      "additionalProperties": false,
+      "properties": {
+        "nota": { "type": "string" },
+        "oracoes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "titulo", "repeticoes", "texto"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "titulo": { "type": "string" },
+              "repeticoes": { "type": "integer", "minimum": 1 },
+              "texto": { "type": "string" },
+              "complemento": { "type": "string" }
+            }
+          }
+        },
+        "oracao_na_roda": { "type": "string" }
+      }
+    },
+    "cores_e_tempos": {
+      "type": "object",
+      "required": ["cores_liturgicas"],
+      "additionalProperties": false,
+      "properties": {
+        "cores_liturgicas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["cor", "hex", "simbolismo", "uso"],
+            "additionalProperties": false,
+            "properties": {
+              "cor": { "type": "string" },
+              "hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "simbolismo": { "type": "string" },
+              "uso": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "glossario_liturgico": {
+      "type": "object",
+      "required": ["espaco_celebrativo", "vestes", "objetos", "montagem_calice"],
+      "additionalProperties": false,
+      "properties": {
+        "espaco_celebrativo": { "$ref": "#/$defs/_listaTermos" },
+        "vestes": { "$ref": "#/$defs/_listaTermos" },
+        "objetos": { "$ref": "#/$defs/_listaTermos" },
+        "montagem_calice": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "_listaTermos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["termo", "definicao"],
+        "additionalProperties": false,
+        "properties": {
+          "termo": { "type": "string" },
+          "definicao": { "type": "string" }
+        }
+      }
+    }
+  },
+  "_mapaArquivos": {
+    "dados/manifest.json": "#/$defs/manifest",
+    "dados/funcoes_escala.json": "#/$defs/funcoes_escala",
+    "dados/missas_e_particulas.json": "#/$defs/missas_e_particulas",
+    "dados/checklists.json": "#/$defs/checklists",
+    "dados/oracoes.json": "#/$defs/oracoes",
+    "dados/cores_e_tempos.json": "#/$defs/cores_e_tempos",
+    "dados/glossario_liturgico.json": "#/$defs/glossario_liturgico"
+  }
+}

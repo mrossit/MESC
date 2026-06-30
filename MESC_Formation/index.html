@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MESC · Formação dos Ministros — Santuário São Judas Tadeu</title>
+<style>
+  :root{
+    --bg:#f7f4ee; --panel:#fffdf9; --ink:#2b2622; --muted:#7a7167;
+    --line:#e7dfd1; --gold:#b08735; --gold-soft:#e9dcc0; --wine:#7a2230;
+    --green:#3f7d4e; --shadow:0 2px 14px rgba(60,45,20,.08);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--wine)}
+  /* layout */
+  .app{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
+  /* sidebar */
+  aside{background:var(--panel);border-right:1px solid var(--line);position:sticky;top:0;height:100vh;overflow-y:auto;padding:0}
+  .brand{padding:22px 22px 16px;border-bottom:1px solid var(--line)}
+  .brand .cross{color:var(--gold);font-size:26px;line-height:1}
+  .brand h1{font-family:var(--serif);font-size:18px;margin:8px 0 2px;font-weight:600;letter-spacing:.2px}
+  .brand p{margin:0;font-size:12px;color:var(--muted)}
+  .brand .ver{display:inline-block;margin-top:8px;font-size:10.5px;color:var(--gold);border:1px solid var(--gold-soft);border-radius:20px;padding:2px 9px}
+  nav{padding:10px 12px 30px}
+  nav button.navitem{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+    font-family:var(--sans);font-size:13.5px;color:var(--ink);padding:9px 12px;border-radius:9px;margin:1px 0;transition:.15s}
+  nav button.navitem:hover{background:#f3ecdd}
+  nav button.navitem.active{background:var(--gold-soft);color:#5a4413;font-weight:600}
+  nav .ic{width:22px;text-align:center;font-size:15px;color:var(--gold)}
+  nav .navitem.active .ic{color:#8a6a1e}
+  nav .grouplabel{font-size:10.5px;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted);padding:14px 14px 5px}
+  /* main */
+  main{min-width:0}
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(247,244,238,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);padding:12px 28px;display:flex;align-items:center;gap:14px}
+  .menu-toggle{display:none;background:none;border:1px solid var(--line);border-radius:8px;font-size:18px;padding:4px 10px;cursor:pointer}
+  .search{flex:1;position:relative;max-width:520px}
+  .search input{width:100%;padding:9px 14px 9px 38px;border:1px solid var(--line);border-radius:10px;background:var(--panel);
+    font-family:var(--sans);font-size:14px;color:var(--ink)}
+  .search input:focus{outline:none;border-color:var(--gold)}
+  .search .mag{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+  .content{padding:34px 44px 80px;max-width:920px}
+  /* search results */
+  #searchResults{display:none}
+  .sr{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:10px 0;cursor:pointer;box-shadow:var(--shadow)}
+  .sr:hover{border-color:var(--gold)}
+  .sr .mod{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px}
+  .sr h4{margin:3px 0 5px;font-family:var(--serif)}
+  .sr p{margin:0;font-size:13.5px;color:var(--muted)}
+  mark{background:#f6e6b8;color:inherit;padding:0 2px;border-radius:3px}
+  /* typography of rendered content */
+  .doc h1{font-family:var(--serif);font-size:30px;font-weight:600;margin:0 0 6px;line-height:1.2}
+  .doc .kicker{color:var(--gold);font-size:12px;text-transform:uppercase;letter-spacing:1.6px;margin-bottom:18px;font-weight:600}
+  .doc h2{font-family:var(--serif);font-size:22px;font-weight:600;margin:34px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
+  .doc h3{font-family:var(--serif);font-size:17px;font-weight:600;margin:22px 0 6px;color:#473f36}
+  .doc p{margin:11px 0}
+  .doc ul{margin:11px 0;padding-left:22px}
+  .doc li{margin:5px 0}
+  .doc blockquote{margin:16px 0;padding:12px 18px;background:#fbf6ea;border-left:3px solid var(--gold);border-radius:0 8px 8px 0;color:#5f564a;font-size:14.5px}
+  .doc blockquote em{font-style:italic}
+  .doc table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13.5px;background:var(--panel);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  .doc th{background:var(--gold-soft);text-align:left;padding:9px 12px;font-weight:600;color:#5a4413}
+  .doc td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+  .doc code{background:#efe7d6;padding:1px 6px;border-radius:5px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  hr.div{border:none;border-top:1px solid var(--line);margin:30px 0}
+  /* cards / widgets */
+  .grid{display:grid;gap:14px}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));margin:16px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
+  .fnum{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;
+    background:var(--wine);color:#fff;font-family:var(--serif);font-weight:600;font-size:15px;margin-bottom:8px}
+  .card h4{margin:2px 0 4px;font-family:var(--serif);font-size:16px}
+  .card .role{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
+  .card .sum{font-size:13px;color:var(--muted);margin:7px 0 0}
+  .card ul{margin:8px 0 0;padding-left:18px;font-size:12.8px;color:#4a433a}
+  .tag{display:inline-block;font-size:10px;background:#eef3ec;color:var(--green);border-radius:20px;padding:2px 8px;margin:6px 4px 0 0}
+  .tag.p{background:#fdeede;color:#9a5a1a}.tag.d{background:#e9eef6;color:#365a96}.tag.e{background:#f6e9ee;color:var(--wine)}
+  .filterbar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:20px;padding:6px 14px;font-size:12.5px;cursor:pointer;color:var(--muted)}
+  .chip.on{background:var(--wine);color:#fff;border-color:var(--wine)}
+  /* checklist */
+  .checklist{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 6px 10px;margin:14px 0;box-shadow:var(--shadow)}
+  .checklist .clh{padding:12px 14px 4px}.checklist .clh h4{margin:0;font-family:var(--serif);font-size:16px}
+  .checklist .clh p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+  .clitem{display:flex;gap:11px;align-items:flex-start;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px}
+  .clitem:hover{background:#faf5ea}
+  .clitem input{margin-top:3px;width:17px;height:17px;accent-color:var(--gold);flex:none}
+  .clitem.done span{text-decoration:line-through;color:var(--muted)}
+  .reset{font-size:12px;color:var(--gold);background:none;border:none;cursor:pointer;margin:4px 0 0 10px}
+  /* calculator */
+  .calc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0;box-shadow:var(--shadow)}
+  .calc label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+  .calc input,.calc select{padding:9px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:var(--sans)}
+  .calc .out{margin-top:14px;font-family:var(--serif);font-size:15px}
+  .calc .out b{font-size:26px;color:var(--wine)}
+  /* color swatches */
+  .swatch{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+  .swatch:first-child{border-top:none}
+  .dot{width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,0,0,.12);flex:none}
+  .swatch b{font-family:var(--serif)} .swatch small{color:var(--muted)}
+  /* maps */
+  .mapwrap{margin:16px 0}
+  .mapwrap img{max-width:100%;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:#fff}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:6px}
+  /* prayer */
+  .prayer{background:linear-gradient(180deg,#fffdf8,#fbf5e9);border:1px solid var(--gold-soft);border-radius:12px;padding:16px 18px;margin:12px 0}
+  .prayer .rep{float:right;font-size:11px;background:var(--gold);color:#fff;border-radius:20px;padding:2px 9px}
+  .prayer h4{margin:0 0 6px;font-family:var(--serif)}
+  .prayer p{margin:0;font-style:italic;color:#4a4035}
+  .footnote{font-size:12px;color:var(--muted);margin-top:40px;border-top:1px solid var(--line);padding-top:16px}
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr}
+    aside{position:fixed;left:0;top:0;width:280px;z-index:50;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.2)}
+    aside.open{transform:translateX(0)}
+    .menu-toggle{display:block}
+    .content{padding:22px 18px 70px}
+    .doc h1{font-size:25px}
+    .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40}
+    .scrim.show{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="cross">✝</div>
+      <h1 id="brandTitle">Formação dos MESC</h1>
+      <p id="brandSub">Santuário São Judas Tadeu</p>
+      <span class="ver" id="brandVer">versão</span>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <main>
+    <div class="topbar">
+      <button class="menu-toggle" id="menuToggle" aria-label="menu">☰</button>
+      <div class="search">
+        <span class="mag">🔍</span>
+        <input id="searchInput" type="search" placeholder="Buscar em todo o material (funções, orações, objetos…)" autocomplete="off">
+      </div>
+    </div>
+    <div class="content">
+      <div id="searchResults"></div>
+      <div id="doc" class="doc"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ DADOS (JSON) ============ -->
+<script type="application/json" id="data-manifest">
+{"titulo":"Formação dos Ministros Extraordinários da Sagrada Comunhão","subtitulo":"Santuário São Judas Tadeu","versao":"2026.1 (renovado)"}
+</script>
+
+<script type="application/json" id="data-funcoes">
+{
+  "descricao": "Funções da escala dos Ministros Extraordinários da Sagrada Comunhão (MESC) no Santuário São Judas Tadeu. Cada número da escala corresponde a um conjunto de responsabilidades. Em missas maiores (10h, 19h, Cura e Libertação) os Auxiliares 1 e 2 distribuem funções adicionais conforme a necessidade.",
+  "fase_legenda": {
+    "preparacao": "Antes da Missa",
+    "durante": "Durante a Missa",
+    "encerramento": "Após a Comunhão / fim da Missa"
+  },
+  "funcoes": [
+    {
+      "numero": 1,
+      "papel": "Auxiliar 1",
+      "categoria": "auxiliar",
+      "resumo": "Líder do horário da Missa.",
+      "responsabilidades": [
+        "Comanda todos os ministros e distribui as funções do dia.",
+        "É o elo com a Liturgia e com os acólitos.",
+        "Decide o número de partículas a consagrar e quantas âmbulas serão montadas.",
+        "Pode alterar posições para o melhor andamento do serviço.",
+        "Junto com o nr 02, é o único que pode sair do altar em caso de necessidade.",
+        "Faz o checklist de tudo antes da Missa."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 2,
+      "papel": "Auxiliar 2",
+      "categoria": "auxiliar",
+      "resumo": "Serve diretamente com o Auxiliar 1 no controle da Missa.",
+      "responsabilidades": [
+        "Ajuda o nr 01 no controle da Missa.",
+        "Coloca a folha de música para o padre.",
+        "Apoia na distribuição de funções e no checklist."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 3,
+      "papel": "Recolher o Santíssimo",
+      "categoria": "santissimo",
+      "resumo": "Recolhe o Santíssimo e prepara o material da Capela.",
+      "responsabilidades": [
+        "Prepara e recolhe o Santíssimo: separa almofada e corporal para embalar o ostensório, corporal e véu para embalar a âmbula.",
+        "Prepara o material levado à Capela: caixas, âmbulas, corporal, manustérgio, sanguíneos, véu e toalhas (guardar no armário da Capela).",
+        "Faz a jaculatória e as orações de recolhimento junto ao nr 04.",
+        "Ao término da Missa, fica com os nrs 1 e 2 para guardar o material na Sacristia."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 4,
+      "papel": "Recolher o Santíssimo",
+      "categoria": "santissimo",
+      "resumo": "Recolhe o Santíssimo junto ao nr 03.",
+      "responsabilidades": [
+        "Prepara e recolhe o Santíssimo junto ao nr 03.",
+        "Reza a jaculatória e as orações da Capela.",
+        "Distribui os pãezinhos para as crianças na escada em frente ao altar.",
+        "A purificação deve ser feita sobre o corporal; deixar os mini sanguíneos junto no altar."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 5,
+      "papel": "Velas",
+      "categoria": "velas",
+      "resumo": "Responsável pelas velas, castiçais e cruz do altar.",
+      "responsabilidades": [
+        "Coloca simetricamente no altar os castiçais, as velas e a cruz.",
+        "Acende as velas cerca de 15 minutos antes da Missa.",
+        "Ao final da Missa, recolhe e guarda as velas (caixa no armário da Sacristia).",
+        "Após o término, troca as velas e prepara para a exposição do Santíssimo."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 6,
+      "papel": "Velas",
+      "categoria": "velas",
+      "resumo": "Responsável pelas velas junto ao nr 05.",
+      "responsabilidades": [
+        "Coloca simetricamente castiçais, velas e cruz no altar.",
+        "Recolhe e guarda as velas ao final da Missa.",
+        "Após recolher o Santíssimo, pode voltar para a troca das velas."
+      ],
+      "fases": ["preparacao", "encerramento"]
+    },
+    {
+      "numero": 7,
+      "papel": "Fila do padre / Adoração",
+      "categoria": "apoio",
+      "resumo": "Cuida da fila de atendimento do padre.",
+      "responsabilidades": [
+        "Responsável por cuidar da fila de atendimento do padre.",
+        "Nas missas das 08h, fica em Adoração ao Santíssimo das 07:00 às 07:30, quando o Santíssimo é recolhido.",
+        "À noite, após a exposição do Santíssimo, entra em Adoração até as 21:00, quando chega o Adorador."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 8,
+      "papel": "Fila do padre / Adoração",
+      "categoria": "apoio",
+      "resumo": "Cuida da fila de atendimento do padre junto ao nr 07.",
+      "responsabilidades": [
+        "Responsável por cuidar da fila de atendimento do padre.",
+        "Mesmos turnos de Adoração do nr 07."
+      ],
+      "fases": ["preparacao", "durante", "encerramento"]
+    },
+    {
+      "numero": 9,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purifica as âmbulas e expõe o Santíssimo.",
+      "responsabilidades": [
+        "Após a Missa, purifica as âmbulas com zelo e em silêncio.",
+        "Prepara o material para purificar: caixas de madeira com a quantidade de âmbulas definida pelos auxiliares, corporal, manustérgios, véu e sanguíneos.",
+        "Recolhe todo o material da Capela e, junto aos nrs 13, 14 e 15, leva para a Sacristia.",
+        "Expõe o Santíssimo na presença de todos."
+      ],
+      "fases": ["encerramento"]
+    },
+    {
+      "numero": 10,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purificação junto aos nrs 9, 11 e 12.",
+      "responsabilidades": [
+        "Combina entre os colegas quem coloca as comunhões no cibório, quem purifica e quem guarda nas caixas.",
+        "Cuida com respeito e silêncio das âmbulas e manustérgios."
+      ],
+      "fases": ["encerramento"]
+    },
+    {
+      "numero": 11,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purificação junto aos nrs 9, 10 e 12.",
+      "responsabilidades": [
+        "Purifica âmbulas e recolhe o material da Capela.",
+        "Os homens levam as caixas para a Sacristia."
+      ],
+      "fases": ["encerramento"]
+    },
+    {
+      "numero": 12,
+      "papel": "Purificação e Exposição",
+      "categoria": "purificacao",
+      "resumo": "Purificação; fecha o portão da Sacristia.",
+      "responsabilidades": [
+        "Purifica âmbulas e recolhe o material da Capela.",
+        "Responsável por fechar o portão da Sacristia antes de recolher o Santíssimo.",
+        "Guardar a chave do Sacrário no armário da Sacristia; conferir o jaleco antes de ir embora."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 13,
+      "papel": "Mezanino",
+      "categoria": "mezanino",
+      "resumo": "Serve a comunhão no mezanino.",
+      "responsabilidades": [
+        "Sai na hora do 'Cordeiro de Deus' e sobe ao mezanino para distribuir a comunhão.",
+        "Ao final, ajuda a levar o material para a Sacristia."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 14,
+      "papel": "Mezanino",
+      "categoria": "mezanino",
+      "resumo": "Serve a comunhão no mezanino junto ao nr 13.",
+      "responsabilidades": [
+        "Sai na hora do 'Cordeiro de Deus' e sobe ao mezanino.",
+        "Ajuda a levar o material para a Sacristia."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 15,
+      "papel": "Mezanino",
+      "categoria": "mezanino",
+      "resumo": "Serve a comunhão no mezanino junto aos nrs 13 e 14.",
+      "responsabilidades": [
+        "Sai na hora do 'Cordeiro de Deus' e sobe ao mezanino.",
+        "Ajuda a levar o material para a Sacristia."
+      ],
+      "fases": ["durante", "encerramento"]
+    },
+    {
+      "numero": 16,
+      "papel": "Liturgia (missas cheias)",
+      "categoria": "extra",
+      "resumo": "Nas missas das 10h, a Liturgia entra como 16º ministro.",
+      "responsabilidades": [
+        "Nas missas das 10h, quem estiver na Liturgia do dia entra como 16º ministro, por causa do aglomerado nos corredores em frente à Capela.",
+        "Em missas maiores, os Auxiliares 1 e 2 distribuem demais funções conforme a necessidade."
+      ],
+      "fases": ["durante"]
+    }
+  ],
+  "observacao_geral": "Independente da função, todos ajudam a montar a credência (água nas jarras, taças, ambão, sineta, montagem do cálice). Os auxiliares coordenam para que o trabalho fique leve e não pese sobre um só — somos um grupo."
+}
+</script>
+<script type="application/json" id="data-missas">
+{
+  "capacidade_igreja": 1200,
+  "regra_calculo_particulas": "O número de partículas a consagrar segue a capacidade da igreja (1200 lugares). A missa das 10h costuma ser a mais cheia, por isso consagra-se mais; às 19h conta-se com 1200. Os Auxiliares 1 e 2 confirmam a quantidade do dia.",
+  "horarios": {
+    "domingo": ["08:00", "10:00", "19:00"],
+    "diaria": ["06:30 (06:30 às 07:00)"],
+    "sao_judas_tadeu_dia_28": {
+      "dia_de_semana": ["07:00", "15:00", "19:30"],
+      "sabado": ["07:00", "15:00", "19:00"],
+      "domingo": ["08:00", "10:00", "15:00", "19:00"]
+    },
+    "cura_e_libertacao": "1ª quinta-feira do mês — 19:30",
+    "sagrado_coracao_de_jesus": "1ª sexta-feira do mês — 06:30",
+    "sagrado_coracao_de_maria": "1º sábado do mês — 06:30"
+  },
+  "adoracao_ao_santissimo": "Segundas-feiras, das 22:00 às 23:00 e das 23:00 às 00:00.",
+  "antecedencia_chegada": {
+    "missa_comum": "1 hora antes",
+    "missa_diaria": "45 minutos antes",
+    "cura_e_libertacao": "1h30 antes"
+  },
+  "escala_por_missa": [
+    {
+      "missa": "Domingo 08:00",
+      "ministros": 15,
+      "eucaristias": 1200,
+      "mapa": "assets/mapa-missa-domingo.png",
+      "observacao": "Escala base de 15 ministros."
+    },
+    {
+      "missa": "Domingo 10:00",
+      "ministros": 18,
+      "eucaristias": 1400,
+      "mapa": "assets/mapa-missa-domingo.png",
+      "observacao": "Missa mais cheia; a Liturgia entra como 16º ministro."
+    },
+    {
+      "missa": "Domingo 19:00",
+      "ministros": 20,
+      "eucaristias": 1400,
+      "mapa": "assets/mapa-missa-domingo.png",
+      "observacao": "Auxiliares distribuem funções adicionais."
+    },
+    {
+      "missa": "Cura e Libertação",
+      "ministros": 26,
+      "eucaristias": 2500,
+      "mapa": "assets/mapa-missa-cura.png",
+      "observacao": "Todos saem do altar após a Consagração (e não após o Pai Nosso)."
+    }
+  ]
+}
+</script>
+<script type="application/json" id="data-checklists">
+{
+  "checklists": [
+    {
+      "id": "apresentacao_uniforme",
+      "titulo": "Apresentação e uniforme",
+      "descricao": "Conferir antes de sair de casa e na Sacristia. \"Somos vitrines\".",
+      "itens": [
+        "Jaleco branco (não bege), bem passado e limpo — vestir somente na Sacristia",
+        "Calça preta (homens e mulheres; não usar leggins)",
+        "Sapato/sandália preta, sem plataforma, salto seguro",
+        "Homens: camisa branca e gravata preta",
+        "Mulheres: camisa ou camiseta branca lisa (sem desenhos)",
+        "Mulheres: cabelos presos (elástico/presilha)",
+        "Mãos limpas e higienizadas; atenção a anéis e brincos",
+        "Maquiagem leve"
+      ]
+    },
+    {
+      "id": "recolher_santissimo",
+      "titulo": "Materiais para recolher o Santíssimo",
+      "descricao": "Separar antes pelos nrs 03 e 04.",
+      "itens": [
+        "Âmbula bojuda com o véu",
+        "Almofada",
+        "Véu para o ostensório",
+        "Corporal para a almofada",
+        "Mini lavabo",
+        "Manustérgio"
+      ]
+    },
+    {
+      "id": "preparo_purificacao",
+      "titulo": "Preparo da purificação na Capela",
+      "descricao": "Preparado pelos nrs 9, 10, 11 e 12 junto aos que recolhem.",
+      "itens": [
+        "Caixas de madeira com a quantidade de âmbulas definida pelos auxiliares",
+        "Corporal (novos e compridos — não precisa colocar sanguíneo por baixo)",
+        "Manustérgios",
+        "Véu",
+        "Sanguíneos",
+        "Purificar a tampa do cibório ao abri-lo (pode ser no final, mas não esquecer)",
+        "Secar o mini lavabo com o sanguíneo após o uso"
+      ]
+    },
+    {
+      "id": "cuidados_materiais",
+      "titulo": "Cuidados com os materiais litúrgicos",
+      "descricao": "Conservação das alfaias e objetos sagrados.",
+      "itens": [
+        "Sempre com as mãos limpas",
+        "Lavar as mãos após preparar a credência e a Capela (suor e poeira escurecem os manustérgios)",
+        "Cuidado com galhetas, cálice, patena e âmbulas",
+        "Não usar mais álcool para higienizar âmbulas (deixa ofuscadas/meladas)",
+        "Polir as âmbulas a cada dois meses para manter o brilho"
+      ]
+    },
+    {
+      "id": "credencia_altar",
+      "titulo": "Credência e montagem do altar",
+      "descricao": "Todos ajudam; auxiliares coordenam.",
+      "itens": [
+        "Seguir a sequência de montagem da credência já conhecida",
+        "Deixar somente o material que realmente será usado",
+        "Não mudar o que o padre e o diácono estão acostumados",
+        "Véu nas âmbulas: somente nas missas com o Pe. Flávio",
+        "Ser dinâmico; quem não for auxiliar também ajuda",
+        "Observar sempre o que o padre está necessitando"
+      ]
+    }
+  ]
+}
+</script>
+<script type="application/json" id="data-oracoes">
+{
+  "nota": "A jaculatória recebe esse nome porque parece um jato ('jaculum', em latim, quer dizer 'jato') que lançamos a Deus do fundo do coração. As orações abaixo são rezadas pelos nrs 03 e 04 ao recolher o Santíssimo, com os demais acompanhando durante a procissão à Capela.",
+  "oracoes": [
+    {
+      "id": "jaculatoria_louvores",
+      "titulo": "Jaculatória de louvor (3x)",
+      "repeticoes": 3,
+      "texto": "Graças e louvores sejam dados a todo momento ao Santíssimo e Diviníssimo Sacramento.",
+      "complemento": "Glória ao Pai, ao Filho e ao Espírito Santo, como era no princípio, agora e sempre. Amém."
+    },
+    {
+      "id": "oracao_anjo_portugal",
+      "titulo": "Oração do Anjo de Portugal (3x)",
+      "repeticoes": 3,
+      "texto": "Meu Deus, eu creio, adoro, espero e amo-Vos. Peço-Vos perdão por aqueles que não creem, não adoram, não esperam e não Vos amam."
+    },
+    {
+      "id": "oracao_reparacao",
+      "titulo": "Oração de reparação (Santíssima Trindade)",
+      "repeticoes": 1,
+      "texto": "Santíssima Trindade, Pai, Filho e Espírito Santo, adoro-Vos profundamente e ofereço-Vos o preciosíssimo Corpo, Sangue, Alma e Divindade de Jesus Cristo, presente em todos os sacrários da terra, em reparação dos ultrajes, sacrilégios e indiferenças com que Ele mesmo é ofendido. E pelos méritos infinitos do Seu Santíssimo Coração e do Coração Imaculado de Maria, peço-Vos a conversão dos pobres pecadores. Amém."
+    },
+    {
+      "id": "encerramento_capela",
+      "titulo": "Encerramento na Capela",
+      "repeticoes": 1,
+      "texto": "Estivemos e continuaremos reunidos em nome do Pai, do Filho e do Espírito Santo. Amém."
+    }
+  ],
+  "oracao_na_roda": "No momento da roda de orientações, reza-se UMA oração de proteção do servir: uma Ave-Maria, OU um Pai-Nosso, OU um Vinde Espírito Santo. As entregas (padre, assembleia, intenções) são feitas na Capela, enquanto se recolhe Jesus."
+}
+</script>
+<script type="application/json" id="data-cores">
+{
+  "cores_liturgicas": [
+    {
+      "cor": "Branco",
+      "hex": "#f6f3ea",
+      "simbolismo": "Pureza",
+      "uso": "Tempos do Natal e da Páscoa; comemorações de Nosso Senhor (exceto as da Paixão), da Virgem Maria, dos Anjos e dos Santos não-mártires."
+    },
+    {
+      "cor": "Vermelho",
+      "hex": "#a1241f",
+      "simbolismo": "Fogo da caridade",
+      "uso": "Paixão do Senhor, Domingo de Pentecostes, festas dos Apóstolos e Evangelistas, celebrações dos Santos Mártires."
+    },
+    {
+      "cor": "Verde",
+      "hex": "#3f7d4e",
+      "simbolismo": "Esperança",
+      "uso": "Maior parte do ano, no Tempo Comum."
+    },
+    {
+      "cor": "Roxo",
+      "hex": "#5b3a72",
+      "simbolismo": "Penitência",
+      "uso": "Advento, e nos ofícios e missas pelos mortos."
+    },
+    {
+      "cor": "Preto",
+      "hex": "#1c1c1c",
+      "simbolismo": "Luto",
+      "uso": "Pode ser usado nas missas pelos mortos."
+    },
+    {
+      "cor": "Rosa",
+      "hex": "#d98aa6",
+      "simbolismo": "Alegria",
+      "uso": "Pode ser usado no III Domingo do Advento e no IV Domingo da Quaresma."
+    }
+  ]
+}
+</script>
+<script type="application/json" id="data-glossario">
+{
+  "espaco_celebrativo": [
+    { "termo": "Nave", "definicao": "Corpo principal da igreja, onde se reúne a assembleia." },
+    { "termo": "Presbitério", "definicao": "Área elevada onde fica o altar e de onde se preside a celebração." },
+    { "termo": "Altar", "definicao": "Mesa onde se realiza a Ceia Eucarística; representa o próprio Jesus na Liturgia. É a mesa do sacrifício — por isso fazemos reverência a ele, e não à cruz." },
+    { "termo": "Credência", "definicao": "Mesa auxiliar onde ficam dispostos os objetos litúrgicos usados na celebração." },
+    { "termo": "Capela do Santíssimo", "definicao": "Local onde o Santíssimo Sacramento é reservado e exposto fora da Missa." },
+    { "termo": "Sacrário / Tabernáculo", "definicao": "Guarda a Eucaristia fora da Missa. Símbolo do Santo dos Santos, lugar da presença real de Cristo na Nova Aliança." }
+  ],
+  "vestes": [
+    { "termo": "Amito", "definicao": "Vestido antes da alva, sobre os ombros. Oração: 'Colocai, Senhor, na minha cabeça o elmo da salvação para que possa repelir os golpes de Satanás.'" },
+    { "termo": "Alva (Túnica)", "definicao": "Veste longa e branca usada por todos os ministros sagrados; representa a nova veste imaculada recebida no Batismo e a pureza de coração." },
+    { "termo": "Sobrepeliz", "definicao": "Pode ser usada no lugar da túnica quando o ministro está de batina; não dispensa a estola e não substitui a alva quando se usa casula (Cerimonial dos Bispos, n.65)." },
+    { "termo": "Cíngulo", "definicao": "Cordão usado como cinto sobre a alva, na cintura. Simboliza o autocontrole (fruto do Espírito). Acompanha sempre quem porta a alva." },
+    { "termo": "Estola Sacerdotal", "definicao": "Elemento distintivo do ministro ordenado; faixa de tecido cuja cor segue o tempo litúrgico. Usada sempre na celebração dos sacramentos." },
+    { "termo": "Estola Diaconal / Dalmática", "definicao": "Estola usada pelo diácono (atravessada) e a dalmática, veste própria do diácono." },
+    { "termo": "Casula", "definicao": "Veste externa do sacerdote na Missa. Formas: Gregoriana, Gótica e Romana." },
+    { "termo": "Véu Umeral", "definicao": "Usado pelo sacerdote ou diácono ao portar o Santíssimo Sacramento; protege a realidade sagrada, expressando que não se toca diretamente com as mãos." },
+    { "termo": "Pluvial (Capa de Asperges)", "definicao": "Capa usada em procissões, bênçãos e aspersões." },
+    { "termo": "Vestes Episcopais", "definicao": "Próprias do bispo: solidéu, mitra, báculo e cruz peitoral. Batinas: sacerdotal, episcopal, cardealícia e papal." }
+  ],
+  "objetos": [
+    { "termo": "Cálice", "definicao": "Taça onde se coloca o vinho que vai ser consagrado." },
+    { "termo": "Patena", "definicao": "Prato onde são colocadas as hóstias para a consagração." },
+    { "termo": "Hóstia", "definicao": "Pão eucarístico. A palavra significa 'vítima que será sacrificada'." },
+    { "termo": "Corporal", "definicao": "Pano quadrangular de linho com uma cruz no centro; sobre ele se coloca o cálice, a patena e a âmbula para a consagração." },
+    { "termo": "Sanguíneo (Purificatório)", "definicao": "Pequeno pano usado pelo celebrante para enxugar a boca, os dedos e o interior do cálice após a consagração." },
+    { "termo": "Pala", "definicao": "Cobertura quadrangular para o cálice." },
+    { "termo": "Alfaias", "definicao": "Designam todos os objetos usados no culto, como os paramentos litúrgicos (corporal, sanguíneo, pala)." },
+    { "termo": "Âmbula (Cibório)", "definicao": "Vaso sagrado que guarda as hóstias consagradas para a distribuição e a reserva eucarística." },
+    { "termo": "Véu do Cibório", "definicao": "Véu que cobre o cibório/âmbula contendo o Santíssimo." },
+    { "termo": "Galhetas", "definicao": "Recipientes onde se coloca a água e o vinho usados na Celebração Eucarística." },
+    { "termo": "Lavabo (Jarra e Bacia)", "definicao": "Conjunto para o lava-mãos do celebrante durante o ofertório." },
+    { "termo": "Manustérgio", "definicao": "Toalha usada para purificar/secar as mãos antes, durante e depois do ato litúrgico." },
+    { "termo": "Sineta (Carrilhão)", "definicao": "Sininhos tocados pelo acólito no momento da consagração." },
+    { "termo": "Turíbulo", "definicao": "Incensário. Usado na procissão de entrada, ao incensar o altar, na proclamação do Evangelho, no ofertório, à elevação após a consagração e na exposição do Santíssimo (incensado de joelhos)." },
+    { "termo": "Naveta", "definicao": "Objeto usado para guardar o incenso antes de queimá-lo no turíbulo." },
+    { "termo": "Caldeirinha e Aspersório", "definicao": "Recipiente da água benta e o instrumento usado para asperjir." },
+    { "termo": "Cruz Processional / Crucifixo do Altar", "definicao": "Cruz conduzida na procissão e o crucifixo disposto junto ao altar." },
+    { "termo": "Castiçal e Vela", "definicao": "Suporte e vela que iluminam o altar; sinal de Cristo, luz do mundo." },
+    { "termo": "Missal Romano", "definicao": "Livro com as orações e textos da celebração da Missa." },
+    { "termo": "Lecionário", "definicao": "Livro com as leituras bíblicas proclamadas na Liturgia da Palavra." },
+    { "termo": "Ostensório", "definicao": "Peça onde o Santíssimo é exposto para a adoração. Composto pela luneta, o ostensório e o trono do ostensório." },
+    { "termo": "Luneta", "definicao": "Suporte que segura a Hóstia consagrada no centro do ostensório." }
+  ],
+  "montagem_calice": [
+    "1. Cálice.",
+    "2. Colocar o sanguíneo sobre o cálice, fazendo leve pressão ao centro.",
+    "3. Colocar a patena sobre o cálice e o sanguíneo.",
+    "4. Colocar a hóstia que vai ser consagrada sobre a patena.",
+    "5. Colocar a pala.",
+    "6. Colocar o corporal.",
+    "7. Colocar o véu do cálice."
+  ]
+}
+</script>
+
+<!-- ============ CONTEÚDO (Markdown) ============ -->
+<script type="text/markdown" id="md-00">
+---
+modulo: "00-identidade"
+titulo: "Identidade do Ministério"
+---
+
+# Identidade do Ministério
+
+## O chamado: aceitei, e agora? Como será?
+
+Fomos convidados a sermos Ministros Extraordinários da Sagrada Comunhão. Entramos para um ministério que tem normas e preceitos, mas, antes de tudo, um chamado. É natural sentir nervosismo no começo — e o caminho para superá-lo é a **humildade**.
+
+Como ensina o Pe. Flávio, ser ministro não me torna melhor do que ninguém. Esta função é um **serviço**: a própria palavra *Liturgia* quer dizer "serviço". Ter humildade é também olhar com sinceridade para o meu comportamento e corrigir o que for inadequado.
+
+## Humildade e serviço
+
+O ministro está a serviço da assembleia, do celebrante e, sobretudo, de Jesus Eucarístico. Por isso somos chamados a sermos **"pontuais e invisíveis"**: presentes, atentos e discretos, sem desviar para nós a atenção que pertence ao mistério celebrado.
+
+Trabalhamos em grupo. Independentemente da função de cada um na escala, todos ajudam na preparação — montar a credência, levar a água às jarras, o ambão, a sineta, a montagem do cálice. Assim o serviço fica leve e não pesa sobre um só. Temos a consciência de que **somos um grupo**.
+
+## Apresentação do ministério
+
+Fazemos parte do **Setor Liturgia**. A coordenação atual:
+
+- **Coordenador do Setor:** Diácono Émerson
+- **Coordenadores dos Ministros a nível Paroquial:** Priscila e Marco
+- **Coordenação dos Ministros do Santuário:** Ana Paula
+- **Comunidade São Marcos:** Luís e Renata
+- **Comunidade São Josemaria Escrivá:** Lizandra e Rodrigo
+- **Coordenação dos Acólitos a nível Paroquial:** João Gabriel
+
+> Os nomes acima refletem a coordenação no momento da última revisão e devem ser atualizados conforme as mudanças do grupo.
+
+## Hierarquia
+
+**Na paróquia:**
+
+- Reitor: Pe. Flávio
+- Setor Liturgia: Diácono Émerson
+- Coordenação dos Ministros (paroquial, santuário e comunidades)
+
+**Na Missa, entre os ministros:** Coordenador de Liturgia do dia → Auxiliar 1 → Auxiliar 2. Temos a obrigação de respeitar os auxiliares, pois são eles que recebem as informações de qualquer alteração — venha ela do Coordenador de Liturgia, do Diácono ou do Padre.
+
+O **padre é o celebrante** e determina tudo na Missa. Somos ajudantes; não tomamos decisões que não nos cabem. Em caso de dúvida, a Liturgia do dia entra em contato com a coordenação.
+
+## Adoração ao Santíssimo
+
+Nosso horário de Adoração é às **segundas-feiras, das 22:00 às 00:00** (turnos das 22:00–23:00 e 23:00–00:00).
+
+> "Fomos criados para o louvor de Sua glória" (Efésios 1, 11-12). "Fazei tudo para a glória de Deus" (1Cor 10, 31).
+
+Se você não estiver na escala, deve participar da Missa de domingo no seu horário — é um preceito de ser católico.
+</script>
+<script type="text/markdown" id="md-01">
+---
+modulo: "01-formacao"
+titulo: "Formação Espiritual e Teológica"
+fonte: "Escola de Liturgia — Prof. Michel Pagiossi Silva (Imersão Litúrgica)"
+---
+
+# Formação Espiritual e Teológica
+
+> Conteúdo formativo baseado na Imersão Litúrgica do Prof. Michel Pagiossi (Escola de Liturgia), organizado em três aulas: o Calvário e a Missa, o simbolismo na Liturgia e o bom serviço litúrgico.
+
+---
+
+## Aula 1 — Encontrando o Tesouro: o Calvário e a Missa
+
+### O homem, o pecado original e a espera
+
+No início, Deus criou o homem em estado de justiça original, em amizade harmoniosa com Ele. Esse estado foi perturbado pelo pecado original, que trouxe a queda. O principal castigo foi a inimizade com Deus — privação da santidade e da justiça originais. Segundo o Catecismo (CIC 76), o pecado original é uma condição com a qual nascemos, "contraída", não "cometida", transmitida pela natureza humana "não por imitação, mas por propagação".
+
+A esperança, porém, nunca se perdeu. Em Gênesis 3, 15 Deus promete a vitória final sobre o pecado. A Santa Missa é uma **extensão do evento do Calvário**, como os ramos se estendem do tronco. No Calvário, Cristo entregou-se obedientemente ao Pai até a morte de cruz (Fl 2, 8); na Missa, participamos desse sacrifício e continuamos a obra redentora de Cristo.
+
+### Existência do Sacrifício da Missa
+
+O Sacrifício da Cruz é único, eterno, universal e perpétuo — mas o ato em si foi transitório. Por isso é conveniente e necessário prolongá-lo como **ato de culto** permanente. Embora o Sacrifício seja universal, ele precisa ser **aplicado a cada homem** de maneira imediata e individual, sobretudo pelos Sacramentos, canais divinamente instituídos que operam *ex opere operato*. O Sacrifício do Altar, de caráter propiciatório e impetratório, toma os méritos da Cruz, oferece-os ao Pai e d'Ele recebe os frutos da redenção.
+
+**Provas de sua existência:**
+
+- **Melquisedeque** — o Messias será sacerdote "segundo a ordem de Melquisedeque" (Sl 109, 4), cuja oblação é de pão e vinho (Gn 14, 18).
+- **Malaquias** — prediz uma oblação pura oferecida "do nascente ao poente" entre as nações (Ml 1, 10-11); no original, *minchach* = sacrifício incruento.
+- **Nosso Senhor** — "Fazei isto em memória de mim" (Lc 22, 19) institui a Eucaristia. Os termos *datur* ("é dado") e *effundetur* ("será derramado") enfatizam a natureza sacrificial.
+- **São Paulo** — em 1Cor 10 distingue os sacrifícios pagãos da Eucaristia, ressaltando a comunhão exclusiva com Cristo.
+
+### Essência do Sacrifício da Missa
+
+A Ceia, a morte de Jesus e a Missa formam **um só sacrifício**. Na Ceia, Nosso Senhor se oferece no pão e no vinho (oblação real, sacramental e figurativa). Na Cruz, a imolação e a oblação são reais. Na Missa, é essencialmente o mesmo Sacrifício da Cruz — o mesmo Sacerdote, a mesma Vítima — com diferença apenas acidental: já não Nosso Senhor diretamente, mas seu Ministro, que oferece uma vítima já imolada e agora gloriosa. Por isso o Concílio Vaticano II prefere o termo **"Mistério Pascal"**.
+
+### Frutos do Sacrifício
+
+A Missa é um sacrifício:
+
+- **Latrêutico** — ato supremo de adoração.
+- **Eucarístico** — hino de ação de graças pela ação de Deus na história.
+- **Satisfatório** — purificação e santificação de quem participa com fé e amor; pode aplicar-se também às almas do Purgatório.
+- **Impetratório / de súplica** — intercessão de Cristo ao Pai por nossas necessidades.
+
+Embora a Missa tenha **valor infinito** (pela dignidade de Cristo que a oferece), a aplicação desse valor é finita, limitada pela nossa capacidade de receber a graça.
+
+### Associação dos fiéis ao Sacrifício
+
+Pelo Batismo, todos os fiéis participam do **sacerdócio comum** (distinto do ministerial ordenado). Somos chamados a unir nossos próprios sacrifícios ao de Cristo. Isso exige disposição interior e intenção consciente: não somos meros espectadores, mas **co-participantes**, chamados a oferecer-nos com Ele por amor a Deus e à salvação do mundo.
+
+---
+
+## Aula 2 — Abrindo o Tesouro: o simbolismo na Liturgia
+
+A liturgia católica é uma tapeçaria de símbolos — pontes entre o divino e o humano. O simbolismo não é ornamento, mas linguagem pela qual a Igreja comunica a fé. Compreender os gestos, objetos, cores e movimentos nos permite viver a liturgia com mais intensidade.
+
+### Acessórios do altar
+
+- **Altar** — coração da celebração; mesa do Senhor e monte do Calvário (refeição e sacrifício).
+- **Velas** — luz suave que cria ambiente sagrado; refletem Cristo, luz do mundo (cada uma pode evocar um dos sete sacramentos).
+- **Tabernáculo** — guarda a Eucaristia; símbolo do Santo dos Santos, presença real de Cristo na Nova Aliança.
+- **Idiomas (latim, grego, hebraico)** — afirmam a universalidade e continuidade da Igreja (*Kyrie eleison*, *Hosana*).
+
+### Dos Ritos Iniciais ao fim da Liturgia da Palavra
+
+A **procissão de entrada** (cruz à frente) simboliza os mártires entrando no Santuário Celeste. A **Antífona de Entrada** evoca os clamores dos profetas. No **Confiteor** reconhecemos nossa indignidade; no **Kyrie**, pedimos misericórdia ao Senhor do Tempo, em três súplicas à Trindade (tríplice miséria: ignorância, culpa e pena). No **Glória**, cantamos com os anjos o nascimento místico do Senhor (omitido em ofícios fúnebres e de penitência). A **Oração do Dia** resume o espírito da Igreja.
+
+Na **Liturgia da Palavra**, sentamo-nos para ouvir. A Primeira Leitura recorda os profetas e João Batista; o **Aleluia** é exultação espiritual. No **Evangelho**, o sacerdote faz quatro sinais da cruz — no livro, na fronte, nos lábios e no peito (conhecer, professar e amar a Palavra). A **Homilia** atualiza a Palavra; o **Credo** é nossa adesão (curvamo-nos ao mencionar a Encarnação); a **Oração dos Fiéis** apresenta os pedidos da congregação.
+
+### Liturgia Sacrificial aos Ritos Finais
+
+Tudo no altar remonta à Santa Ceia. No **ofertório**, o canto exprime a alegria dos oferentes e o sacerdote pede que Deus aceite a oblação. A gota de água no vinho representa a humanidade misturada ao Sangue Redentor; o **Lavabo** evoca o lava-pés. No **Sanctus** ("Corações ao alto!") cantamos com os anjos; o Hosana lembra a entrada em Jerusalém.
+
+O **Cânon** é a oração mais importante: reza-se pelos vivos, defuntos, pela Igreja terrestre e celeste. O sacerdote se dobra sobre o altar para consagrar (o altar é o próprio Cristo); as elevações recordam Cristo elevado na Cruz. A **fração da Hóstia** lembra Nosso Senhor perfurado pela lança; a junção do pedaço com o Sangue simboliza a Ressurreição. Canta-se o **"Cordeiro de Deus"** (visão da Jerusalém Celeste). O **Pai-Nosso** prepara para a Comunhão.
+
+Na **Comunhão**, vivemos o véu eucarístico — como os discípulos de Emaús, sabemos pela fé que Ele está presente. A oração pós-comunhão evoca os 40 dias com os Apóstolos; a **bênção final** representa Pentecostes; o **"Ite"** é o envio. Como diz São Roberto Belarmino, nenhum gesto do sacerdote é mera gesticulação: estender os braços após a consagração significa Cristo com os braços abertos na Cruz.
+
+---
+
+## Aula 3 — Partilhando o Tesouro: o bom serviço litúrgico
+
+### A Liturgia como joia da Igreja
+
+Segundo o Pe. Reüs, "a liturgia é a casa de ouro, de perfeita harmonia, a glória da Igreja". É o "diadema e o diamante": coroa a Igreja com a majestade de Deus e reflete a luz divina em todas as direções. Mais do que ritos e cerimônias, é a manifestação tangível da divindade na vida da Igreja — a ser vivida e experimentada, não apenas compreendida.
+
+### As rubricas e o Direito Litúrgico
+
+As **rubricas** (do latim *ruber*, vermelho) são as instruções que orientam a oração e a conduta na celebração. Em escala maior, constituem o **Direito Litúrgico** — não imposição arbitrária, mas expressão do cuidado pastoral da Igreja em salvaguardar a pureza do culto e promover a participação dos fiéis.
+
+### Zelo pela unidade e cuidado na celebração
+
+A liturgia é celebração comunitária do Corpo de Cristo, não prática individualista. Por isso a Igreja zela pela unidade — sem rejeitar a diversidade legítima, mas reconhecendo que quem legisla é o Magistério. Como adverte a instrução *Redemptionis Sacramentum*, muitos abusos nascem da ignorância sobre o significado dos ritos; daí a necessidade de **formação litúrgica sólida**. Seguir as rubricas com cuidado não é legalismo, mas amor e respeito pelo Mistério Pascal — uma estrutura que liberta os fiéis para se concentrarem no mistério divino.
+
+### A Autoridade Papal e a "Ars Celebrandi"
+
+Como Vigário de Cristo, o Papa tem o dever de supervisionar o culto litúrgico (cf. Mt 16, 18), em colaboração com a Congregação para o Culto Divino. A **"ars celebrandi"** é a arte de celebrar dignamente os ritos, revelando e honrando o mistério da Eucaristia — exige dos ministros compreensão profunda e respeito reverente por cada gesto, palavra e símbolo.
+
+### Formação litúrgica permanente
+
+A formação é um processo **contínuo e vitalício**, jornada espiritual que exige humildade — a disposição de admitir que nunca compreenderemos completamente os mistérios de Deus. É mais do que aprendizagem: é conversão do coração.
+
+> Monsenhor Fulton Sheen convida-nos a visualizar: *"o Sumo Sacerdote, Cristo, saindo da sacristia do Céu para o altar do Calvário... O Calvário é a Sua Catedral; a rocha do Calvário é a pedra do altar; o rubor do sol poente, a lâmpada do Santuário... Ele está de pé, como sacerdote, e prostrado, como vítima. A Sua Missa vai começar."*
+
+Somos chamados a salvaguardar e fazer brilhar a preciosa joia da Eucaristia, o diadema da Igreja. Cada Missa é uma nova oportunidade de comunhão mais profunda com Deus. **Você virá conosco?**
+</script>
+<script type="text/markdown" id="md-02">
+---
+modulo: "02-ministro"
+titulo: "O Ministro: Postura e Apresentação"
+---
+
+# O Ministro: Postura e Apresentação
+
+## Apresentação e uniforme
+
+A apresentação é parte do nosso serviço — **"somos vitrines"**. Por isso, atenção ao uniforme e à higiene pessoal.
+
+- **Jaleco** branco (não bege), bem passado e limpo. Não é um casaquinho curto. Vestir **somente na Sacristia** e não sair da igreja com ele — exceto os ministros que levam comunhão aos enfermos.
+- **Homens:** calça preta, sapato preto (não tênis), camisa branca e gravata preta.
+- **Mulheres:** calça preta (não leggins), sapato ou sandália preta sem plataforma, com salto seguro; camisa ou camiseta branca lisa, sem desenhos; **cabelos presos**.
+- Mãos limpas e higienizadas; atenção a anéis e brincos; maquiagem leve.
+
+> Veja o checklist interativo "Apresentação e uniforme" no módulo de Serviço.
+
+## Posturas e gestos na Missa
+
+No altar, **seguimos o padre**. A regra geral é discrição e unidade nos gestos.
+
+- Sempre que descer ou subir ao altar, faça **reverência à mesa** (não à cruz) — ela é a mesa do sacrifício. O mesmo vale para a Capela.
+- Sentados antes da Missa: cuidado com conversas, mãos no cabelo, nos óculos etc.
+- Só **sentamos depois que o padre sentar**; só **levantamos quando o padre levantar** (inclusive no Evangelho).
+- Na proclamação do Evangelho, fazemos apenas as **três cruzes** — na fronte, nos lábios e no peito.
+- Acompanhamos os gestos do padre (Ato Penitencial, Glória); combinem todos o mesmo movimento.
+- Durante a **Consagração** e o **Pai-Nosso**, não responder em voz alta — atrapalha o padre.
+- Quando o padre elevar o cálice e proclamar "Por Cristo, com Cristo e em Cristo", **somente ele** levanta as mãos.
+- Na bênção final, **ajoelhar**; ao "Ide em paz", já estar de pé (inclusive quem está na Capela).
+- Ao se sentar no altar, não cruzar as pernas; se possível, mãos sobre os joelhos.
+
+## Sacristia e silêncio
+
+Todos os trabalhos começam na Sacristia. Nós nos empolgamos em conversas sem perceber que o tom sobe — e muitas vezes há pessoas chegando com dores e sofrimentos; nossas risadas passam a impressão de que estamos alheios.
+
+Silêncio especialmente **na chegada** e **ao fim da Missa**, quando o padre inicia os atendimentos. Por isso, após a Missa, só permanecem na Sacristia os **nrs 1, 2 e 3**; os demais, após retirar o material da credência e do altar, dirigem-se à Capela — sem esperar serem convidados a se retirar.
+
+Na **roda** de orientações, reza-se apenas uma oração de proteção do servir (uma Ave-Maria *ou* um Pai-Nosso *ou* um Vinde Espírito Santo). As entregas são feitas na Capela, enquanto recolhemos Jesus.
+
+## Pontuais e invisíveis
+
+Orientações gerais do Pe. Flávio:
+
+- **Pontualidade:** chegar 1 hora antes (missas diárias 45 min; Cura e Libertação 1h30).
+- **Começamos juntos e terminamos juntos** (salvo urgência ou trabalho).
+- Nas escalas, misturar ministros novos com antigos, para que os mais experientes **orientem** (não "deem ordens").
+- Não sair do lugar durante a Missa sem necessidade — desvia a atenção da assembleia.
+- Não correr na igreja nem demonstrar agitação; observar sempre os auxiliares.
+- Ensaiar o toque do carrilhão.
+- Reverência sempre ao passar pelo altar e voltada para o altar.
+</script>
+<script type="text/markdown" id="md-03">
+---
+modulo: "03-servico"
+titulo: "Serviço na Missa (passo a passo)"
+dados:
+  - "dados/funcoes_escala.json"
+  - "dados/missas_e_particulas.json"
+  - "dados/checklists.json"
+---
+
+# Serviço na Missa (passo a passo)
+
+## Horários e chegada
+
+**Domingos:** 08:00, 10:00 e 19:00. **Missas diárias:** 06:30 (das 06:30 às 07:00).
+
+**Missas de São Judas Tadeu (dia 28 de cada mês):**
+
+- Dia de semana: 07:00, 15:00 e 19:30
+- Sábado: 07:00, 15:00 e 19:00
+- Domingo: 08:00, 10:00, 15:00 e 19:00
+
+**Missas especiais:** Cura e Libertação (1ª quinta, 19:30); Sagrado Coração de Jesus (1ª sexta, 06:30); Sagrado Coração de Maria (1º sábado, 06:30).
+
+Como ministros, chegamos **1 hora antes** do início da Missa e entramos pelo **portão da Sacristia** (missas diárias: 45 min; Cura e Libertação: 1h30).
+
+## Como sou escalado
+
+Todo mês é enviado um formulário (Google Forms) no grupo de Ministros. Cada um responde a sua disponibilidade — **casais respondem juntos** (um responde e marca o cônjuge), com sim/não para cada missa, sem justificativa. Pede-se a gentileza de servir **um domingo sim, outro não**, para que todos possam participar.
+
+Colocar disponibilidade não significa ser escalado em todas as missas marcadas. E, se algum ministro pedir troca por imprevisto, você pode se oferecer para cobrir.
+
+## Funções da escala
+
+Cada número da escala tem responsabilidades próprias. Em missas maiores (10h, 19h, Cura e Libertação), os Auxiliares 1 e 2 distribuem funções adicionais. Os dados completos estão em **`dados/funcoes_escala.json`** (e aparecem como cards interativos no app). Resumo:
+
+| Nº | Função | Em poucas palavras |
+|----|--------|--------------------|
+| 1 | Auxiliar 1 | Líder do horário; comanda e distribui funções; define partículas e âmbulas. |
+| 2 | Auxiliar 2 | Apoia o nr 1 no controle; coloca a folha de música para o padre. |
+| 3 | Recolher o Santíssimo | Recolhe o Santíssimo; prepara material da Capela; guarda material com 1 e 2. |
+| 4 | Recolher o Santíssimo | Recolhe junto ao 3; distribui os pãezinhos às crianças. |
+| 5 e 6 | Velas | Castiçais, velas e cruz; acende ~15 min antes; recolhe ao fim. |
+| 7 e 8 | Fila do padre / Adoração | Cuidam da fila do padre; turnos de Adoração (manhã e noite). |
+| 9, 10, 11, 12 | Purificação e Exposição | Purificam âmbulas, recolhem material e expõem o Santíssimo. |
+| 12 | (também) | Fecha o portão da Sacristia; guarda a chave do Sacrário. |
+| 13, 14, 15 | Mezanino | Sobem ao mezanino no "Cordeiro de Deus" para distribuir a comunhão. |
+| 16 | Liturgia (10h) | Entra como 16º ministro nas missas cheias. |
+
+> Independente da função, **todos ajudam** a montar a credência. Somos um grupo.
+
+## Ministros e partículas
+
+| Missa | Ministros | Eucaristias |
+|-------|-----------|-------------|
+| Domingo 08:00 | 15 | 1200 |
+| Domingo 10:00 | 18 | 1400 |
+| Domingo 19:00 | 20 | 1400 |
+| Cura e Libertação | 26 | 2500 |
+
+**Cálculo das partículas:** segue a capacidade da igreja (1200 lugares). Como a missa das 10h é mais cheia, consagra-se mais; às 19h conta-se com 1200. Os Auxiliares 1 e 2 confirmam a quantidade do dia. *(Use a calculadora no app para uma estimativa rápida.)*
+
+## Credência e altar
+
+- Não mudar o que o padre e o diácono estão acostumados — **"não inventamos a roda"**.
+- Seguir a sequência de montagem da credência; deixar só o material que será usado.
+- Ser dinâmico: se precisar, além dos auxiliares 1 e 2, os demais ajudam.
+- **Véu nas âmbulas:** somente nas missas com o Pe. Flávio.
+- Os acendedores recarregáveis foram escolhidos pensando no melhor para o serviço.
+
+## Saídas do altar e da Capela
+
+- Normalmente, **após o Pai-Nosso**, os ministros que pegam as âmbulas saem do altar **pela parte da frente**.
+- Os ministros do lado da credência saem juntos pela cortina.
+- Os do lado do ambão saem na ordem **07, 08**, seguidos dos ministros do mezanino.
+- Os do mezanino saem juntos, em fila curta.
+- Os que vão para a igreja saem em ordem de número e juntos.
+- **Cura e Libertação:** todos saem do altar **após a Consagração** (e não após o Pai-Nosso).
+- Ao retornar à Capela, deixe a âmbula e o mini sanguíneo no altar, comungue e retorne. Se o padre estiver em oração ou já disse "Oremos", só entre depois que terminar. Se ele for asperge ou dar a bênção, ajoelhe-se onde estiver.
+
+## Como ministrar a comunhão
+
+A partir da orientação do Pe. Flávio, **voltamos a ministrar a Eucaristia na boca** — estejamos preparados para as formas:
+
+- Pegar a hóstia com as pontas dos dedos e, junto à âmbula, elevá-la à boca do fiel, com cuidado para **não derrubar**. Se cair, **consumir** e limpar o chão imediatamente com o sanguíneo, para que não fique nenhuma partícula.
+- Dizer **"O Corpo de Cristo"**.
+- Observar se o fiel realmente **consome** a hóstia (vale também para quem comunga na mão). Na dúvida, pare a fila, vá atrás do fiel e peça gentilmente que comungue na sua frente.
+- Respeitar as demais formas: de joelhos diante do ministro ou na mão.
+- **Não cabe ao ministro negar a comunhão** nem julgar quem pode ou não comungar.
+- Posicione-se de modo que as pessoas venham até você e façam a volta sem esbarrar na próxima. Vire-se para distribuir somente depois que o padre descer a escada.
+
+## Mapas de posição
+
+O app exibe os mapas de posição da igreja:
+
+- **Missa de Domingo** — `assets/mapa-missa-domingo.png`
+- **Cura e Libertação** — `assets/mapa-missa-cura.png`
+
+A ordem de saída da Capela e a distribuição por posição são definidas pela coordenação a cada escala (o mapa original com nomes serve de modelo).
+</script>
+<script type="text/markdown" id="md-04">
+---
+modulo: "04-santissimo"
+titulo: "O Santíssimo: Recolher, Expor, Purificar"
+dados:
+  - "dados/oracoes.json"
+  - "dados/checklists.json"
+---
+
+# O Santíssimo: Recolher, Expor, Purificar
+
+> Este é o coração do nosso serviço. Tudo aqui se faz com **zelo, silêncio e reverência** — estamos com Jesus Eucarístico.
+
+## Reverência ao Santíssimo
+
+Sempre que formos verificar o Sacrário — seja para ver a reserva eucarística, seja para retirar o cibório — fazemos uma **genuflexão com o joelho direito no chão**, ao abrir e ao fechar. Fazemos a mesma genuflexão ao entrar e sair da Capela.
+
+Pessoas com dificuldades motoras fazem uma **reverência profunda** e falam com Jesus.
+
+## Materiais para recolher
+
+Separados pelos nrs 03 e 04 (checklist completo no app):
+
+- Âmbula bojuda com o véu
+- Almofada
+- Véu para o ostensório
+- Corporal para a almofada
+- Mini lavabo
+- Manustérgio
+
+## Orações e jaculatórias
+
+Os nrs 03 e 04 rezam, ao recolher, as orações da Capela; os demais acompanham durante a procissão. (Texto completo em `dados/oracoes.json`.)
+
+1. **Jaculatória de louvor (3x):** "Graças e louvores sejam dados a todo momento ao Santíssimo e Diviníssimo Sacramento." Seguida do "Glória ao Pai...".
+2. **Oração do Anjo de Portugal (3x):** "Meu Deus, eu creio, adoro, espero e amo-Vos. Peço-Vos perdão por aqueles que não creem, não adoram, não esperam e não Vos amam."
+3. **Oração de reparação:** "Santíssima Trindade... ofereço-Vos o preciosíssimo Corpo, Sangue, Alma e Divindade de Jesus Cristo... peço-Vos a conversão dos pobres pecadores. Amém."
+4. **Encerramento na Capela:** "Estivemos e continuaremos reunidos em nome do Pai, do Filho e do Espírito Santo. Amém."
+
+> *Jaculatória* vem de *jaculum* (latim, "jato"): é um jato que lançamos a Deus do fundo do coração.
+
+## Recolher passo a passo
+
+1. Combinem **antes** quem ajuda e quem faz o quê — para não ficar dúvida na hora.
+2. Preparem no altar os materiais (almofada, corporais, véus).
+3. Ajoelhem-se e rezem a jaculatória de louvor (3x) e o "Glória ao Pai".
+4. Levantem e iniciem o recolhimento, rezando a Oração do Anjo de Portugal; a pessoa da vela vai à frente, começando a procissão à Capela.
+5. Ao retirar o trono, **troque o corporal** (não fique esperando pelo outro).
+6. Façam a genuflexão; abram o Sacrário, guardem a âmbula com Jesus e retirem o cibório com a reserva, a ser distribuída nas âmbulas que já estão no altar.
+7. **Fechem a porta do Sacrário** ao retirar a reserva — deixar aberto passa sensação de descuido.
+8. Distribuam as âmbulas metade para cada lado, com o cibório ao centro, facilitando a distribuição.
+9. Rezem a oração de reparação e encerrem de joelhos: "Estivemos e continuaremos reunidos...".
+10. Deixem a **chave do Sacrário** com o nr responsável / no armário da Sacristia.
+11. Ao encerrar, saiam da Capela em **silêncio** e vão para os seus lugares — sem "passear" pela igreja nem conversar na porta da Capela.
+
+## Purificação
+
+Responsáveis: nrs 9, 10, 11 e 12 (preparo no checklist do app).
+
+- Todo serviço com as âmbulas é feito **sobre o corporal**. Com os corporais novos e compridos, não é preciso colocar sanguíneo por baixo.
+- Combinar quem coloca as comunhões no cibório, quem purifica e quem guarda nas caixas.
+- Ao abrir o cibório, **purificar a tampa** (pode ser no final, mas não esquecer).
+- Secar o mini lavabo com o sanguíneo após o uso.
+- **Não usamos mais álcool** para higienizar âmbulas (deixava ofuscadas e com aparência de meladas). A cada dois meses, dar uma polida para manter o brilho.
+- Os homens levam as caixas para a Sacristia; as mulheres, por usarem salto, evitam.
+
+## Exposição
+
+Para expor o Santíssimo, **esperar por todos os ministros** e dar tempo para a igreja silenciar — salvo nas missas de São Judas Tadeu e de Cura e Libertação.
+
+Nas missas das 08h, os nrs 7 e 8 ficam em Adoração das 07:00 às 07:30, quando o Santíssimo é recolhido. À noite, após a exposição, entram em Adoração até as 21:00, quando chega o Adorador.
+</script>
+<script type="text/markdown" id="md-05">
+---
+modulo: "05-referencia"
+titulo: "Referência Litúrgica Ilustrada"
+dados:
+  - "dados/cores_e_tempos.json"
+  - "dados/glossario_liturgico.json"
+---
+
+# Referência Litúrgica Ilustrada
+
+> Glossário de consulta rápida. No app, cada termo vira um card pesquisável, com ilustração quando disponível.
+
+## Cores litúrgicas
+
+As cores litúrgicas exprimem o tempo e o mistério celebrado (dados em `dados/cores_e_tempos.json`):
+
+- **Branco** — pureza. Natal, Páscoa, festas do Senhor (exceto Paixão), de Maria, dos Anjos e Santos não-mártires.
+- **Vermelho** — fogo da caridade. Paixão, Pentecostes, Apóstolos e Evangelistas, Santos Mártires.
+- **Verde** — esperança. Tempo Comum (maior parte do ano).
+- **Roxo** — penitência. Advento e missas pelos mortos.
+- **Preto** — luto. Pode ser usado nas missas pelos mortos.
+- **Rosa** — alegria. III Domingo do Advento e IV Domingo da Quaresma.
+
+## Espaço celebrativo
+
+- **Nave** — corpo principal da igreja, onde se reúne a assembleia.
+- **Presbitério** — área elevada do altar, de onde se preside.
+- **Altar** — mesa da Ceia Eucarística; representa o próprio Jesus. É a mesa do sacrifício (fazemos reverência a ele).
+- **Credência** — mesa auxiliar dos objetos litúrgicos.
+- **Capela do Santíssimo** — reserva e exposição do Santíssimo fora da Missa.
+- **Sacrário / Tabernáculo** — guarda a Eucaristia; presença real de Cristo.
+
+## Vestes litúrgicas
+
+Amito, Alva (Túnica), Sobrepeliz, Cíngulo, Estola Sacerdotal, Estola Diaconal/Dalmática, Casula (Gregoriana, Gótica, Romana), Véu Umeral, Pluvial (Capa de Asperges) e as vestes episcopais (solidéu, mitra, báculo, cruz peitoral). Definições e orações de revestimento em `dados/glossario_liturgico.json`.
+
+## Objetos litúrgicos
+
+Cálice, Patena, Hóstia, Corporal, Sanguíneo (Purificatório), Pala, Alfaias, Âmbula (Cibório), Véu do Cibório, Galhetas, Lavabo, Manustérgio, Sineta (Carrilhão), Turíbulo, Naveta, Caldeirinha e Aspersório, Cruz Processional / Crucifixo do Altar, Castiçal e Vela, Missal Romano, Lecionário, Ostensório e Luneta. Todas as definições estão no glossário em dados.
+
+## Montagem do cálice
+
+1. Cálice.
+2. Colocar o sanguíneo sobre o cálice, com leve pressão ao centro.
+3. Colocar a patena sobre o cálice e o sanguíneo.
+4. Colocar a hóstia que será consagrada sobre a patena.
+5. Colocar a pala.
+6. Colocar o corporal.
+7. Colocar o véu do cálice.
+
+> **Turíbulo — quando se usa:** procissão de entrada; ao incensar o altar no início; na proclamação do Evangelho; no ofertório (oferendas, altar, cruz, bispo, celebrantes e povo); à elevação após a consagração; e na exposição do Santíssimo (incensado de joelhos). Fonte: Cerimonial dos Bispos, n. 86–94.
+</script>
+<script type="text/markdown" id="md-06">
+---
+modulo: "06-enfermos"
+titulo: "Comunhão aos Enfermos e Vida do Grupo"
+---
+
+# Comunhão aos Enfermos e Vida do Grupo
+
+## Comunhão aos enfermos
+
+Temos uma equipe de **Ministros dos Enfermos**, que levam a comunhão a doentes e idosos — mas existe uma preparação.
+
+A responsável é a **Nerci**, coordenadora da Pastoral dos Doentes e Idosos. Quando alguém pedir para levar a comunhão, falamos com ela, para que junto com o **Pe. Wilson** seja feita uma visita ao doente; depois ele libera que seja levada.
+
+Só vamos a **hospitais** para os nossos paroquianos. Se pedirem para levar a um parente ou amigo, orientamos que o pedido seja feito **na paróquia à qual a pessoa pertence**.
+
+> Lembrete: apenas os ministros que levam comunhão aos enfermos saem da igreja de jaleco.
+
+## Contribuição mensal
+
+Arrecadamos mensalmente de **R$ 5,00 a R$ 10,00** por ministro. A reserva é usada para reposição de materiais, presentes dos padres e do diácono, envio de coroas, etc.
+
+**PIX (chave e-mail):** ana.soares.paula@outlook.com
+
+> Dado de contribuição sujeito a atualização pela coordenação.
+
+## Preceitos do ministro
+
+Entramos para um ministério que tem **normas e preceitos**. Quem não estiver na escala deve participar da Missa de domingo no seu horário — é um preceito de ser católico. E a Adoração ao Santíssimo, às segundas-feiras das 22:00 às 00:00, é parte da nossa vida de oração como grupo.
+</script>
+
+<script>
+/* ===== Module registry (drives navigation) ===== */
+const MODULES = [
+  {id:"00", icon:"✝", title:"Identidade do Ministério", group:"Formação",
+    sub:"O chamado, a humildade e a hierarquia", md:"md-00"},
+  {id:"01", icon:"📖", title:"Formação Teológica", group:"Formação",
+    sub:"O Calvário, o simbolismo e o bom serviço", md:"md-01"},
+  {id:"02", icon:"🕊", title:"Postura e Apresentação", group:"O Ministro",
+    sub:"Uniforme, gestos, silêncio, pontualidade", md:"md-02"},
+  {id:"03", icon:"🍞", title:"Serviço na Missa", group:"O Ministro",
+    sub:"Escala, funções, partículas, comunhão", md:"md-03", widgets:["funcoes","escala","calc","mapas","checkUniforme"]},
+  {id:"04", icon:"☀", title:"O Santíssimo", group:"O Ministro",
+    sub:"Recolher, expor, purificar", md:"md-04", widgets:["oracoes","checkRecolher"]},
+  {id:"05", icon:"📿", title:"Referência Litúrgica", group:"Consulta",
+    sub:"Cores, vestes, objetos, cálice", md:"md-05", widgets:["cores","glossario"]},
+  {id:"06", icon:"🤝", title:"Enfermos e Vida do Grupo", group:"Consulta",
+    sub:"Comunhão aos doentes, contribuição", md:"md-06"},
+];
+
+const $=s=>document.querySelector(s);
+const J=id=>{try{return JSON.parse($("#"+id).textContent)}catch(e){return null}};
+const MD=id=>$("#"+id)?$("#"+id).textContent:"";
+
+/* ===== tiny markdown -> html ===== */
+function inline(t){
+  return t
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*]+)\*/g,'$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2">$1</a>');
+}
+function renderMD(src){
+  src=src.trim().replace(/^---[\s\S]*?\n---[ \t]*\n?/,""); // strip YAML front-matter
+  const lines=src.split("\n"); let html=""; let i=0;
+  while(i<lines.length){
+    let ln=lines[i];
+    if(/^\s*$/.test(ln)){i++;continue;}
+    if(/^#{1,3}\s/.test(ln)){
+      const lvl=ln.match(/^#+/)[0].length; html+=`<h${lvl}>${inline(ln.replace(/^#+\s/,""))}</h${lvl}>`; i++; continue;
+    }
+    if(/^---\s*$/.test(ln)){html+='<hr class="div">';i++;continue;}
+    if(/^>\s?/.test(ln)){
+      let buf=[]; while(i<lines.length&&/^>\s?/.test(lines[i])){buf.push(lines[i].replace(/^>\s?/,""));i++;}
+      html+=`<blockquote>${inline(buf.join(" "))}</blockquote>`; continue;
+    }
+    if(/^\|/.test(ln)){
+      let rows=[]; while(i<lines.length&&/^\|/.test(lines[i])){rows.push(lines[i]);i++;}
+      const cells=r=>r.split("|").slice(1,-1).map(c=>c.trim());
+      let head=cells(rows[0]); let body=rows.slice(2).map(cells);
+      html+='<table><thead><tr>'+head.map(h=>`<th>${inline(h)}</th>`).join("")+'</tr></thead><tbody>'+
+        body.map(r=>'<tr>'+r.map(c=>`<td>${inline(c)}</td>`).join("")+'</tr>').join("")+'</tbody></table>';
+      continue;
+    }
+    if(/^[-*]\s/.test(ln)){
+      let buf=[]; while(i<lines.length&&/^[-*]\s/.test(lines[i])){buf.push(lines[i].replace(/^[-*]\s/,""));i++;}
+      html+='<ul>'+buf.map(b=>`<li>${inline(b)}</li>`).join("")+'</ul>'; continue;
+    }
+    let buf=[]; while(i<lines.length&&!/^\s*$/.test(lines[i])&&!/^(#{1,3}\s|>|\||[-*]\s|---\s*$)/.test(lines[i])){buf.push(lines[i]);i++;}
+    html+=`<p>${inline(buf.join(" "))}</p>`;
+  }
+  return html;
+}
+
+/* ===== build nav ===== */
+function buildNav(){
+  const man=J("data-manifest");
+  $("#brandTitle").textContent=man.titulo.length>34?"Formação dos MESC":man.titulo;
+  $("#brandSub").textContent=man.subtitulo; $("#brandVer").textContent=man.versao;
+  const nav=$("#nav"); let last="";
+  MODULES.forEach(m=>{
+    if(m.group!==last){const g=document.createElement("div");g.className="grouplabel";g.textContent=m.group;nav.appendChild(g);last=m.group;}
+    const b=document.createElement("button");b.className="navitem";b.dataset.id=m.id;
+    b.innerHTML=`<span class="ic">${m.icon}</span><span>${m.title}</span>`;
+    b.onclick=()=>{location.hash=m.id;};
+    nav.appendChild(b);
+  });
+}
+
+/* ===== widgets ===== */
+const phaseTag={preparacao:["Antes da Missa","p"],durante:["Durante","d"],encerramento:["Após a Comunhão","e"]};
+function wFuncoes(){
+  const d=J("data-funcoes"); if(!d)return"";
+  const cards=d.funcoes.map(f=>`
+    <div class="card fcard" data-fases="${f.fases.join(' ')}">
+      <div class="fnum">${f.numero}</div>
+      <div class="role">${f.papel}</div>
+      <h4>${f.resumo}</h4>
+      <ul>${f.responsabilidades.map(r=>`<li>${r}</li>`).join("")}</ul>
+      <div>${f.fases.map(p=>`<span class="tag ${phaseTag[p][1]}">${phaseTag[p][0]}</span>`).join("")}</div>
+    </div>`).join("");
+  return `<h2>Funções da escala — cards</h2>
+    <div class="filterbar" id="fasefilter">
+      <span class="chip on" data-f="all">Todas</span>
+      <span class="chip" data-f="preparacao">Antes da Missa</span>
+      <span class="chip" data-f="durante">Durante</span>
+      <span class="chip" data-f="encerramento">Após a Comunhão</span>
+    </div>
+    <div class="grid cards" id="fcards">${cards}</div>`;
+}
+function wEscala(){
+  const d=J("data-missas"); if(!d)return"";
+  const rows=d.escala_por_missa.map(m=>`<tr><td><b>${m.missa}</b></td><td>${m.ministros}</td><td>${m.eucaristias}</td><td>${m.observacao}</td></tr>`).join("");
+  return `<h2>Ministros e eucaristias por missa</h2>
+    <table><thead><tr><th>Missa</th><th>Ministros</th><th>Eucaristias</th><th>Observação</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function wCalc(){
+  return `<h2>Calculadora de partículas</h2>
+  <div class="calc">
+    <label>Lugares ocupados estimados (capacidade da igreja: 1200)</label>
+    <input id="calcIn" type="number" min="0" value="1200" style="width:160px">
+    <select id="calcMissa" style="margin-left:8px">
+      <option value="1">Missa comum</option><option value="1.17">Missa cheia (10h)</option><option value="2.08">Cura e Libertação</option>
+    </select>
+    <div class="out">Sugestão de consagração: <b id="calcOut">1200</b> partículas</div>
+    <p style="font-size:12px;color:var(--muted);margin:8px 0 0">Estimativa orientativa. A quantidade final é definida pelos Auxiliares 1 e 2 do dia.</p>
+  </div>`;
+}
+function wMapas(){
+  return `<h2>Mapas de posição da igreja</h2>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+    <figure class="mapwrap"><img src="assets/mapa-missa-domingo.png" alt="Mapa missa de domingo"><figcaption>Missa de Domingo</figcaption></figure>
+    <figure class="mapwrap"><img src="assets/mapa-missa-cura.png" alt="Mapa missa de cura e libertação"><figcaption>Cura e Libertação</figcaption></figure>
+  </div>`;
+}
+function wChecklist(id){
+  const d=J("data-checklists"); if(!d)return"";
+  const cl=d.checklists.find(c=>c.id===id); if(!cl)return"";
+  return `<div class="checklist" data-cl="${cl.id}">
+    <div class="clh"><h4>✓ ${cl.titulo}</h4><p>${cl.descricao}</p></div>
+    ${cl.itens.map((t,k)=>`<label class="clitem"><input type="checkbox" data-k="${k}"><span>${t}</span></label>`).join("")}
+    <button class="reset">limpar</button>
+  </div>`;
+}
+function wCheckGroup(ids){return ids.map(wChecklist).join("");}
+function wOracoes(){
+  const d=J("data-oracoes"); if(!d)return"";
+  const cards=d.oracoes.map(o=>`<div class="prayer">${o.repeticoes>1?`<span class="rep">${o.repeticoes}×</span>`:""}
+     <h4>${o.titulo}</h4><p>${o.texto}</p>${o.complemento?`<p style="margin-top:8px">${o.complemento}</p>`:""}</div>`).join("");
+  return `<h2>Orações e jaculatórias da Capela</h2><blockquote>${d.nota}</blockquote>${cards}
+    <blockquote><strong>Na roda:</strong> ${d.oracao_na_roda}</blockquote>`;
+}
+function wCores(){
+  const d=J("data-cores"); if(!d)return"";
+  return `<h2>Cores litúrgicas</h2><div class="card">${d.cores_liturgicas.map(c=>`
+    <div class="swatch"><div class="dot" style="background:${c.hex}"></div>
+    <div><b>${c.cor}</b> — <small>${c.simbolismo}</small><br><small>${c.uso}</small></div></div>`).join("")}</div>`;
+}
+function wGlossario(){
+  const d=J("data-glossario"); if(!d)return"";
+  const sec=(t,arr)=>`<h3>${t}</h3><div class="grid cards">${arr.map(o=>`<div class="card glo" data-t="${(o.termo+' '+o.definicao).toLowerCase()}"><h4>${o.termo}</h4><p class="sum">${o.definicao}</p></div>`).join("")}</div>`;
+  return `<h2>Glossário litúrgico — busca</h2>
+    <div class="search" style="max-width:420px;margin:6px 0 4px"><span class="mag">🔍</span>
+      <input id="gloSearch" placeholder="Filtrar termos (ex.: âmbula, casula, turíbulo)"></div>
+    ${sec("Espaço celebrativo",d.espaco_celebrativo)}
+    ${sec("Vestes litúrgicas",d.vestes)}
+    ${sec("Objetos litúrgicos",d.objetos)}
+    <h3>Montagem do cálice</h3><div class="card"><ul>${d.montagem_calice.map(s=>`<li>${s}</li>`).join("")}</ul></div>`;
+}
+const WIDGETS={funcoes:wFuncoes,escala:wEscala,calc:wCalc,mapas:wMapas,oracoes:wOracoes,cores:wCores,glossario:wGlossario,
+  checkUniforme:()=>wChecklist("apresentacao_uniforme")+wChecklist("credencia_altar"),
+  checkRecolher:()=>wChecklist("recolher_santissimo")+wChecklist("preparo_purificacao")+wChecklist("cuidados_materiais")};
+
+/* ===== render a module ===== */
+function renderModule(id){
+  const m=MODULES.find(x=>x.id===id)||MODULES[0];
+  document.querySelectorAll(".navitem").forEach(b=>b.classList.toggle("active",b.dataset.id===m.id));
+  let html=renderMD(MD(m.md));
+  if(m.widgets) m.widgets.forEach(w=>{if(WIDGETS[w])html+=WIDGETS[w]();});
+  html+=`<p class="footnote">Módulo ${m.id} · Material renovado dos MESC — Santuário São Judas Tadeu. Conteúdo de leitura em <code>conteudo/${m.md.replace('md-','')}…md</code>; dados estruturados em <code>dados/</code>.</p>`;
+  $("#doc").innerHTML=html;
+  $("#searchResults").style.display="none"; $("#doc").style.display="block";
+  window.scrollTo(0,0);
+  attachWidgetEvents();
+  closeSidebar();
+}
+function attachWidgetEvents(){
+  // phase filter
+  const fb=$("#fasefilter");
+  if(fb){fb.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+    fb.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on");
+    const f=c.dataset.f;
+    document.querySelectorAll("#fcards .fcard").forEach(card=>{
+      card.style.display=(f==="all"||card.dataset.fases.includes(f))?"":"none";});
+  });}
+  // calculator
+  const ci=$("#calcIn");
+  if(ci){const calc=()=>{const v=Math.round((+ci.value||0)*(+$("#calcMissa").value));$("#calcOut").textContent=v.toLocaleString("pt-BR");};
+    ci.oninput=calc;$("#calcMissa").onchange=calc;calc();}
+  // glossario search
+  const gs=$("#gloSearch");
+  if(gs){gs.oninput=()=>{const q=gs.value.toLowerCase().trim();
+    document.querySelectorAll(".glo").forEach(c=>{c.style.display=c.dataset.t.includes(q)?"":"none";});};}
+  // checklists (with persistence)
+  document.querySelectorAll(".checklist").forEach(cl=>{
+    const key="mesc_cl_"+cl.dataset.cl; let saved={};
+    try{saved=JSON.parse(localStorage.getItem(key)||"{}")}catch(e){}
+    cl.querySelectorAll(".clitem").forEach(it=>{
+      const cb=it.querySelector("input"),k=cb.dataset.k;
+      if(saved[k]){cb.checked=true;it.classList.add("done");}
+      cb.onchange=()=>{it.classList.toggle("done",cb.checked);saved[k]=cb.checked;
+        try{localStorage.setItem(key,JSON.stringify(saved))}catch(e){}};
+    });
+    cl.querySelector(".reset").onclick=()=>{cl.querySelectorAll("input").forEach(cb=>{cb.checked=false;cb.closest(".clitem").classList.remove("done");});
+      try{localStorage.removeItem(key)}catch(e){}};
+  });
+}
+
+/* ===== search across everything ===== */
+function buildIndex(){
+  const idx=[];
+  MODULES.forEach(m=>{
+    const txt=renderMD(MD(m.md)).replace(/<[^>]+>/g," ");
+    idx.push({id:m.id,title:m.title,icon:m.icon,kind:"Módulo",text:txt});
+  });
+  const f=J("data-funcoes"); if(f)f.funcoes.forEach(x=>idx.push({id:"03",title:`Função ${x.numero} — ${x.papel}`,icon:"🍞",kind:"Escala",text:x.resumo+" "+x.responsabilidades.join(" ")}));
+  const g=J("data-glossario"); if(g)["espaco_celebrativo","vestes","objetos"].forEach(s=>g[s].forEach(o=>idx.push({id:"05",title:o.termo,icon:"📿",kind:"Glossário",text:o.definicao})));
+  const o=J("data-oracoes"); if(o)o.oracoes.forEach(x=>idx.push({id:"04",title:x.titulo,icon:"☀",kind:"Oração",text:x.texto}));
+  const c=J("data-cores"); if(c)c.cores_liturgicas.forEach(x=>idx.push({id:"05",title:"Cor: "+x.cor,icon:"📿",kind:"Cor litúrgica",text:x.simbolismo+" "+x.uso}));
+  const cl=J("data-checklists"); if(cl)cl.checklists.forEach(x=>idx.push({id:x.id.includes("uniform")||x.id.includes("credencia")?"03":"04",title:"Checklist: "+x.titulo,icon:"✓",kind:"Checklist",text:x.itens.join(" ")}));
+  return idx;
+}
+let INDEX=[];
+function doSearch(q){
+  q=q.trim().toLowerCase();
+  if(q.length<2){$("#searchResults").style.display="none";$("#doc").style.display="block";return;}
+  const res=INDEX.map(e=>{
+    const hay=(e.title+" "+e.text).toLowerCase(); const pos=hay.indexOf(q);
+    return pos>=0?{...e,pos}:null;}).filter(Boolean).slice(0,40);
+  const box=$("#searchResults");
+  if(!res.length){box.innerHTML=`<p style="color:var(--muted)">Nada encontrado para “${q}”.</p>`;}
+  else{box.innerHTML=res.map(r=>{
+    const t=r.text; const i=t.toLowerCase().indexOf(q); let ex=i>=0?t.slice(Math.max(0,i-50),i+90):t.slice(0,120);
+    ex=ex.replace(new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig"),"<mark>$1</mark>");
+    return `<div class="sr" data-go="${r.id}"><div class="mod">${r.icon} ${r.kind}</div><h4>${r.title}</h4><p>…${ex}…</p></div>`;
+  }).join("");}
+  box.querySelectorAll(".sr").forEach(s=>s.onclick=()=>{$("#searchInput").value="";location.hash=s.dataset.go;});
+  $("#doc").style.display="none"; box.style.display="block";
+}
+
+/* ===== sidebar mobile ===== */
+function closeSidebar(){$("#sidebar").classList.remove("open");$("#scrim").classList.remove("show");}
+$("#menuToggle").onclick=()=>{$("#sidebar").classList.toggle("open");$("#scrim").classList.toggle("show");};
+$("#scrim").onclick=closeSidebar;
+
+/* ===== boot ===== */
+window.addEventListener("hashchange",()=>renderModule(location.hash.replace("#","")));
+$("#searchInput").addEventListener("input",e=>doSearch(e.target.value));
+document.addEventListener("DOMContentLoaded",()=>{
+  buildNav(); INDEX=buildIndex();
+  renderModule(location.hash.replace("#","")||"00");
+});
+</script>
+</body>
+</html>

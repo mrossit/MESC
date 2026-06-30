@@ -1,0 +1,67 @@
+{
+  "titulo": "Formação dos Ministros Extraordinários da Sagrada Comunhão",
+  "subtitulo": "Santuário São Judas Tadeu",
+  "versao": "2026.1 (renovado)",
+  "descricao": "Substrato de conteúdo do app MESC. Reúne formação espiritual/teológica, postura do ministro, serviço operacional na Missa, cuidado com o Santíssimo, referência litúrgica ilustrada e a vida do grupo.",
+  "modulos": [
+    {
+      "id": "00-identidade",
+      "titulo": "Identidade do Ministério",
+      "icone": "✝",
+      "resumo": "Quem somos, o chamado ao serviço, a humildade e a hierarquia.",
+      "conteudo": "conteudo/00-identidade.md",
+      "secoes": ["O chamado: aceitei, e agora?", "Humildade e serviço", "Apresentação do ministério", "Hierarquia", "Adoração ao Santíssimo"]
+    },
+    {
+      "id": "01-formacao",
+      "titulo": "Formação Espiritual e Teológica",
+      "icone": "📖",
+      "resumo": "O Calvário e a Missa, o simbolismo da Liturgia e o bom serviço litúrgico (Escola de Liturgia).",
+      "conteudo": "conteudo/01-formacao-teologica.md",
+      "secoes": ["Aula 1 — O Calvário e a Missa", "Aula 2 — O simbolismo na Liturgia", "Aula 3 — O bom serviço litúrgico"]
+    },
+    {
+      "id": "02-ministro",
+      "titulo": "O Ministro: Postura e Apresentação",
+      "icone": "🕊",
+      "resumo": "Como se apresentar, posturas e gestos na Missa, silêncio e pontualidade.",
+      "conteudo": "conteudo/02-postura-do-ministro.md",
+      "secoes": ["Apresentação e uniforme", "Posturas e gestos na Missa", "Sacristia e silêncio", "Pontuais e invisíveis"]
+    },
+    {
+      "id": "03-servico",
+      "titulo": "Serviço na Missa (passo a passo)",
+      "icone": "🍞",
+      "resumo": "Horários, escala, funções 1–16, partículas, credência, saídas e como ministrar a comunhão.",
+      "conteudo": "conteudo/03-servico-na-missa.md",
+      "dados": ["dados/funcoes_escala.json", "dados/missas_e_particulas.json", "dados/checklists.json"],
+      "secoes": ["Horários e chegada", "Como sou escalado", "Funções da escala", "Ministros e partículas", "Credência e altar", "Saídas do altar e da Capela", "Como ministrar a comunhão", "Mapas de posição"]
+    },
+    {
+      "id": "04-santissimo",
+      "titulo": "O Santíssimo: Recolher, Expor, Purificar",
+      "icone": "☀",
+      "resumo": "Reverência, materiais, jaculatórias e o passo a passo na Capela.",
+      "conteudo": "conteudo/04-santissimo.md",
+      "dados": ["dados/oracoes.json", "dados/checklists.json"],
+      "secoes": ["Reverência ao Santíssimo", "Materiais para recolher", "Orações e jaculatórias", "Recolher passo a passo", "Purificação", "Exposição"]
+    },
+    {
+      "id": "05-referencia",
+      "titulo": "Referência Litúrgica Ilustrada",
+      "icone": "📿",
+      "resumo": "Cores e tempos, espaço celebrativo, vestes e objetos litúrgicos, montagem do cálice.",
+      "conteudo": "conteudo/05-referencia-liturgica.md",
+      "dados": ["dados/cores_e_tempos.json", "dados/glossario_liturgico.json"],
+      "secoes": ["Cores litúrgicas", "Espaço celebrativo", "Vestes litúrgicas", "Objetos litúrgicos", "Montagem do cálice"]
+    },
+    {
+      "id": "06-enfermos",
+      "titulo": "Comunhão aos Enfermos",
+      "icone": "🤝",
+      "resumo": "Como funciona a comunhão aos doentes e idosos e a preparação necessária.",
+      "conteudo": "conteudo/06-enfermos-e-grupo.md",
+      "secoes": ["Comunhão aos enfermos", "Contribuição mensal", "Preceitos do ministro"]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "espaco_celebrativo": [
+    { "termo": "Nave", "definicao": "Corpo principal da igreja, onde se reúne a assembleia." },
+    { "termo": "Presbitério", "definicao": "Área elevada onde fica o altar e de onde se preside a celebração." },
+    { "termo": "Altar", "definicao": "Mesa onde se realiza a Ceia Eucarística; representa o próprio Jesus na Liturgia. É a mesa do sacrifício — por isso fazemos reverência a ele, e não à cruz." },
+    { "termo": "Credência", "definicao": "Mesa auxiliar onde ficam dispostos os objetos litúrgicos usados na celebração." },
+    { "termo": "Capela do Santíssimo", "definicao": "Local onde o Santíssimo Sacramento é reservado e exposto fora da Missa." },
+    { "termo": "Sacrário / Tabernáculo", "definicao": "Guarda a Eucaristia fora da Missa. Símbolo do Santo dos Santos, lugar da presença real de Cristo na Nova Aliança." }
+  ],
+  "vestes": [
+    { "termo": "Amito", "definicao": "Vestido antes da alva, sobre os ombros. Oração: 'Colocai, Senhor, na minha cabeça o elmo da salvação para que possa repelir os golpes de Satanás.'" },
+    { "termo": "Alva (Túnica)", "definicao": "Veste longa e branca usada por todos os ministros sagrados; representa a nova veste imaculada recebida no Batismo e a pureza de coração." },
+    { "termo": "Sobrepeliz", "definicao": "Pode ser usada no lugar da túnica quando o ministro está de batina; não dispensa a estola e não substitui a alva quando se usa casula (Cerimonial dos Bispos, n.65)." },
+    { "termo": "Cíngulo", "definicao": "Cordão usado como cinto sobre a alva, na cintura. Simboliza o autocontrole (fruto do Espírito). Acompanha sempre quem porta a alva." },
+    { "termo": "Estola Sacerdotal", "definicao": "Elemento distintivo do ministro ordenado; faixa de tecido cuja cor segue o tempo litúrgico. Usada sempre na celebração dos sacramentos." },
+    { "termo": "Estola Diaconal / Dalmática", "definicao": "Estola usada pelo diácono (atravessada) e a dalmática, veste própria do diácono." },
+    { "termo": "Casula", "definicao": "Veste externa do sacerdote na Missa. Formas: Gregoriana, Gótica e Romana." },
+    { "termo": "Véu Umeral", "definicao": "Usado pelo sacerdote ou diácono ao portar o Santíssimo Sacramento; protege a realidade sagrada, expressando que não se toca diretamente com as mãos." },
+    { "termo": "Pluvial (Capa de Asperges)", "definicao": "Capa usada em procissões, bênçãos e aspersões." },
+    { "termo": "Vestes Episcopais", "definicao": "Próprias do bispo: solidéu, mitra, báculo e cruz peitoral. Batinas: sacerdotal, episcopal, cardealícia e papal." }
+  ],
+  "objetos": [
+    { "termo": "Cálice", "definicao": "Taça onde se coloca o vinho que vai ser consagrado." },
+    { "termo": "Patena", "definicao": "Prato onde são colocadas as hóstias para a consagração." },
+    { "termo": "Hóstia", "definicao": "Pão eucarístico. A palavra significa 'vítima que será sacrificada'." },
+    { "termo": "Corporal", "definicao": "Pano quadrangular de linho com uma cruz no centro; sobre ele se coloca o cálice, a patena e a âmbula para a consagração." },
+    { "termo": "Sanguíneo (Purificatório)", "definicao": "Pequeno pano usado pelo celebrante para enxugar a boca, os dedos e o interior do cálice após a consagração." },
+    { "termo": "Pala", "definicao": "Cobertura quadrangular para o cálice." },
+    { "termo": "Alfaias", "definicao": "Designam todos os objetos usados no culto, como os paramentos litúrgicos (corporal, sanguíneo, pala)." },
+    { "termo": "Âmbula (Cibório)", "definicao": "Vaso sagrado que guarda as hóstias consagradas para a distribuição e a reserva eucarística." },
+    { "termo": "Véu do Cibório", "definicao": "Véu que cobre o cibório/âmbula contendo o Santíssimo." },
+    { "termo": "Galhetas", "definicao": "Recipientes onde se coloca a água e o vinho usados na Celebração Eucarística." },
+    { "termo": "Lavabo (Jarra e Bacia)", "definicao": "Conjunto para o lava-mãos do celebrante durante o ofertório." },
+    { "termo": "Manustérgio", "definicao": "Toalha usada para purificar/secar as mãos antes, durante e depois do ato litúrgico." },
+    { "termo": "Sineta (Carrilhão)", "definicao": "Sininhos tocados pelo acólito no momento da consagração." },
+    { "termo": "Turíbulo", "definicao": "Incensário. Usado na procissão de entrada, ao incensar o altar, na proclamação do Evangelho, no ofertório, à elevação após a consagração e na exposição do Santíssimo (incensado de joelhos)." },
+    { "termo": "Naveta", "definicao": "Objeto usado para guardar o incenso antes de queimá-lo no turíbulo." },
+    { "termo": "Caldeirinha e Aspersório", "definicao": "Recipiente da água benta e o instrumento usado para asperjir." },
+    { "termo": "Cruz Processional / Crucifixo do Altar", "definicao": "Cruz conduzida na procissão e o crucifixo disposto junto ao altar." },
+    { "termo": "Castiçal e Vela", "definicao": "Suporte e vela que iluminam o altar; sinal de Cristo, luz do mundo." },
+    { "termo": "Missal Romano", "definicao": "Livro com as orações e textos da celebração da Missa." },
+    { "termo": "Lecionário", "definicao": "Livro com as leituras bíblicas proclamadas na Liturgia da Palavra." },
+    { "termo": "Ostensório", "definicao": "Peça onde o Santíssimo é exposto para a adoração. Composto pela luneta, o ostensório e o trono do ostensório." },
+    { "termo": "Luneta", "definicao": "Suporte que segura a Hóstia consagrada no centro do ostensório." }
+  ],
+  "montagem_calice": [
+    "1. Cálice.",
+    "2. Colocar o sanguíneo sobre o cálice, fazendo leve pressão ao centro.",
+    "3. Colocar a patena sobre o cálice e o sanguíneo.",
+    "4. Colocar a hóstia que vai ser consagrada sobre a patena.",
+    "5. Colocar a pala.",
+    "6. Colocar o corporal.",
+    "7. Colocar o véu do cálice."
+  ]
+}
