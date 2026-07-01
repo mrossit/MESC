@@ -997,23 +997,15 @@
       0 -1px 16px rgba(253, 251, 247, 0.05);
   }
 
-  .capacitor-ios .ios-glass-bar,
-  .dark.capacitor-ios .ios-glass-bar {
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
+  /* iOS (Capacitor/WebKit) keeps the full CSS liquid glass — WebKit supports
+     -webkit-backdrop-filter: blur+saturate. The native UIVisualEffect overlay
+     was removed (it sat behind everything with nothing to blur → transparent). */
 
   .dark .ios-glass-bar::before {
     background:
       linear-gradient(112deg, rgba(253, 251, 247, 0.13), transparent 34%),
       linear-gradient(292deg, transparent 55%, rgba(var(--old-gold), 0.10)),
       linear-gradient(0deg, rgba(253, 251, 247, 0.055), transparent 56%);
-  }
-
-  .capacitor-ios .ios-glass-bar::before {
-    opacity: 0.34;
   }
 
   .toast-viewport {

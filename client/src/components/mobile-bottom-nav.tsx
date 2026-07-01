@@ -1,9 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Calendar, Church, GraduationCap, Menu, Repeat2 } from "lucide-react";
-import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
-import { isNativeGlassAvailable, NativeGlass } from "@/lib/native-glass";
 
 interface NavItem {
   title: string;
@@ -11,54 +9,10 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-function cssLengthToPixels(value: string): number {
-  const trimmed = value.trim();
-  if (!trimmed) return 60;
-
-  const numericValue = Number.parseFloat(trimmed);
-  if (!Number.isFinite(numericValue)) return 60;
-
-  if (trimmed.endsWith("rem")) {
-    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    return numericValue * (Number.isFinite(rootFontSize) ? rootFontSize : 16);
-  }
-
-  return numericValue;
-}
-
-function getTabBarHeightPixels(): number {
-  const style = getComputedStyle(document.documentElement);
-  return cssLengthToPixels(style.getPropertyValue("--app-tab-bar-height"));
-}
-
 export function MobileBottomNav() {
   const [location] = useLocation();
   const { setOpenMobile } = useSidebar();
   const currentPath = location.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
-
-  useEffect(() => {
-    if (!isNativeGlassAvailable()) return;
-
-    let animationFrameId = 0;
-
-    const syncNativeGlass = () => {
-      window.cancelAnimationFrame(animationFrameId);
-      animationFrameId = window.requestAnimationFrame(() => {
-        void NativeGlass.showTabBarGlass({ height: getTabBarHeightPixels() }).catch(() => undefined);
-      });
-    };
-
-    syncNativeGlass();
-    window.addEventListener("resize", syncNativeGlass);
-    window.addEventListener("orientationchange", syncNativeGlass);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", syncNativeGlass);
-      window.removeEventListener("orientationchange", syncNativeGlass);
-      void NativeGlass.hide().catch(() => undefined);
-    };
-  }, []);
 
   const navItems: NavItem[] = [
     {

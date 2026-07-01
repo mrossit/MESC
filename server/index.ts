@@ -430,6 +430,14 @@ async function bootstrapServer({ listen = true } = {}): Promise<Server> {
     await scheduleCache.clear();
     console.log("🧹 Schedule cache cleared on startup");
 
+    // Auto-seed formation content on startup (idempotent: guards on existing
+    // track + onConflictDoNothing). Fire-and-forget so a seed hiccup never
+    // blocks or crashes boot. Removes the need for a manual admin seed click.
+    void import("./seeds/formation-seed")
+      .then(({ default: seedFormation }) => seedFormation())
+      .then(() => console.log("📚 Formation content ensured on startup"))
+      .catch((error) => console.error("⚠️ Formation auto-seed skipped:", error));
+
     if (listen) {
       server.listen(port, "0.0.0.0", () => {
         console.log(`✅ Server started on port ${port} (${process.env.NODE_ENV})`);
