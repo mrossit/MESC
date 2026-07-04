@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx server/seedAdmin.ts",
     "db:seed:liturgical": "tsx server/seeds/index.ts",
+    "db:seed:formation": "tsx server/seeds/formation-seed.ts",
+    "formation:validate": "tsx scripts/validate-mesc-formation.ts",
     "db:backup": "NODE_ENV=production tsx scripts/backup-db.ts",
     "db:restore": "NODE_ENV=production tsx scripts/restore-db.ts",
     "db:studio": "drizzle-kit studio",
