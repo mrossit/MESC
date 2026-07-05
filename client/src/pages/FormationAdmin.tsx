@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -143,7 +143,7 @@ interface Stats {
   tracks: { total: number; active: number };
   modules: { total: number };
   lessons: { total: number; active: number };
-  sections: { total: number };
+  sections: { total: number; videos?: number };
 }
 
 type AdminView =
@@ -397,8 +397,10 @@ function TrackFormDialog({
     }
   };
 
-  // Reset form when dialog opens
-  useState(() => resetForm(track));
+  useEffect(() => {
+    if (open) resetForm(track);
+  }, [open, track]);
+
   const handleOpenChange = (val: boolean) => {
     if (val) resetForm(track);
     onOpenChange(val);
@@ -547,7 +549,10 @@ function ModuleFormDialog({
     }
   };
 
-  useState(() => resetForm(mod));
+  useEffect(() => {
+    if (open) resetForm(mod);
+  }, [open, mod]);
+
   const handleOpenChange = (val: boolean) => {
     if (val) resetForm(mod);
     onOpenChange(val);
@@ -695,7 +700,10 @@ function LessonFormDialog({
     }
   };
 
-  useState(() => resetForm(lesson));
+  useEffect(() => {
+    if (open) resetForm(lesson);
+  }, [open, lesson]);
+
   const handleOpenChange = (val: boolean) => {
     if (val) resetForm(lesson);
     onOpenChange(val);
@@ -852,11 +860,13 @@ function SectionFormDialog({
   onOpenChange,
   lessonId,
   section,
+  defaultType = "text",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lessonId: string;
   section: Section | null;
+  defaultType?: Section["type"];
 }) {
   const isEdit = !!section;
   const [form, setForm] = useState({
@@ -899,7 +909,7 @@ function SectionFormDialog({
     } else {
       setForm({
         title: "",
-        type: "text",
+        type: defaultType,
         isRequired: true,
         estimatedMinutes: "",
         content: "",
@@ -912,7 +922,10 @@ function SectionFormDialog({
     }
   };
 
-  useState(() => resetForm(section));
+  useEffect(() => {
+    if (open) resetForm(section);
+  }, [open, section, defaultType]);
+
   const handleOpenChange = (val: boolean) => {
     if (val) resetForm(section);
     onOpenChange(val);
@@ -1033,12 +1046,19 @@ function SectionFormDialog({
           )}
 
           {form.type === "video" && (
-            <div>
-              <Label>URL do Vídeo</Label>
+            <div className="rounded-xl border border-border/70 bg-muted/30 p-3 space-y-2">
+              <Label className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                URL do Vídeo
+              </Label>
               <Input
+                placeholder="https://youtube.com/... ou link do arquivo"
                 value={form.videoUrl}
                 onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                Use uma URL pública ou hospedada em ambiente autorizado. O app exibirá o vídeo dentro da aula para os ministros.
+              </p>
             </div>
           )}
 
@@ -1085,7 +1105,7 @@ function SectionFormDialog({
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !form.title}
+            disabled={mutation.isPending || !form.title || (form.type === "video" && !form.videoUrl)}
           >
             {mutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {isEdit ? "Salvar" : "Criar"}
@@ -1196,6 +1216,7 @@ function SectionsView({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSection, setEditSection] = useState<Section | null>(null);
+  const [sectionDefaultType, setSectionDefaultType] = useState<Section["type"]>("text");
   const [deleteTarget, setDeleteTarget] = useState<Section | null>(null);
 
   const { data, isLoading } = useQuery<{ sections: Section[] }>({
@@ -1243,6 +1264,18 @@ function SectionsView({
     reorderMutation.mutate(reordered.map((s) => s.id));
   };
 
+  const openNewSection = (type: Section["type"] = "text") => {
+    setSectionDefaultType(type);
+    setEditSection(null);
+    setDialogOpen(true);
+  };
+
+  const openEditSection = (section: Section) => {
+    setSectionDefaultType(section.type);
+    setEditSection(section);
+    setDialogOpen(true);
+  };
+
   return (
     <div>
       <AdminBreadcrumb
@@ -1254,11 +1287,16 @@ function SectionsView({
         onNavigate={onNavigate}
       />
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold">Seções da Aula: {lesson.title}</h2>
-        <Button size="sm" onClick={() => { setEditSection(null); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1" /> Nova Seção
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => openNewSection("video")}>
+            <Video className="h-4 w-4 mr-1" /> Novo Vídeo
+          </Button>
+          <Button size="sm" onClick={() => openNewSection("text")}>
+            <Plus className="h-4 w-4 mr-1" /> Nova Seção
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -1270,14 +1308,14 @@ function SectionsView({
           <CardContent className="py-12 text-center text-muted-foreground">
             <FileText className="h-10 w-10 mx-auto mb-3 opacity-50" />
             <p>Nenhuma seção cadastrada nesta aula.</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => { setEditSection(null); setDialogOpen(true); }}
-            >
-              Criar primeira seção
-            </Button>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => openNewSection("video")}>
+                <Video className="h-4 w-4 mr-1" /> Adicionar vídeo
+              </Button>
+              <Button size="sm" onClick={() => openNewSection("text")}>
+                Criar primeira seção
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -1314,7 +1352,7 @@ function SectionsView({
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
-                        onClick={() => { setEditSection(section); setDialogOpen(true); }}
+                        onClick={() => openEditSection(section)}
                         title="Editar"
                       >
                         <Edit className="h-3.5 w-3.5" />
@@ -1362,6 +1400,7 @@ function SectionsView({
         onOpenChange={setDialogOpen}
         lessonId={lesson.id}
         section={editSection}
+        defaultType={sectionDefaultType}
       />
 
       <DeleteConfirmDialog
@@ -1893,12 +1932,13 @@ function FormationDashboard({
     { label: "Módulos", value: statsData?.modules.total ?? "—", icon: BookOpen },
     { label: "Aulas", value: statsData?.lessons.total ?? "—", sub: `${statsData?.lessons.active ?? 0} ativas`, icon: FileText },
     { label: "Seções", value: statsData?.sections.total ?? "—", icon: BarChart3 },
+    { label: "Vídeos", value: statsData?.sections.videos ?? "—", sub: "em aulas", icon: Video },
   ];
 
   return (
     <div>
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {statCards.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-4">
@@ -1916,9 +1956,14 @@ function FormationDashboard({
       </div>
 
       {/* Actions bar */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Trilhas de Formação</h2>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">Trilhas de Formação</h2>
+          <p className="text-sm text-muted-foreground">
+            Coordenadores podem publicar aulas, conteúdos, quizzes e vídeos para os ministros.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/formation/library">
               <BookOpen className="h-4 w-4 mr-1" /> Biblioteca
@@ -2112,7 +2157,7 @@ export default function FormationAdmin({ onExit }: FormationAdminProps) {
           <div>
             <h1 className="text-xl font-bold">Administração da Formação</h1>
             <p className="text-sm text-muted-foreground">
-              Gerencie trilhas, módulos, aulas e seções do programa de formação
+              Gerencie trilhas, módulos, aulas, conteúdos e vídeos do programa de formação
             </p>
           </div>
         </div>

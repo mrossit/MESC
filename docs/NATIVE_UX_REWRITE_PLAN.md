@@ -38,7 +38,7 @@ Replace the remaining PWA-like frontend behavior with a native-first app experie
    - Settings and device permissions.
    - Mission home.
    - Schedules: calendar, list, export, confirmation.
-   - Formation.
+   - Formation: minister learning flow plus coordinator studio for lessons, content, quizzes, and video sections.
    - Substitutions.
    - Profile and account.
    - Coordinator workflows.

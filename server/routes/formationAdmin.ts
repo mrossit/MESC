@@ -878,6 +878,10 @@ router.get('/stats', async (req, res) => {
     const [modulesCount] = await db.select({ total: count() }).from(formationModules);
     const [lessonsCount] = await db.select({ total: count() }).from(formationLessons);
     const [sectionsCount] = await db.select({ total: count() }).from(formationLessonSections);
+    const [videoSectionsCount] = await db
+      .select({ total: count() })
+      .from(formationLessonSections)
+      .where(eq(formationLessonSections.type, 'video'));
 
     const [activeTracksCount] = await db.select({ total: count() }).from(formationTracks).where(eq(formationTracks.isActive, true));
     const [activeLessonsCount] = await db.select({ total: count() }).from(formationLessons).where(eq(formationLessons.isActive, true));
@@ -886,7 +890,7 @@ router.get('/stats', async (req, res) => {
       tracks: { total: tracksCount.total, active: activeTracksCount.total },
       modules: { total: modulesCount.total },
       lessons: { total: lessonsCount.total, active: activeLessonsCount.total },
-      sections: { total: sectionsCount.total }
+      sections: { total: sectionsCount.total, videos: videoSectionsCount.total }
     });
   } catch (error: unknown) {
     console.error('Error fetching admin stats:', error);

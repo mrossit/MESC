@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { isAdmin as isAdminRole } from "@shared/roles";
+import { isAdmin as canManageFormationRole } from "@shared/roles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -821,7 +821,7 @@ export default function Formation() {
   });
 
   const user = authData?.user;
-  const isAdmin = isAdminRole(user?.role);
+  const canManageFormation = canManageFormationRole(user?.role);
 
   const {
     data: overview,
@@ -853,8 +853,8 @@ export default function Formation() {
 
   const allTracks = overview?.tracks ?? [];
   const tracks = useMemo(() => {
-    return getVisibleFormationTracks(allTracks, isAdmin);
-  }, [allTracks, isAdmin]);
+    return getVisibleFormationTracks(allTracks, canManageFormation);
+  }, [allTracks, canManageFormation]);
   const summary = overview?.summary;
   const selectedFormationMap = formationMaterial?.assets.maps[selectedMapIndex] ?? formationMaterial?.assets.maps[0];
 
@@ -1014,7 +1014,7 @@ export default function Formation() {
     );
   }
 
-  if (adminMode && isAdmin) {
+  if (adminMode && canManageFormation) {
     return <FormationAdmin onExit={() => setAdminMode(false)} />;
   }
 
@@ -1044,7 +1044,7 @@ export default function Formation() {
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                   {formatPercentage(summary?.percentageCompleted)} concluído
                 </Badge>
-                {isAdmin && (
+                {canManageFormation && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1052,7 +1052,7 @@ export default function Formation() {
                     data-testid="button-open-admin-mode"
                   >
                     <Settings className="h-4 w-4 mr-2" />
-                    Área Administrativa
+                    Gerenciar aulas
                   </Button>
                 )}
               </div>
