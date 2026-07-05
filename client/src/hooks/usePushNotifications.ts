@@ -105,10 +105,6 @@ function clearStoredNativePushToken() {
   localStorage.removeItem(NATIVE_PUSH_PROVIDER_KEY);
 }
 
-function readStoredNativePushPermissionOutcome() {
-  return getStorage()?.getItem(NATIVE_PUSH_PERMISSION_OUTCOME_KEY) ?? null;
-}
-
 function storeNativePushPermissionOutcome(permission: PushPermissionState) {
   const localStorage = getStorage();
   if (!localStorage) return;
@@ -124,6 +120,14 @@ function hasAuthToken() {
 function normalizeNativePermission(value: string | undefined): PushPermissionState {
   if (value === "granted" || value === "denied" || value === "prompt-with-rationale") return value;
   return "prompt";
+}
+
+function getNativePushErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/aps-environment|entitlement|provision/i.test(message)) {
+    return "Notificações nativas ainda não estão assinadas neste build. É preciso habilitar Push Notifications no Apple Developer e gerar um novo TestFlight.";
+  }
+  return message || "Falha ao registrar notificações do aparelho.";
 }
 
 async function waitForNativeRegistrationToken() {
@@ -157,12 +161,12 @@ async function waitForNativeRegistrationToken() {
       });
 
       errorHandle = await PushNotifications.addListener("registrationError", (registrationError) => {
-        settle(() => reject(new Error(registrationError.error || "Falha ao registrar notificações do aparelho.")));
+        settle(() => reject(new Error(getNativePushErrorMessage(registrationError.error))));
       });
 
       await PushNotifications.register();
     } catch (error) {
-      settle(() => reject(error));
+      settle(() => reject(new Error(getNativePushErrorMessage(error))));
     }
   });
 }
@@ -232,16 +236,13 @@ export function usePushNotifications(): PushNotificationsState {
             if (!provider) return;
 
             let nativePermission = normalizeNativePermission((await PushNotifications.checkPermissions()).receive);
-            if ((nativePermission === "prompt" || nativePermission === "prompt-with-rationale")
-              && !readStoredNativePushPermissionOutcome()) {
-              nativePermission = normalizeNativePermission((await PushNotifications.requestPermissions()).receive);
-              storeNativePushPermissionOutcome(nativePermission);
-            } else if (nativePermission === "granted" || nativePermission === "denied") {
+            if (nativePermission === "granted" || nativePermission === "denied") {
               storeNativePushPermissionOutcome(nativePermission);
             }
 
             if (nativePermission !== "granted") {
               clearStoredNativePushToken();
+              await syncNativePushDevice("", provider, false).catch(() => undefined);
               return;
             }
 
@@ -270,7 +271,7 @@ export function usePushNotifications(): PushNotificationsState {
         console.warn("[Push] Native push setup failed:", setupError);
         if (!cancelled) {
           setStatus("errored");
-          setError(setupError instanceof Error ? setupError.message : "Não foi possível inicializar notificações do aparelho.");
+          setError(getNativePushErrorMessage(setupError));
         }
       }
     }
@@ -379,6 +380,7 @@ export function usePushNotifications(): PushNotificationsState {
         if (nativePermission === "prompt" || nativePermission === "prompt-with-rationale") {
           nativePermission = normalizeNativePermission((await PushNotifications.requestPermissions()).receive);
         }
+        storeNativePushPermissionOutcome(nativePermission);
 
         setPermission(nativePermission);
         if (nativePermission !== "granted") {
@@ -394,7 +396,7 @@ export function usePushNotifications(): PushNotificationsState {
       } catch (err) {
         console.error("[Push] Failed to subscribe native device:", err);
         setStatus("errored");
-        setError(err instanceof Error ? err.message : "Não foi possível ativar as notificações do aparelho.");
+        setError(getNativePushErrorMessage(err) || "Não foi possível ativar as notificações do aparelho.");
       } finally {
         setIsBusy(false);
       }

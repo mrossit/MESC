@@ -323,7 +323,7 @@ export default function Settings() {
       return;
     }
 
-    if (pushStatus === 'errored') {
+    if (!pushIsNative && pushStatus === 'errored') {
       setError(pushIsNative
         ? 'Erro ao inicializar notificações do aparelho. Tente fechar e abrir o app novamente.'
         : 'Erro ao inicializar notificações push. Tente recarregar a página.');
@@ -346,6 +346,7 @@ export default function Settings() {
           ? 'Notificações do aparelho ativadas com sucesso!'
           : 'Notificações push ativadas com sucesso!');
       } catch (err) {
+        setSettings(prev => ({ ...prev, pushNotifications: false }));
         setError(pushError || (pushIsNative
           ? 'Erro ao ativar notificações do aparelho.'
           : 'Erro ao ativar notificações push.'));
@@ -580,7 +581,7 @@ export default function Settings() {
             )}
 
             <Tabs defaultValue="notifications" className="w-full">
-              <TabsList className={`liquid-glass-chip grid h-auto w-full rounded-lg p-1 ${isDev ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              <TabsList className={`liquid-glass-chip grid h-auto w-full rounded-xl p-1 ${isDev ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <TabsTrigger value="notifications" className="min-w-0 px-2 text-xs sm:text-sm">
                   <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Notificações</span>
@@ -606,7 +607,7 @@ export default function Settings() {
 
               <TabsContent value="notifications" className="space-y-6 mt-6">
                 <div className="space-y-4">
-                  <Card className="liquid-glass border-0">
+                  <Card className="ios-material-card border-0">
                     <CardContent className="pt-6">
                       <div className="space-y-4">
                         {pushStatus === 'no-support' && (
@@ -619,8 +620,16 @@ export default function Settings() {
                             </AlertDescription>
                           </Alert>
                         )}
+                        {pushError && (
+                          <Alert className="border-amber-300/70 bg-amber-50/70 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                            <Info className="h-4 w-4" />
+                            <AlertDescription className="text-xs sm:text-sm">
+                              {pushError}
+                            </AlertDescription>
+                          </Alert>
+                        )}
 
-                        <div className="liquid-glass-chip flex items-center justify-between rounded-lg p-4">
+                        <div className="ios-control-row flex items-center justify-between gap-4 rounded-xl p-4">
                           <div className="space-y-0.5">
                             <Label htmlFor="push" className="text-sm sm:text-base font-medium">
                               {pushIsNative ? 'Notificações do aparelho' : 'Notificações Push'}
@@ -649,7 +658,7 @@ export default function Settings() {
                           />
                         </div>
 
-                        <div className="liquid-glass-chip flex items-center justify-between rounded-lg p-4">
+                        <div className="ios-control-row flex items-center justify-between gap-4 rounded-xl p-4">
                           <div className="space-y-0.5">
                             <Label htmlFor="email" className="text-sm sm:text-base font-medium">
                               Notificações por E-mail
@@ -667,7 +676,7 @@ export default function Settings() {
                           />
                         </div>
 
-                        <div className="liquid-glass-chip space-y-2 rounded-lg p-4">
+                        <div className="ios-control-row space-y-2 rounded-xl p-4">
                           <Label htmlFor="reminder" className="text-sm sm:text-base font-medium">
                             Lembrete antecipado
                           </Label>
@@ -680,7 +689,7 @@ export default function Settings() {
                             onChange={(e) => 
                               setSettings(prev => ({ ...prev, reminderHours: Number(e.target.value) }))
                             }
-                            className="w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.7rem_center]"
+                            className="w-full appearance-none rounded-lg border border-white/60 bg-white/55 bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.7rem_center] px-3 py-2.5 pr-8 text-sm text-gray-900 shadow-inner backdrop-blur-xl focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring dark:border-white/10 dark:bg-white/10 dark:text-gray-100"
                             style={{
                               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`
                             }}
@@ -698,7 +707,7 @@ export default function Settings() {
               </TabsContent>
 
               <TabsContent value="availability" className="space-y-6 mt-6">
-                <Card className="liquid-glass border-0">
+                <Card className="ios-material-card border-0">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
@@ -828,7 +837,7 @@ export default function Settings() {
               </TabsContent>
 
               <TabsContent value="account" className="space-y-6 mt-6">
-                <Card className="liquid-glass border-0">
+                <Card className="ios-material-card border-0">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                       <Fingerprint className="h-5 w-5 text-neutral-accentWarm dark:text-dark-gold" />
@@ -839,7 +848,7 @@ export default function Settings() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-start justify-between gap-4 rounded-lg border border-white/50 bg-white/30 p-4 dark:border-white/10 dark:bg-white/5">
+                    <div className="ios-control-row flex items-start justify-between gap-4 rounded-xl p-4">
                       <div className="min-w-0 space-y-1">
                         <Label htmlFor="biometric-login" className="text-sm font-semibold">
                           {biometricStatus?.native ? `Entrar com ${biometricStatus.label}` : 'Entrar com biometria'}
@@ -863,7 +872,7 @@ export default function Settings() {
                   </CardContent>
                 </Card>
 
-                <Card className="liquid-glass border-destructive/30">
+                <Card className="ios-material-card border-destructive/25">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                       <ShieldAlert className="h-5 w-5 text-destructive" />
@@ -884,7 +893,7 @@ export default function Settings() {
                       </AlertDescription>
                     </Alert>
 
-                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                    <div className="ios-control-row rounded-xl border-destructive/25 bg-destructive/5 p-4">
                       <h3 className="text-sm font-semibold text-destructive">Excluir minha conta</h3>
                       <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
                         Esta ação encerra sua sessão, desativa o acesso e remove os dados pessoais associados.
@@ -910,7 +919,7 @@ export default function Settings() {
               {/* DEV MODE TAB - Only visible in development */}
               {isDev && (
                 <TabsContent value="dev" className="space-y-6 mt-6">
-                  <Card className="border-yellow-500 border-2">
+                  <Card className="ios-material-card border-yellow-500/40">
                     <CardHeader>
                       <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                         <Code2 className="h-5 w-5 text-yellow-600" />
