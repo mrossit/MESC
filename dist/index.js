@@ -7202,1533 +7202,544 @@ var init_websocket = __esm({
   }
 });
 
+// server/services/mescFormationContent.ts
+import { access, readFile } from "node:fs/promises";
+import path from "node:path";
+import { v5 as uuidv5 } from "uuid";
+import { z as z8 } from "zod";
+async function loadMescFormationContent(root = MESC_FORMATION_ROOT) {
+  const schemaIndex = await readJson(root, "dados/schema/mesc.schema.json", schemaIndexSchema);
+  for (const relativePath of Object.values(dataFiles)) {
+    if (!schemaIndex._mapaArquivos[relativePath]) {
+      throw new Error(`Schema n\xE3o referencia ${relativePath}`);
+    }
+  }
+  const manifest = await readJson(root, dataFiles.manifest, manifestSchema);
+  const funcoesEscala = await readJson(root, dataFiles.funcoes_escala, funcoesEscalaSchema);
+  const missasEParticulas = await readJson(root, dataFiles.missas_e_particulas, missasEParticulasSchema);
+  const checklists = await readJson(root, dataFiles.checklists, checklistsSchema);
+  const oracoes = await readJson(root, dataFiles.oracoes, oracoesSchema);
+  const coresETempos = await readJson(root, dataFiles.cores_e_tempos, coresETemposSchema);
+  const glossarioLiturgico = await readJson(root, dataFiles.glossario_liturgico, glossarioLiturgicoSchema);
+  const knownDataPaths = new Set(Object.values(dataFiles));
+  const modules = [];
+  for (const module of manifest.modulos) {
+    await assertFileExists(root, module.conteudo);
+    for (const dataPath of module.dados ?? []) {
+      if (!knownDataPaths.has(dataPath)) {
+        throw new Error(`M\xF3dulo ${module.id} referencia dado desconhecido: ${dataPath}`);
+      }
+      await assertFileExists(root, dataPath);
+    }
+    const rawMarkdown = await readFile(path.join(root, module.conteudo), "utf8");
+    const { frontMatter, markdown } = stripFrontMatter(rawMarkdown);
+    if (frontMatter.modulo && frontMatter.modulo !== module.id) {
+      throw new Error(`Front matter de ${module.conteudo} usa m\xF3dulo ${frontMatter.modulo}, esperado ${module.id}`);
+    }
+    modules.push({
+      manifest: module,
+      frontMatter,
+      markdown,
+      sections: splitMarkdownSections(module, markdown)
+    });
+  }
+  for (const massConfig of missasEParticulas.escala_por_missa) {
+    await assertFileExists(root, massConfig.mapa);
+  }
+  return {
+    manifest,
+    data: {
+      funcoes_escala: funcoesEscala,
+      missas_e_particulas: missasEParticulas,
+      checklists,
+      oracoes,
+      cores_e_tempos: coresETempos,
+      glossario_liturgico: glossarioLiturgico
+    },
+    modules
+  };
+}
+function buildFormationSeedRecords(content) {
+  const modules = content.modules.map((module, index2) => {
+    const durationMinutes = module.sections.reduce((sum2, section) => sum2 + section.estimatedMinutes, 0);
+    return {
+      id: uuidv5(`mesc-module:${module.manifest.id}`, MESC_FORMATION_UUID_NAMESPACE),
+      trackId: MESC_FORMATION_TRACK_ID,
+      title: module.manifest.titulo,
+      description: module.manifest.resumo,
+      category: getModuleCategory(module.manifest.id),
+      content: module.markdown,
+      durationMinutes,
+      orderIndex: index2
+    };
+  });
+  const lessons = content.modules.map((module, index2) => {
+    const moduleRecord = modules[index2];
+    return {
+      id: uuidv5(`mesc-lesson:${module.manifest.id}:conteudo`, MESC_FORMATION_UUID_NAMESPACE),
+      moduleId: moduleRecord.id,
+      trackId: MESC_FORMATION_TRACK_ID,
+      title: module.manifest.titulo,
+      description: module.manifest.resumo,
+      lessonNumber: 1,
+      durationMinutes: moduleRecord.durationMinutes,
+      objectives: module.manifest.secoes,
+      isActive: true,
+      orderIndex: 0
+    };
+  });
+  const sections = content.modules.flatMap((module, moduleIndex) => {
+    const lesson = lessons[moduleIndex];
+    return module.sections.map((section) => ({
+      id: uuidv5(`mesc-section:${section.id}`, MESC_FORMATION_UUID_NAMESPACE),
+      lessonId: lesson.id,
+      type: "text",
+      title: section.title,
+      content: section.content,
+      orderIndex: section.orderIndex,
+      isRequired: true,
+      estimatedMinutes: section.estimatedMinutes
+    }));
+  });
+  return {
+    track: {
+      id: MESC_FORMATION_TRACK_ID,
+      title: "Forma\xE7\xE3o MESC S\xE3o Judas Tadeu",
+      description: `${content.manifest.subtitulo} \u2022 ${content.manifest.versao}`,
+      category: "liturgia",
+      icon: "Cross",
+      orderIndex: 0,
+      isActive: true
+    },
+    modules,
+    lessons,
+    sections
+  };
+}
+function buildMescFormationMaterialResponse(content) {
+  return {
+    title: content.manifest.titulo,
+    subtitle: content.manifest.subtitulo,
+    version: content.manifest.versao,
+    description: content.manifest.descricao,
+    modules: content.manifest.modulos.map((module) => ({
+      id: module.id,
+      title: module.titulo,
+      summary: module.resumo,
+      icon: module.icone,
+      sections: module.secoes,
+      contentPath: module.conteudo,
+      dataPaths: module.dados ?? []
+    })),
+    assets: {
+      maps: content.data.missas_e_particulas.escala_por_missa.map((map) => ({
+        mass: map.missa,
+        ministers: map.ministros,
+        particles: map.eucaristias,
+        observation: map.observacao,
+        sourcePath: map.mapa,
+        assetUrl: getMescFormationPublicAssetUrl(map.mapa)
+      }))
+    },
+    data: content.data
+  };
+}
+var MESC_FORMATION_ROOT, MESC_FORMATION_TRACK_ID, MESC_FORMATION_PUBLIC_ASSET_BASE, MESC_FORMATION_UUID_NAMESPACE, dataFiles, faseSchema, categoriaFuncaoSchema, manifestSchema, funcoesEscalaSchema, missasEParticulasSchema, checklistsSchema, oracoesSchema, coresETemposSchema, termoGlossarioSchema, glossarioLiturgicoSchema, schemaIndexSchema, readJson, assertFileExists, stripFrontMatter, slugify, splitMarkdownSections, getModuleCategory, getMescFormationPublicAssetUrl;
+var init_mescFormationContent = __esm({
+  "server/services/mescFormationContent.ts"() {
+    "use strict";
+    MESC_FORMATION_ROOT = path.resolve(process.cwd(), "MESC_Formation");
+    MESC_FORMATION_TRACK_ID = "mesc-formation-2026";
+    MESC_FORMATION_PUBLIC_ASSET_BASE = "/mesc-formation";
+    MESC_FORMATION_UUID_NAMESPACE = "8a34e97b-8ee0-4487-b971-bbc8f00fd6a3";
+    dataFiles = {
+      manifest: "dados/manifest.json",
+      funcoes_escala: "dados/funcoes_escala.json",
+      missas_e_particulas: "dados/missas_e_particulas.json",
+      checklists: "dados/checklists.json",
+      oracoes: "dados/oracoes.json",
+      cores_e_tempos: "dados/cores_e_tempos.json",
+      glossario_liturgico: "dados/glossario_liturgico.json"
+    };
+    faseSchema = z8.enum(["preparacao", "durante", "encerramento"]);
+    categoriaFuncaoSchema = z8.enum([
+      "auxiliar",
+      "santissimo",
+      "velas",
+      "apoio",
+      "purificacao",
+      "mezanino",
+      "extra"
+    ]);
+    manifestSchema = z8.object({
+      titulo: z8.string().min(1),
+      subtitulo: z8.string().min(1),
+      versao: z8.string().min(1),
+      descricao: z8.string().min(1),
+      modulos: z8.array(z8.object({
+        id: z8.string().min(1),
+        titulo: z8.string().min(1),
+        icone: z8.string().min(1),
+        resumo: z8.string().min(1),
+        conteudo: z8.string().min(1),
+        dados: z8.array(z8.string().min(1)).optional(),
+        secoes: z8.array(z8.string().min(1))
+      }).strict()).min(1)
+    }).strict();
+    funcoesEscalaSchema = z8.object({
+      descricao: z8.string().min(1),
+      fase_legenda: z8.object({
+        preparacao: z8.string().min(1),
+        durante: z8.string().min(1),
+        encerramento: z8.string().min(1)
+      }).strict(),
+      funcoes: z8.array(z8.object({
+        numero: z8.number().int().positive(),
+        papel: z8.string().min(1),
+        categoria: categoriaFuncaoSchema,
+        resumo: z8.string().min(1),
+        responsabilidades: z8.array(z8.string().min(1)),
+        fases: z8.array(faseSchema)
+      }).strict()).min(1),
+      observacao_geral: z8.string().min(1)
+    }).strict();
+    missasEParticulasSchema = z8.object({
+      capacidade_igreja: z8.number().int().positive(),
+      regra_calculo_particulas: z8.string().min(1),
+      horarios: z8.object({
+        domingo: z8.array(z8.string().min(1)),
+        diaria: z8.array(z8.string().min(1)),
+        sao_judas_tadeu_dia_28: z8.object({
+          dia_de_semana: z8.array(z8.string().min(1)),
+          sabado: z8.array(z8.string().min(1)),
+          domingo: z8.array(z8.string().min(1))
+        }).strict(),
+        cura_e_libertacao: z8.string().min(1),
+        sagrado_coracao_de_jesus: z8.string().min(1),
+        sagrado_coracao_de_maria: z8.string().min(1)
+      }).strict(),
+      adoracao_ao_santissimo: z8.string().min(1),
+      antecedencia_chegada: z8.object({
+        missa_comum: z8.string().min(1),
+        missa_diaria: z8.string().min(1),
+        cura_e_libertacao: z8.string().min(1)
+      }).strict(),
+      escala_por_missa: z8.array(z8.object({
+        missa: z8.string().min(1),
+        ministros: z8.number().int().positive(),
+        eucaristias: z8.number().int().positive(),
+        mapa: z8.string().min(1),
+        observacao: z8.string().min(1)
+      }).strict()).min(1)
+    }).strict();
+    checklistsSchema = z8.object({
+      checklists: z8.array(z8.object({
+        id: z8.string().min(1),
+        titulo: z8.string().min(1),
+        descricao: z8.string().min(1),
+        itens: z8.array(z8.string().min(1))
+      }).strict()).min(1)
+    }).strict();
+    oracoesSchema = z8.object({
+      nota: z8.string().min(1),
+      oracoes: z8.array(z8.object({
+        id: z8.string().min(1),
+        titulo: z8.string().min(1),
+        repeticoes: z8.number().int().positive(),
+        texto: z8.string().min(1),
+        complemento: z8.string().min(1).optional()
+      }).strict()).min(1),
+      oracao_na_roda: z8.string().min(1)
+    }).strict();
+    coresETemposSchema = z8.object({
+      cores_liturgicas: z8.array(z8.object({
+        cor: z8.string().min(1),
+        hex: z8.string().regex(/^#[0-9a-fA-F]{6}$/),
+        simbolismo: z8.string().min(1),
+        uso: z8.string().min(1)
+      }).strict()).min(1)
+    }).strict();
+    termoGlossarioSchema = z8.object({
+      termo: z8.string().min(1),
+      definicao: z8.string().min(1)
+    }).strict();
+    glossarioLiturgicoSchema = z8.object({
+      espaco_celebrativo: z8.array(termoGlossarioSchema),
+      vestes: z8.array(termoGlossarioSchema),
+      objetos: z8.array(termoGlossarioSchema),
+      montagem_calice: z8.array(z8.string().min(1))
+    }).strict();
+    schemaIndexSchema = z8.object({
+      _mapaArquivos: z8.record(z8.string().min(1))
+    }).passthrough();
+    readJson = async (root, relativePath, schema) => {
+      const absolutePath = path.join(root, relativePath);
+      const raw = await readFile(absolutePath, "utf8");
+      const parsed = JSON.parse(raw);
+      try {
+        return schema.parse(parsed);
+      } catch (error) {
+        if (error instanceof z8.ZodError) {
+          throw new Error(`Arquivo ${relativePath} inv\xE1lido: ${error.issues.map((issue) => issue.path.join(".")).join(", ")}`);
+        }
+        throw error;
+      }
+    };
+    assertFileExists = async (root, relativePath) => {
+      try {
+        await access(path.join(root, relativePath));
+      } catch {
+        throw new Error(`Arquivo referenciado n\xE3o encontrado: ${relativePath}`);
+      }
+    };
+    stripFrontMatter = (raw) => {
+      const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+      if (!match) {
+        return { frontMatter: {}, markdown: raw.trim() };
+      }
+      const frontMatter = {};
+      const lines = match[1].split(/\r?\n/);
+      let currentListKey = null;
+      for (const line of lines) {
+        const listItem = line.match(/^\s*-\s*["']?(.+?)["']?\s*$/);
+        if (listItem && currentListKey) {
+          const current = frontMatter[currentListKey];
+          frontMatter[currentListKey] = [
+            ...Array.isArray(current) ? current : [],
+            listItem[1]
+          ];
+          continue;
+        }
+        const keyValue = line.match(/^([a-zA-Z_]+):\s*(.*)$/);
+        if (!keyValue) {
+          currentListKey = null;
+          continue;
+        }
+        const [, key, rawValue] = keyValue;
+        const typedKey = key;
+        const value = rawValue.trim();
+        if (!value) {
+          frontMatter[typedKey] = [];
+          currentListKey = typedKey;
+          continue;
+        }
+        frontMatter[typedKey] = value.replace(/^["']|["']$/g, "");
+        currentListKey = null;
+      }
+      return {
+        frontMatter,
+        markdown: raw.slice(match[0].length).trim()
+      };
+    };
+    slugify = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    splitMarkdownSections = (module, markdown) => {
+      const sections = [];
+      let current = null;
+      const introLines = [];
+      for (const line of markdown.split(/\r?\n/)) {
+        const heading = line.match(/^##\s+(.+)$/);
+        if (heading) {
+          if (current) {
+            sections.push(current);
+          }
+          current = { title: heading[1].trim(), lines: [] };
+          continue;
+        }
+        if (line.startsWith("# ")) {
+          continue;
+        }
+        if (current) {
+          current.lines.push(line);
+        } else {
+          introLines.push(line);
+        }
+      }
+      if (current) {
+        sections.push(current);
+      }
+      if (sections.length === 0) {
+        sections.push({ title: module.titulo, lines: introLines });
+      }
+      return sections.map((section, index2) => {
+        const content = section.lines.join("\n").trim();
+        return {
+          id: `${module.id}:${slugify(section.title) || index2 + 1}`,
+          title: section.title,
+          content: content || module.resumo,
+          orderIndex: index2,
+          estimatedMinutes: Math.max(3, Math.ceil((content || module.resumo).length / 900))
+        };
+      });
+    };
+    getModuleCategory = (moduleId) => {
+      if (["00-identidade", "01-formacao", "04-santissimo"].includes(moduleId)) {
+        return "espiritualidade";
+      }
+      if (["02-ministro", "03-servico", "06-enfermos"].includes(moduleId)) {
+        return "pratica";
+      }
+      return "liturgia";
+    };
+    getMescFormationPublicAssetUrl = (sourcePath) => `${MESC_FORMATION_PUBLIC_ASSET_BASE}/${path.basename(sourcePath)}`;
+  }
+});
+
 // server/seeds/formation-seed.ts
 var formation_seed_exports = {};
 __export(formation_seed_exports, {
   default: () => formation_seed_default,
   seedFormation: () => seedFormation
 });
-import { eq as eq31 } from "drizzle-orm";
+import { and as and24, eq as eq31, inArray as inArray16, notInArray as notInArray2 } from "drizzle-orm";
 async function seedFormation() {
-  console.log("\u{1F331} Starting formation seed...");
-  try {
-    const tracks = [
-      {
-        id: "liturgy-track-1",
-        title: "Forma\xE7\xE3o Lit\xFArgica B\xE1sica",
-        description: "Fundamentos da liturgia eucar\xEDstica e orienta\xE7\xF5es pr\xE1ticas para Ministros Extraordin\xE1rios da Sagrada Comunh\xE3o",
-        category: "liturgia",
-        icon: "Cross",
-        orderIndex: 0,
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date(),
-        updatedAt: /* @__PURE__ */ new Date()
-      },
-      {
-        id: "spirituality-track-1",
-        title: "Forma\xE7\xE3o Espiritual",
-        description: "Aprofundamento na espiritualidade eucar\xEDstica e na vida de ora\xE7\xE3o do ministro",
-        category: "espiritualidade",
-        icon: "Heart",
-        orderIndex: 1,
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date(),
-        updatedAt: /* @__PURE__ */ new Date()
-      }
-    ];
-    console.log("\u{1F4DA} Inserting tracks...");
-    for (const track of tracks) {
-      const existing = await db.select().from(formationTracks).where(eq31(formationTracks.id, track.id)).limit(1);
-      if (existing.length === 0) {
-        await db.insert(formationTracks).values(track);
-        console.log(`  \u2713 Created track: ${track.title}`);
-      } else {
-        console.log(`  \u2937 Track already exists: ${track.title}`);
-      }
+  console.log("\u{1F331} Sincronizando forma\xE7\xE3o oficial MESC...");
+  const content = await loadMescFormationContent();
+  const records = buildFormationSeedRecords(content);
+  const now = /* @__PURE__ */ new Date();
+  await db.update(formationTracks).set({ isActive: false, updatedAt: now }).where(inArray16(formationTracks.id, legacyFormationTrackIds));
+  await db.insert(formationTracks).values({
+    ...records.track,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: formationTracks.id,
+    set: {
+      title: records.track.title,
+      description: records.track.description,
+      category: records.track.category,
+      icon: records.track.icon,
+      orderIndex: records.track.orderIndex,
+      isActive: records.track.isActive,
+      updatedAt: now
     }
-    console.log("\n\u{1F4D6} Creating Liturgy Track modules and lessons...");
-    const liturgyModule1 = {
-      trackId: "liturgy-track-1",
-      title: "A Eucaristia na Igreja",
-      description: "Fundamentos teol\xF3gicos e hist\xF3ricos da celebra\xE7\xE3o eucar\xEDstica",
-      category: "liturgia",
-      orderIndex: 0,
-      estimatedDuration: 90,
-      isActive: true,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    const [module1] = await db.insert(formationModules).values(liturgyModule1).onConflictDoNothing().returning();
-    if (module1) {
-      console.log(`  \u2713 Module 1: ${liturgyModule1.title}`);
-      const [lesson1_1] = await db.insert(formationLessons).values({
-        moduleId: module1.id,
-        trackId: "liturgy-track-1",
-        title: "O Sacramento da Eucaristia",
-        description: "Compreendendo a Eucaristia como fonte e \xE1pice da vida crist\xE3",
-        lessonNumber: 1,
-        durationMinutes: 30,
-        orderIndex: 0,
-        objectives: [
-          "Compreender o significado teol\xF3gico da Eucaristia",
-          "Reconhecer a Eucaristia como memorial da P\xE1scoa de Cristo",
-          "Valorizar a presen\xE7a real de Cristo no Sacramento"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson1_1) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson1_1.id,
-            type: "text",
-            title: "Introdu\xE7\xE3o",
-            content: `A Eucaristia \xE9 o sacramento central da vida crist\xE3. Como ensina o Catecismo da Igreja Cat\xF3lica (CIC 1324): "A Eucaristia \xE9 fonte e \xE1pice de toda a vida crist\xE3".
-
-Neste sacramento, Jesus Cristo se faz presente de modo \xFAnico e especial, oferecendo-se ao Pai em sacrif\xEDcio e dando-se a n\xF3s como alimento espiritual.`,
-            orderIndex: 0,
-            estimatedMinutes: 5,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_1.id,
-            type: "text",
-            title: "A Institui\xE7\xE3o da Eucaristia",
-            content: `Na \xFAltima ceia, Jesus instituiu a Eucaristia dizendo: "Isto \xE9 o meu corpo que \xE9 dado por v\xF3s; fazei isto em mem\xF3ria de mim" (Lc 22,19).
-
-A Eucaristia \xE9 memorial da P\xE1scoa de Cristo, ou seja, torna presente e atual o sacrif\xEDcio \xFAnico de Cristo na cruz. N\xE3o \xE9 uma simples lembran\xE7a, mas uma presen\xE7a real e eficaz.`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_1.id,
-            type: "text",
-            title: "A Presen\xE7a Real",
-            content: `A Igreja professa a f\xE9 na presen\xE7a real de Cristo na Eucaristia. Pelo poder do Esp\xEDrito Santo e pelas palavras de Cristo, o p\xE3o e o vinho se tornam verdadeiramente o Corpo e o Sangue de Cristo.
-
-Esta transforma\xE7\xE3o \xE9 chamada de "transubstancia\xE7\xE3o". O Conc\xEDlio de Trento afirma que Cristo est\xE1 presente "verdadeira, real e substancialmente" na Eucaristia.`,
-            orderIndex: 2,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_1.id,
-            type: "text",
-            title: "Reflex\xE3o Final",
-            content: `Como Ministros Extraordin\xE1rios da Sagrada Comunh\xE3o, somos chamados a servir com profunda rever\xEAncia, reconhecendo que tocamos e distribu\xEDmos o Corpo de Cristo.
-
-Nossa f\xE9 na presen\xE7a real deve se manifestar em nossos gestos, palavras e atitudes durante o servi\xE7o lit\xFArgico.`,
-            orderIndex: 3,
-            estimatedMinutes: 5,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 1.1: ${lesson1_1.title} (4 sections)`);
-      }
-      const [lesson1_2] = await db.insert(formationLessons).values({
-        moduleId: module1.id,
-        trackId: "liturgy-track-1",
-        title: "A Celebra\xE7\xE3o Eucar\xEDstica",
-        description: "Estrutura e partes da Santa Missa",
-        lessonNumber: 2,
-        durationMinutes: 35,
-        orderIndex: 1,
-        objectives: [
-          "Conhecer a estrutura da celebra\xE7\xE3o eucar\xEDstica",
-          "Compreender o significado de cada parte da Missa",
-          "Identificar os momentos principais da liturgia"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson1_2) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson1_2.id,
-            type: "text",
-            title: "As Duas Grandes Partes da Missa",
-            content: `A celebra\xE7\xE3o eucar\xEDstica possui duas grandes partes que formam um \xFAnico ato de culto:
-
-1. **Liturgia da Palavra**: Onde Deus fala ao seu povo e Cristo anuncia o Evangelho
-2. **Liturgia Eucar\xEDstica**: Onde o povo oferece o p\xE3o e o vinho que se tornam o Corpo e Sangue de Cristo
-
-Estas duas partes s\xE3o t\xE3o intimamente ligadas que constituem um s\xF3 ato de culto (IGMR 28).`,
-            orderIndex: 0,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_2.id,
-            type: "text",
-            title: "Ritos Iniciais",
-            content: `Os ritos iniciais preparam a assembleia para ouvir a Palavra e celebrar a Eucaristia:
-
-- **Entrada**: Canto e prociss\xE3o
-- **Sauda\xE7\xE3o**: O sacerdote sa\xFAda o povo
-- **Ato Penitencial**: Reconhecemos nossos pecados
-- **Gl\xF3ria**: Hino de louvor (exceto Advento e Quaresma)
-- **Ora\xE7\xE3o do Dia**: Coleta que une as inten\xE7\xF5es do povo`,
-            orderIndex: 1,
-            estimatedMinutes: 7,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_2.id,
-            type: "text",
-            title: "Liturgia da Palavra",
-            content: `Na Liturgia da Palavra, Deus fala ao seu povo:
-
-- **Primeira Leitura**: Geralmente do Antigo Testamento
-- **Salmo Responsorial**: Resposta orante \xE0 Palavra
-- **Segunda Leitura**: Das cartas apost\xF3licas (domingos e solenidades)
-- **Evangelho**: Ponto alto da Liturgia da Palavra
-- **Homilia**: Explica\xE7\xE3o das leituras
-- **Profiss\xE3o de F\xE9**: Credo
-- **Ora\xE7\xE3o dos Fi\xE9is**: Preces pela Igreja e pelo mundo`,
-            orderIndex: 2,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_2.id,
-            type: "text",
-            title: "Liturgia Eucar\xEDstica e Ritos Finais",
-            content: `**Liturgia Eucar\xEDstica:**
-- **Prepara\xE7\xE3o das Oferendas**: Apresenta\xE7\xE3o do p\xE3o e vinho
-- **Ora\xE7\xE3o Eucar\xEDstica**: Consagra\xE7\xE3o - momento central da Missa
-- **Rito da Comunh\xE3o**: Pai Nosso, sinal da paz, fra\xE7\xE3o do p\xE3o, comunh\xE3o
-
-**Ritos Finais:**
-- **Avisos**: Comunica\xE7\xF5es \xE0 assembleia
-- **B\xEAn\xE7\xE3o**: Sacerdote aben\xE7oa o povo
-- **Despedida**: "Ide em paz"
-
-Como ministros, participamos especialmente do Rito da Comunh\xE3o.`,
-            orderIndex: 3,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 1.2: ${lesson1_2.title} (4 sections)`);
-      }
-      const [lesson1_3] = await db.insert(formationLessons).values({
-        moduleId: module1.id,
-        trackId: "liturgy-track-1",
-        title: "Formas de Receber a Comunh\xE3o",
-        description: "Hist\xF3ria e orienta\xE7\xF5es sobre as formas de distribui\xE7\xE3o da Sagrada Comunh\xE3o",
-        lessonNumber: 3,
-        durationMinutes: 25,
-        orderIndex: 2,
-        objectives: [
-          "Conhecer a hist\xF3ria das formas de comunh\xE3o",
-          "Compreender as normas atuais da Igreja",
-          "Respeitar as diferentes formas de piedade dos fi\xE9is"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson1_3) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson1_3.id,
-            type: "text",
-            title: "Perspectiva Hist\xF3rica",
-            content: `Ao longo da hist\xF3ria da Igreja, a forma de receber a comunh\xE3o passou por diferentes pr\xE1ticas:
-
-- **Primeiros s\xE9culos**: A comunh\xE3o era recebida na m\xE3o, com grande rever\xEAncia
-- **Idade M\xE9dia**: Estabeleceu-se a pr\xE1tica da comunh\xE3o na boca
-- **P\xF3s-Vaticano II**: A Igreja permitiu novamente a comunh\xE3o na m\xE3o em algumas regi\xF5es
-
-Ambas as formas s\xE3o leg\xEDtimas e expressam a f\xE9 na presen\xE7a real de Cristo.`,
-            orderIndex: 0,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_3.id,
-            type: "text",
-            title: "Normas Atuais",
-            content: `A Instru\xE7\xE3o Redemptionis Sacramentum estabelece:
-
-**Comunh\xE3o na Boca:**
-- Forma tradicional
-- O fiel inclina a cabe\xE7a
-- O ministro coloca a h\xF3stia diretamente na l\xEDngua
-
-**Comunh\xE3o na M\xE3o:**
-- Permitida onde aprovada pela Confer\xEAncia Episcopal
-- O fiel estende as m\xE3os (uma sobre a outra)
-- Recebe a h\xF3stia e a leva \xE0 boca imediatamente
-- As m\xE3os devem estar limpas e dignas
-
-O fiel tem o direito de escolher a forma de receber a comunh\xE3o.`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson1_3.id,
-            type: "text",
-            title: "Atitude do Ministro",
-            content: `Como ministros, devemos:
-
-1. **Respeitar**: A escolha de cada fiel sobre como receber a comunh\xE3o
-2. **Estar preparados**: Para distribuir de ambas as formas com igual rever\xEAncia
-3. **Evitar julgamentos**: N\xE3o cabe a n\xF3s julgar a piedade alheia
-4. **Manter rever\xEAncia**: Em ambos os modos de distribui\xE7\xE3o
-5. **Seguir as normas**: Da diocese e da par\xF3quia
-
-Nossa atitude deve sempre refletir a f\xE9 na presen\xE7a real de Cristo.`,
-            orderIndex: 2,
-            estimatedMinutes: 7,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 1.3: ${lesson1_3.title} (3 sections)`);
-      }
+  });
+  const moduleIds = records.modules.map((module) => module.id);
+  const lessonIds = records.lessons.map((lesson) => lesson.id);
+  const sectionIds = records.sections.map((section) => section.id);
+  if (lessonIds.length > 0 && sectionIds.length > 0) {
+    for (const lesson of records.lessons) {
+      const sectionIdsForLesson = records.sections.filter((section) => section.lessonId === lesson.id).map((section) => section.id);
+      await db.delete(formationLessonSections).where(
+        and24(
+          eq31(formationLessonSections.lessonId, lesson.id),
+          notInArray2(formationLessonSections.id, sectionIdsForLesson)
+        )
+      );
     }
-    const liturgyModule2 = {
-      trackId: "liturgy-track-1",
-      title: "O Ministro Extraordin\xE1rio da Sagrada Comunh\xE3o",
-      description: "Identidade, miss\xE3o e espiritualidade do ministro",
-      category: "liturgia",
-      orderIndex: 1,
-      estimatedDuration: 75,
-      isActive: true,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    const [module2] = await db.insert(formationModules).values(liturgyModule2).onConflictDoNothing().returning();
-    if (module2) {
-      console.log(`  \u2713 Module 2: ${liturgyModule2.title}`);
-      const [lesson2_1] = await db.insert(formationLessons).values({
-        moduleId: module2.id,
-        trackId: "liturgy-track-1",
-        title: "Voca\xE7\xE3o e Miss\xE3o do Ministro",
-        description: "Compreendendo o chamado para o servi\xE7o eucar\xEDstico",
-        lessonNumber: 1,
-        durationMinutes: 30,
-        orderIndex: 0,
-        objectives: [
-          "Reconhecer o minist\xE9rio como voca\xE7\xE3o",
-          "Compreender a miss\xE3o do ministro extraordin\xE1rio",
-          "Identificar as qualidades necess\xE1rias para o servi\xE7o"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson2_1) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson2_1.id,
-            type: "text",
-            title: "Um Chamado Especial",
-            content: `O minist\xE9rio extraordin\xE1rio da Sagrada Comunh\xE3o \xE9 um verdadeiro chamado de Deus. N\xE3o se trata apenas de uma fun\xE7\xE3o pr\xE1tica, mas de uma voca\xE7\xE3o ao servi\xE7o do Corpo de Cristo.
-
-S\xE3o Paulo nos ensina: "Cada um exer\xE7a, em benef\xEDcio dos outros, o dom que recebeu, como bons administradores da multiforme gra\xE7a de Deus" (1Pd 4,10).
-
-Este minist\xE9rio exige:
-- F\xE9 profunda na presen\xE7a real de Cristo
-- Vida sacramental intensa
-- Testemunho de vida crist\xE3
-- Disponibilidade para servir`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson2_1.id,
-            type: "text",
-            title: "A Miss\xE3o do Ministro",
-            content: `**Fun\xE7\xF5es principais:**
-
-1. **Durante a Missa:**
-   - Auxiliar na distribui\xE7\xE3o da Sagrada Comunh\xE3o
-   - Servir o Corpo e Sangue de Cristo aos fi\xE9is
-
-2. **Fora da Missa:**
-   - Levar a comunh\xE3o aos enfermos e impossibilitados
-   - Realizar celebra\xE7\xF5es dominicais sem presb\xEDtero (quando autorizado)
-   - Expor o Sant\xEDssimo Sacramento para adora\xE7\xE3o (com autoriza\xE7\xE3o)
-
-**Car\xE1ter extraordin\xE1rio:**
-Este minist\xE9rio \xE9 "extraordin\xE1rio" porque complementa o minist\xE9rio ordin\xE1rio do bispo, presb\xEDtero e di\xE1cono. \xC9 exercido em casos de necessidade pastoral.`,
-            orderIndex: 1,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson2_1.id,
-            type: "text",
-            title: "Qualidades Necess\xE1rias",
-            content: `O C\xF3digo de Direito Can\xF4nico (c\xE2n. 910) e as orienta\xE7\xF5es lit\xFArgicas estabelecem que o ministro deve:
-
-**Requisitos b\xE1sicos:**
-- Ser cat\xF3lico praticante
-- Estar em estado de gra\xE7a
-- Ter idade m\xEDnima (geralmente 16 anos)
-- Ter recebido os sacramentos da inicia\xE7\xE3o crist\xE3
-
-**Qualidades espirituais:**
-- F\xE9 viva na Eucaristia
-- Vida de ora\xE7\xE3o constante
-- Participa\xE7\xE3o dominical na Missa
-- Testemunho de vida crist\xE3
-
-**Qualidades humanas:**
-- Maturidade e equil\xEDbrio
-- Discri\xE7\xE3o e prud\xEAncia
-- Pontualidade e responsabilidade
-- Esp\xEDrito de servi\xE7o
-
-**Forma\xE7\xE3o cont\xEDnua:**
-O ministro deve buscar forma\xE7\xE3o permanente em liturgia, espiritualidade e doutrina cat\xF3lica.`,
-            orderIndex: 2,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 2.1: ${lesson2_1.title} (3 sections)`);
-      }
-      const [lesson2_2] = await db.insert(formationLessons).values({
-        moduleId: module2.id,
-        trackId: "liturgy-track-1",
-        title: "Procedimentos Lit\xFArgicos Pr\xE1ticos",
-        description: "Como realizar o minist\xE9rio com rever\xEAncia e corre\xE7\xE3o",
-        lessonNumber: 2,
-        durationMinutes: 45,
-        orderIndex: 1,
-        objectives: [
-          "Conhecer os procedimentos corretos para distribuir a comunh\xE3o",
-          "Aprender a postura e gestos adequados",
-          "Saber lidar com situa\xE7\xF5es especiais"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson2_2) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson2_2.id,
-            type: "text",
-            title: "Prepara\xE7\xE3o Antes da Missa",
-            content: `**Prepara\xE7\xE3o pessoal:**
-- Chegar com anteced\xEAncia (15-20 minutos)
-- Fazer uma ora\xE7\xE3o preparat\xF3ria
-- Verificar a escala e seu posicionamento
-- Estar em estado de gra\xE7a (confiss\xE3o recente)
-- Vestir-se adequadamente com dignidade
-
-**Prepara\xE7\xE3o pr\xE1tica:**
-- Higienizar bem as m\xE3os
-- Verificar se h\xE1 \xE1gua e toalha dispon\xEDveis
-- Conhecer o n\xFAmero aproximado de comungantes
-- Identificar qualquer orienta\xE7\xE3o especial do dia`,
-            orderIndex: 0,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson2_2.id,
-            type: "text",
-            title: "Durante a Distribui\xE7\xE3o da Comunh\xE3o",
-            content: `**Momento de aproxima\xE7\xE3o ao altar:**
-- Aguardar o sinal do sacerdote
-- Aproximar-se com rever\xEAncia
-- Fazer genuflex\xE3o antes de subir ao altar
-- Receber a \xE2mbula ou o c\xE1lice das m\xE3os do sacerdote
-
-**F\xF3rmula sacramental:**
-Ao apresentar a h\xF3stia a cada fiel, dizer claramente:
-"O Corpo de Cristo"
-
-O fiel responde: "Am\xE9m"
-
-Esta resposta n\xE3o \xE9 uma mera formalidade, mas uma profiss\xE3o de f\xE9 na presen\xE7a real.
-
-**Postura:**
-- Manter postura reverente e digna
-- Olhar cada comungante nos olhos
-- Aguardar a resposta "Am\xE9m" antes de depositar a h\xF3stia
-- Manter aten\xE7\xE3o e cuidado com cada part\xEDcula
-- Se uma h\xF3stia cair, recolh\xEA-la imediatamente com rever\xEAncia`,
-            orderIndex: 1,
-            estimatedMinutes: 15,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson2_2.id,
-            type: "text",
-            title: "Distribuindo a Comunh\xE3o na Boca e na M\xE3o",
-            content: `**Na boca:**
-1. Segurar a h\xF3stia entre o polegar e o indicador
-2. Aguardar que o fiel incline a cabe\xE7a e abra a boca
-3. Colocar a h\xF3stia delicadamente sobre a l\xEDngua
-4. Evitar tocar os l\xE1bios ou l\xEDngua do fiel
-
-**Na m\xE3o:**
-1. O fiel deve estender as m\xE3os (uma sobre a outra)
-2. Colocar a h\xF3stia com rever\xEAncia sobre a palma da m\xE3o
-3. Observar discretamente se o fiel leva a h\xF3stia \xE0 boca imediatamente
-4. Caso note algo irregular, informar discretamente o sacerdote ap\xF3s a Missa
-
-**Aten\xE7\xE3o especial:**
-- Crian\xE7as: Verificar se j\xE1 fizeram primeira comunh\xE3o
-- Quem se aproxima de bra\xE7os cruzados: Dar a b\xEAn\xE7\xE3o ("Que Deus te aben\xE7oe")
-- Cel\xEDacos: Podem existir h\xF3stias especiais dispon\xEDveis`,
-            orderIndex: 2,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson2_2.id,
-            type: "text",
-            title: "Ap\xF3s a Distribui\xE7\xE3o",
-            content: `**Purifica\xE7\xE3o dos vasos:**
-- Retornar ao altar com rever\xEAncia
-- Se houver h\xF3stias restantes, entregar ao sacerdote ou di\xE1cono
-- Se for o c\xE1lice, o sacerdote ou di\xE1cono far\xE1 a purifica\xE7\xE3o
-- Nunca deixar part\xEDculas na \xE2mbula - consumi-las com rever\xEAncia
-
-**Retorno ao lugar:**
-- Fazer genuflex\xE3o ao Sant\xEDssimo
-- Retornar ao seu lugar
-- Fazer uma a\xE7\xE3o de gra\xE7as pessoal
-
-**P\xF3s-Missa:**
-- Ajudar na arruma\xE7\xE3o se necess\xE1rio
-- Fazer uma ora\xE7\xE3o de agradecimento
-- Lavar as m\xE3os se tiver tocado as esp\xE9cies
-
-**Lembrete importante:**
-Ap\xF3s distribuir a comunh\xE3o, recomenda-se n\xE3o comer nem beber nada por 15 minutos, como sinal de rever\xEAncia.`,
-            orderIndex: 3,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 2.2: ${lesson2_2.title} (4 sections)`);
-      }
-    }
-    const liturgyModule3 = {
-      trackId: "liturgy-track-1",
-      title: "Espiritualidade Eucar\xEDstica",
-      description: "Viv\xEAncia espiritual e compromisso do ministro",
-      category: "liturgia",
-      orderIndex: 2,
-      estimatedDuration: 60,
-      isActive: true,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    const [module3] = await db.insert(formationModules).values(liturgyModule3).onConflictDoNothing().returning();
-    if (module3) {
-      console.log(`  \u2713 Module 3: ${liturgyModule3.title}`);
-      const [lesson3_1] = await db.insert(formationLessons).values({
-        moduleId: module3.id,
-        trackId: "liturgy-track-1",
-        title: "A Vida de Ora\xE7\xE3o do Ministro",
-        description: "Cultivando uma espiritualidade eucar\xEDstica profunda",
-        lessonNumber: 1,
-        durationMinutes: 30,
-        orderIndex: 0,
-        objectives: [
-          "Compreender a import\xE2ncia da ora\xE7\xE3o pessoal",
-          "Conhecer pr\xE1ticas de piedade eucar\xEDstica",
-          "Desenvolver uma rela\xE7\xE3o pessoal com Cristo na Eucaristia"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson3_1) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson3_1.id,
-            type: "text",
-            title: "Fundamento da Vida Espiritual",
-            content: `"Sem mim, nada podeis fazer" (Jo 15,5)
-
-O minist\xE9rio eucar\xEDstico brota de uma vida de ora\xE7\xE3o intensa. N\xE3o podemos dar aos outros o que n\xE3o temos. Para distribuir o P\xE3o da Vida, precisamos primeiro nos alimentar dele.
-
-**A ora\xE7\xE3o do ministro deve incluir:**
-- **Missa Dominical**: Participa\xE7\xE3o ativa e consciente
-- **Ora\xE7\xE3o di\xE1ria**: Momento pessoal com Deus
-- **Leitura orante da Escritura**: Lectio Divina
-- **Adora\xE7\xE3o eucar\xEDstica**: Tempo de contempla\xE7\xE3o
-- **Exame de consci\xEAncia**: Revis\xE3o da vida di\xE1ria`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson3_1.id,
-            type: "text",
-            title: "Pr\xE1ticas de Piedade Eucar\xEDstica",
-            content: `**Antes da Missa:**
-- Chegar com anteced\xEAncia
-- Fazer uma ora\xE7\xE3o preparat\xF3ria
-- Revisar as leituras do dia
-- Pedir ao Esp\xEDrito Santo que renove sua f\xE9
-
-**Durante a Missa:**
-- Participar ativamente de cada parte
-- Comungar com devo\xE7\xE3o
-- Fazer a\xE7\xE3o de gra\xE7as ap\xF3s comungar
-
-**Adora\xE7\xE3o Eucar\xEDstica:**
-- Visitar o Sant\xEDssimo regularmente
-- Participar de horas de adora\xE7\xE3o
-- Fazer vig\xEDlias quando poss\xEDvel
-
-**Devo\xE7\xF5es complementares:**
-- Ter\xE7o meditando os mist\xE9rios
-- Leitura espiritual
-- Ora\xE7\xE3o da Igreja (Liturgia das Horas)`,
-            orderIndex: 1,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson3_1.id,
-            type: "text",
-            title: "Crescendo na Intimidade com Cristo",
-            content: `A rela\xE7\xE3o com Cristo eucar\xEDstico \xE9 como qualquer relacionamento: precisa ser cultivada.
-
-**Passos para aprofundar a intimidade:**
-
-1. **Regularidade**: Estabelecer hor\xE1rios fixos de ora\xE7\xE3o
-2. **Sil\xEAncio**: Criar momentos de escuta
-3. **Confian\xE7a**: Abrir o cora\xE7\xE3o como a um amigo
-4. **Perseveran\xE7a**: Manter a ora\xE7\xE3o mesmo na aridez
-5. **A\xE7\xE3o**: Deixar a ora\xE7\xE3o transformar a vida
-
-**Frutos esperados:**
-- Maior amor \xE0 Eucaristia
-- Desejo de servir com generosidade
-- Paz interior
-- Testemunho de vida que atrai outros
-
-"Permanecei em mim, e eu permanecerei em v\xF3s" (Jo 15,4)`,
-            orderIndex: 2,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 3.1: ${lesson3_1.title} (3 sections)`);
-      }
-      const [lesson3_2] = await db.insert(formationLessons).values({
-        moduleId: module3.id,
-        trackId: "liturgy-track-1",
-        title: "O Testemunho de Vida do Ministro",
-        description: "Vivendo coerentemente com o minist\xE9rio exercido",
-        lessonNumber: 2,
-        durationMinutes: 30,
-        orderIndex: 1,
-        objectives: [
-          "Compreender a responsabilidade do testemunho",
-          "Identificar \xE1reas de crescimento pessoal",
-          "Comprometer-se com uma vida coerente com a f\xE9"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (lesson3_2) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: lesson3_2.id,
-            type: "text",
-            title: "A Chamada \xE0 Santidade",
-            content: `"Sede santos, porque eu sou santo" (1Pd 1,16)
-
-O ministro extraordin\xE1rio n\xE3o \xE9 apenas algu\xE9m que distribui a comunh\xE3o. \xC9 uma testemunha viva de Cristo. A comunidade observa nossa vida e nosso exemplo.
-
-**O que o povo espera ver:**
-- Coer\xEAncia entre f\xE9 e vida
-- Participa\xE7\xE3o ass\xEDdua na Missa
-- Vida sacramental intensa
-- Caridade no relacionamento com todos
-- Humildade no servi\xE7o
-
-N\xE3o precisamos ser perfeitos, mas devemos estar em caminho de convers\xE3o constante.`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson3_2.id,
-            type: "text",
-            title: "\xC1reas de Aten\xE7\xE3o Especial",
-            content: `**Vida sacramental:**
-- Confiss\xE3o regular (recomenda-se mensal)
-- Comunh\xE3o frequente e devota
-- Estar em estado de gra\xE7a ao ministrar
-
-**Vida familiar:**
-- Cultivar o amor conjugal (se casado)
-- Educar os filhos na f\xE9
-- Fazer da fam\xEDlia "igreja dom\xE9stica"
-
-**Vida comunit\xE1ria:**
-- Participar da vida paroquial
-- Colaborar nas pastorais
-- Manter bom relacionamento com todos
-
-**Vida profissional:**
-- Ser honesto no trabalho
-- Ser testemunha de Cristo no ambiente profissional
-- Praticar a justi\xE7a e a caridade
-
-**Vida social:**
-- Evitar ambientes e situa\xE7\xF5es incompat\xEDveis com a f\xE9
-- Ser sal e luz no mundo (Mt 5,13-14)`,
-            orderIndex: 1,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: lesson3_2.id,
-            type: "text",
-            title: "Lidando com as Pr\xF3prias Fragilidades",
-            content: `Todos temos limita\xE7\xF5es e fraquezas. O importante \xE9 reconhec\xEA-las e buscar crescer.
-
-**Quando cometer erros:**
-1. Reconhecer humildemente
-2. Buscar a confiss\xE3o
-3. Reparar o mal causado quando poss\xEDvel
-4. Continuar servindo com humildade
-
-**Evitar:**
-- Hipocrisia (parecer santo sem buscar s\xEA-lo)
-- Esc\xE2ndalo (a\xE7\xF5es que afastam outros da f\xE9)
-- Orgulho espiritual (sentir-se superior)
-- Tibieza (frieza na vida espiritual)
-
-**Lembrar sempre:**
-"Quem se gloria, glorie-se no Senhor" (1Cor 1,31)
-
-Nossa santidade n\xE3o \xE9 m\xE9rito nosso, mas dom de Deus. Servimos pela gra\xE7a d'Ele.`,
-            orderIndex: 2,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 3.2: ${lesson3_2.title} (3 sections)`);
-      }
-    }
-    console.log("\n\u{1F64F} Creating Spirituality Track modules and lessons...");
-    const spiritModule1 = {
-      trackId: "spirituality-track-1",
-      title: "Fundamentos da Vida Espiritual",
-      description: "Bases da espiritualidade crist\xE3 cat\xF3lica",
-      category: "espiritualidade",
-      orderIndex: 0,
-      estimatedDuration: 80,
-      isActive: true,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    const [spiritMod1] = await db.insert(formationModules).values(spiritModule1).onConflictDoNothing().returning();
-    if (spiritMod1) {
-      console.log(`  \u2713 Module 1: ${spiritModule1.title}`);
-      const [spiritLesson1_1] = await db.insert(formationLessons).values({
-        moduleId: spiritMod1.id,
-        trackId: "spirituality-track-1",
-        title: "A Ora\xE7\xE3o como Di\xE1logo com Deus",
-        description: "Compreendendo e praticando a ora\xE7\xE3o crist\xE3",
-        lessonNumber: 1,
-        durationMinutes: 35,
-        orderIndex: 0,
-        objectives: [
-          "Compreender a ora\xE7\xE3o como encontro pessoal com Deus",
-          "Conhecer diferentes formas de ora\xE7\xE3o",
-          "Desenvolver uma vida de ora\xE7\xE3o constante"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson1_1) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson1_1.id,
-            type: "text",
-            title: "O Que \xC9 Ora\xE7\xE3o?",
-            content: `"A ora\xE7\xE3o \xE9 a eleva\xE7\xE3o da alma a Deus ou o pedido a Deus de bens convenientes" (S\xE3o Jo\xE3o Damasceno, citado no CIC 2559).
-
-A ora\xE7\xE3o n\xE3o \xE9 apenas falar com Deus, mas estar com Deus. \xC9 um relacionamento pessoal de amor, confian\xE7a e entrega.
-
-Jesus nos ensinou a orar:
-- Pelo exemplo: Passava noites em ora\xE7\xE3o (Lc 6,12)
-- Pelos ensinamentos: "Orai sem cessar" (1Ts 5,17)
-- Pelo Pai Nosso: Modelo de toda ora\xE7\xE3o crist\xE3
-
-A ora\xE7\xE3o crist\xE3 \xE9 trinit\xE1ria: dirigimo-nos ao Pai, por Cristo, no Esp\xEDrito Santo.`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson1_1.id,
-            type: "text",
-            title: "Formas de Ora\xE7\xE3o",
-            content: `A tradi\xE7\xE3o da Igreja reconhece v\xE1rias formas de ora\xE7\xE3o:
-
-**Segundo a express\xE3o:**
-- **Vocal**: Palavras pronunciadas (Pai Nosso, Ave Maria)
-- **Meditativa**: Reflex\xE3o sobre a Palavra de Deus
-- **Contemplativa**: Sil\xEAncio amoroso na presen\xE7a de Deus
-
-**Segundo o conte\xFAdo:**
-- **Adora\xE7\xE3o**: Reconhecer Deus como Criador
-- **Louvor**: Glorificar a Deus por quem Ele \xE9
-- **S\xFAplica**: Pedir o que necessitamos
-- **Intercess\xE3o**: Pedir pelos outros
-- **A\xE7\xE3o de gra\xE7as**: Agradecer os dons recebidos
-
-Todas as formas s\xE3o v\xE1lidas e complementares. O importante \xE9 orar com o cora\xE7\xE3o.`,
-            orderIndex: 1,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson1_1.id,
-            type: "text",
-            title: "Dificuldades na Ora\xE7\xE3o",
-            content: `\xC9 normal enfrentar dificuldades na ora\xE7\xE3o:
-
-**Distra\xE7\xF5es:**
-- S\xE3o normais, especialmente no in\xEDcio
-- Quando perceber, retornar suavemente \xE0 ora\xE7\xE3o
-- N\xE3o se culpar, mas recome\xE7ar com paci\xEAncia
-
-**Aridez espiritual:**
-- Per\xEDodos sem "sentir" a presen\xE7a de Deus
-- \xC9 uma prova da f\xE9, n\xE3o abandono de Deus
-- Continuar orando com fidelidade
-
-**Falta de tempo:**
-- Estabelecer prioridades
-- Come\xE7ar com pouco tempo, mas com regularidade
-- "Quem diz que n\xE3o tem tempo, n\xE3o tem vontade" (Santa Teresa)
-
-**Como perseverar:**
-1. Hor\xE1rio fixo para ora\xE7\xE3o
-2. Lugar apropriado e silencioso
-3. Usar recursos (B\xEDblia, livros espirituais)
-4. Pedir ajuda do Esp\xEDrito Santo
-5. N\xE3o desistir nas dificuldades`,
-            orderIndex: 2,
-            estimatedMinutes: 13,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 1.1: ${spiritLesson1_1.title} (3 sections)`);
-      }
-      const [spiritLesson1_2] = await db.insert(formationLessons).values({
-        moduleId: spiritMod1.id,
-        trackId: "spirituality-track-1",
-        title: "Os Sacramentos: Encontro com Cristo",
-        description: "A vida sacramental como fonte de gra\xE7a",
-        lessonNumber: 2,
-        durationMinutes: 25,
-        orderIndex: 1,
-        objectives: [
-          "Compreender os sacramentos como encontros com Cristo",
-          "Valorizar especialmente a Eucaristia e a Reconcilia\xE7\xE3o",
-          "Viver intensamente a vida sacramental"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson1_2) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson1_2.id,
-            type: "text",
-            title: "Sacramentos: Sinais Eficazes da Gra\xE7a",
-            content: `Os sacramentos s\xE3o "obras-primas de Deus" (CIC 1116). S\xE3o sinais sens\xEDveis e eficazes da gra\xE7a, institu\xEDdos por Cristo e confiados \xE0 Igreja.
-
-**Os sete sacramentos:**
-
-**Inicia\xE7\xE3o Crist\xE3:**
-1. Batismo - Nascimento para a vida nova
-2. Confirma\xE7\xE3o - Fortaleza do Esp\xEDrito Santo
-3. Eucaristia - Alimento da vida eterna
-
-**Cura:**
-4. Reconcilia\xE7\xE3o - Perd\xE3o dos pecados
-5. Un\xE7\xE3o dos Enfermos - Conforto na doen\xE7a
-
-**Servi\xE7o:**
-6. Ordem - Minist\xE9rio apost\xF3lico
-7. Matrim\xF4nio - Comunh\xE3o de vida e amor
-
-Cada sacramento comunica uma gra\xE7a espec\xEDfica e nos configura a Cristo.`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson1_2.id,
-            type: "text",
-            title: "Eucaristia e Reconcilia\xE7\xE3o: Fontes de Vida",
-            content: `**A Eucaristia:**
-- Centro e \xE1pice da vida crist\xE3
-- Atualiza\xE7\xE3o do sacrif\xEDcio de Cristo
-- Comunh\xE3o com o Corpo e Sangue do Senhor
-- Alimento para o caminho
-
-Para o ministro: Participar da Missa dominical com devo\xE7\xE3o, chegando cedo e preparando o cora\xE7\xE3o.
-
-**A Reconcilia\xE7\xE3o:**
-- Sacramento da miseric\xF3rdia de Deus
-- Cura as feridas do pecado
-- Restaura a amizade com Deus
-- Fortalece para n\xE3o pecar
-
-Recomenda-se a confiss\xE3o mensal para quem exerce minist\xE9rios. \xC9 um encontro de cura e liberta\xE7\xE3o.`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson1_2.id,
-            type: "text",
-            title: "Vivendo Sacramentalmente",
-            content: `**Prepara\xE7\xE3o para os sacramentos:**
-- Estado de gra\xE7a (confiss\xE3o se necess\xE1rio)
-- Jejum eucar\xEDstico (1 hora)
-- Disposi\xE7\xE3o interior de f\xE9 e amor
-- Roupa adequada e digna
-
-**Ap\xF3s receber os sacramentos:**
-- A\xE7\xE3o de gra\xE7as
-- Compromisso de convers\xE3o
-- Testemunho de vida transformada
-
-**Frutos de uma vida sacramental intensa:**
-- Crescimento na santidade
-- For\xE7a para vencer o pecado
-- Alegria e paz interior
-- Capacidade de amar e servir
-
-Os sacramentos n\xE3o s\xE3o "obriga\xE7\xF5es", mas encontros de amor com Cristo!`,
-            orderIndex: 2,
-            estimatedMinutes: 5,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 1.2: ${spiritLesson1_2.title} (3 sections)`);
-      }
-      const [spiritLesson1_3] = await db.insert(formationLessons).values({
-        moduleId: spiritMod1.id,
-        trackId: "spirituality-track-1",
-        title: "A Palavra de Deus na Vida do Ministro",
-        description: "Leitura orante da Sagrada Escritura",
-        lessonNumber: 3,
-        durationMinutes: 20,
-        orderIndex: 2,
-        objectives: [
-          "Valorizar a Sagrada Escritura",
-          "Aprender a fazer lectio divina",
-          "Comprometer-se com a leitura di\xE1ria da Palavra"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson1_3) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson1_3.id,
-            type: "text",
-            title: "A B\xEDblia: Palavra Viva de Deus",
-            content: `"Desconhecer as Escrituras \xE9 desconhecer Cristo" (S\xE3o Jer\xF4nimo).
-
-A B\xEDblia n\xE3o \xE9 apenas um livro antigo, mas Palavra viva e eficaz (Hb 4,12). Deus continua falando atrav\xE9s dela hoje.
-
-**Por que ler a B\xEDblia:**
-- Para conhecer a Deus e seu plano de salva\xE7\xE3o
-- Para conhecer Jesus Cristo mais profundamente
-- Para encontrar orienta\xE7\xE3o para a vida
-- Para alimentar a f\xE9 e a esperan\xE7a
-- Para crescer na intimidade com Deus
-
-O Conc\xEDlio Vaticano II recomenda: "\xC9 preciso que os fi\xE9is tenham amplo acesso \xE0 Sagrada Escritura" (DV 22).`,
-            orderIndex: 0,
-            estimatedMinutes: 7,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson1_3.id,
-            type: "text",
-            title: "Lectio Divina: Leitura Orante",
-            content: `A lectio divina \xE9 um m\xE9todo antigo de leitura orante da B\xEDblia:
-
-**1. LECTIO (Leitura):**
-- Ler o texto com aten\xE7\xE3o
-- O que o texto diz em si mesmo?
-
-**2. MEDITATIO (Medita\xE7\xE3o):**
-- Refletir sobre o texto
-- O que o texto diz para mim?
-
-**3. ORATIO (Ora\xE7\xE3o):**
-- Responder a Deus
-- O que quero dizer a Deus?
-
-**4. CONTEMPLATIO (Contempla\xE7\xE3o):**
-- Permanecer em sil\xEAncio com Deus
-- Deixar Deus transformar o cora\xE7\xE3o
-
-**5. ACTIO (A\xE7\xE3o):**
-- Compromisso concreto
-- O que vou fazer?
-
-Dedicar 10-15 minutos di\xE1rios para essa pr\xE1tica.`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson1_3.id,
-            type: "text",
-            title: "Dicas Pr\xE1ticas",
-            content: `**Como come\xE7ar:**
-1. Escolher um hor\xE1rio di\xE1rio fixo
-2. Come\xE7ar pelos Evangelhos (Mateus, Marcos, Lucas, Jo\xE3o)
-3. Ter uma B\xEDblia cat\xF3lica com boas notas
-4. Pedir a luz do Esp\xEDrito Santo antes de ler
-5. Ler devagar, saboreando cada palavra
-
-**Recursos \xFAteis:**
-- Aplicativos de B\xEDblia cat\xF3licos
-- Coment\xE1rios e subs\xEDdios b\xEDblicos
-- Grupos de partilha da Palavra
-- Homilias e catequeses
-
-**Aten\xE7\xE3o:**
-Sempre ler a B\xEDblia na f\xE9 da Igreja. Evitar interpreta\xE7\xF5es particulares. Em d\xFAvida, consultar um padre ou catequista.
-
-"Tua palavra \xE9 l\xE2mpada para os meus passos, luz para o meu caminho" (Sl 119,105)`,
-            orderIndex: 2,
-            estimatedMinutes: 3,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 1.3: ${spiritLesson1_3.title} (3 sections)`);
-      }
-    }
-    const spiritModule2 = {
-      trackId: "spirituality-track-1",
-      title: "As Virtudes na Vida do Ministro",
-      description: "Cultivando as virtudes teologais e cardeais",
-      category: "espiritualidade",
-      orderIndex: 1,
-      estimatedDuration: 70,
-      isActive: true,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    const [spiritMod2] = await db.insert(formationModules).values(spiritModule2).onConflictDoNothing().returning();
-    if (spiritMod2) {
-      console.log(`  \u2713 Module 2: ${spiritModule2.title}`);
-      const [spiritLesson2_1] = await db.insert(formationLessons).values({
-        moduleId: spiritMod2.id,
-        trackId: "spirituality-track-1",
-        title: "Virtudes Teologais: F\xE9, Esperan\xE7a e Caridade",
-        description: "As tr\xEAs virtudes que unem o homem a Deus",
-        lessonNumber: 1,
-        durationMinutes: 35,
-        orderIndex: 0,
-        objectives: [
-          "Compreender as virtudes teologais",
-          "Identificar como viv\xEA-las concretamente",
-          "Crescer na f\xE9, esperan\xE7a e caridade"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson2_1) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson2_1.id,
-            type: "text",
-            title: "A F\xE9: Dom e Resposta",
-            content: `"A f\xE9 \xE9 a certeza das coisas que se esperam, a demonstra\xE7\xE3o das realidades que n\xE3o se veem" (Hb 11,1).
-
-**A f\xE9 \xE9:**
-- Dom gratuito de Deus
-- Resposta livre do homem
-- Ades\xE3o pessoal a Deus
-- Aceita\xE7\xE3o da verdade revelada
-
-**Vivendo a f\xE9:**
-- Professar: Crer e proclamar a f\xE9 (Credo)
-- Celebrar: Participar dos sacramentos
-- Viver: Conformar a vida aos mandamentos
-- Orar: Dialogar com Deus na ora\xE7\xE3o
-
-**Para o ministro:**
-A f\xE9 na presen\xE7a real de Cristo na Eucaristia deve ser viva e consciente. Cada gesto lit\xFArgico deve expressar essa f\xE9 profunda.
-
-"Creio, Senhor, mas aumenta a minha f\xE9!" (Mc 9,24)`,
-            orderIndex: 0,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson2_1.id,
-            type: "text",
-            title: "A Esperan\xE7a: \xC2ncora da Alma",
-            content: `"A esperan\xE7a n\xE3o decepciona, porque o amor de Deus foi derramado em nossos cora\xE7\xF5es" (Rm 5,5).
-
-**A esperan\xE7a crist\xE3:**
-- Confia nas promessas de Cristo
-- Aguarda a vida eterna
-- Conta com a gra\xE7a do Esp\xEDrito Santo
-- N\xE3o \xE9 ingenuidade, mas certeza fundada em Deus
-
-**Contra a esperan\xE7a:**
-- Desespero: Perder a confian\xE7a em Deus
-- Presun\xE7\xE3o: Confiar apenas em si mesmo
-
-**Vivendo a esperan\xE7a:**
-- Nas dificuldades: Confiar na provid\xEAncia
-- No pecado: Crer no perd\xE3o divino
-- No sofrimento: Unir-se \xE0 cruz de Cristo
-- No servi\xE7o: Trabalhar pelo Reino sem desanimar
-
-"Espera no Senhor, s\xEA forte! Coragem! Espera no Senhor!" (Sl 27,14)`,
-            orderIndex: 1,
-            estimatedMinutes: 11,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson2_1.id,
-            type: "text",
-            title: "A Caridade: A Maior das Virtudes",
-            content: `"Deus \xE9 amor" (1Jo 4,8). A caridade \xE9 a virtude pela qual amamos a Deus acima de tudo e ao pr\xF3ximo como a n\xF3s mesmos.
-
-**Duplo mandamento:**
-1. Amar a Deus de todo o cora\xE7\xE3o (verticalidade)
-2. Amar o pr\xF3ximo como a si mesmo (horizontalidade)
-
-N\xE3o h\xE1 caridade para com Deus sem caridade para com o pr\xF3ximo, e vice-versa.
-
-**Express\xF5es da caridade:**
-- **Paci\xEAncia**: Suportar com amor
-- **Bondade**: Fazer o bem aos outros
-- **Perd\xE3o**: N\xE3o guardar rancor
-- **Servi\xE7o**: Doar-se generosamente
-- **Verdade**: Falar com amor, mas com verdade
-
-**Para o ministro:**
-O minist\xE9rio \xE9 exerc\xEDcio de caridade. Servimos porque amamos a Cristo presente na Eucaristia e nos irm\xE3os.
-
-"Permaneceis no meu amor" (Jo 15,9)`,
-            orderIndex: 2,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 2.1: ${spiritLesson2_1.title} (3 sections)`);
-      }
-      const [spiritLesson2_2] = await db.insert(formationLessons).values({
-        moduleId: spiritMod2.id,
-        trackId: "spirituality-track-1",
-        title: "Virtudes Cardeais: Prud\xEAncia e Justi\xE7a",
-        description: "Vivendo com sabedoria e retid\xE3o",
-        lessonNumber: 2,
-        durationMinutes: 20,
-        orderIndex: 1,
-        objectives: [
-          "Conhecer as virtudes da prud\xEAncia e justi\xE7a",
-          "Aplic\xE1-las na vida e no minist\xE9rio",
-          "Crescer em sabedoria e retid\xE3o"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson2_2) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson2_2.id,
-            type: "text",
-            title: "Prud\xEAncia: A Sabedoria Pr\xE1tica",
-            content: `A prud\xEAncia \xE9 a virtude que disp\xF5e a raz\xE3o a discernir, em toda circunst\xE2ncia, o verdadeiro bem e a escolher os meios adequados para realiz\xE1-lo.
-
-**Atos da prud\xEAncia:**
-1. **Aconselhar-se**: Buscar orienta\xE7\xE3o
-2. **Julgar**: Discernir o que fazer
-3. **Decidir**: Escolher e agir
-
-**No minist\xE9rio:**
-- Saber quando falar e quando calar
-- Discernir situa\xE7\xF5es delicadas
-- Agir com equil\xEDbrio e bom senso
-- Evitar extremos
-
-**Pecados contra a prud\xEAncia:**
-- Precipita\xE7\xE3o: Agir sem pensar
-- Neglig\xEAncia: N\xE3o dar import\xE2ncia devida
-- Inconst\xE2ncia: Mudar sem motivo
-
-"Sede prudentes como as serpentes e simples como as pombas" (Mt 10,16)`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson2_2.id,
-            type: "text",
-            title: "Justi\xE7a: Dar a Cada Um o Que Lhe \xC9 Devido",
-            content: `A justi\xE7a \xE9 a vontade firme e constante de dar a Deus e ao pr\xF3ximo o que lhes \xE9 devido.
-
-**Justi\xE7a para com Deus:**
-- Culto de adora\xE7\xE3o (virtude da religi\xE3o)
-- Gratid\xE3o pelos dons recebidos
-- Fidelidade \xE0s promessas feitas
-
-**Justi\xE7a para com o pr\xF3ximo:**
-- Respeitar os direitos de cada um
-- Promover a equidade nas rela\xE7\xF5es
-- N\xE3o julgar precipitadamente
-- Respeitar a boa fama (n\xE3o caluniar)
-
-**Justi\xE7a social:**
-- Preocupa\xE7\xE3o com o bem comum
-- Aten\xE7\xE3o aos mais pobres e necessitados
-- Compromisso com uma sociedade mais justa
-
-**No minist\xE9rio:**
-- Tratar todos com igualdade e respeito
-- N\xE3o fazer acep\xE7\xE3o de pessoas
-- Cumprir fielmente os compromissos assumidos
-
-"Buscai primeiro o Reino de Deus e a sua justi\xE7a" (Mt 6,33)`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 2.2: ${spiritLesson2_2.title} (2 sections)`);
-      }
-      const [spiritLesson2_3] = await db.insert(formationLessons).values({
-        moduleId: spiritMod2.id,
-        trackId: "spirituality-track-1",
-        title: "Virtudes Cardeais: Fortaleza e Temperan\xE7a",
-        description: "For\xE7a nas dificuldades e dom\xEDnio de si mesmo",
-        lessonNumber: 3,
-        durationMinutes: 15,
-        orderIndex: 2,
-        objectives: [
-          "Desenvolver a fortaleza espiritual",
-          "Praticar a temperan\xE7a no dia a dia",
-          "Vencer as tenta\xE7\xF5es e prova\xE7\xF5es"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson2_3) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson2_3.id,
-            type: "text",
-            title: "Fortaleza: Firmeza nas Dificuldades",
-            content: `A fortaleza assegura, nas dificuldades, a firmeza e a const\xE2ncia na busca do bem.
-
-**Duas dimens\xF5es:**
-1. **Resistir**: Suportar as prova\xE7\xF5es sem desanimar
-2. **Atacar**: Enfrentar os obst\xE1culos com coragem
-
-**Manifesta\xE7\xF5es:**
-- Paci\xEAncia no sofrimento
-- Perseveran\xE7a na ora\xE7\xE3o
-- Coragem para testemunhar a f\xE9
-- Firmeza diante das tenta\xE7\xF5es
-
-**No minist\xE9rio:**
-- Continuar servindo mesmo quando dif\xEDcil
-- N\xE3o desanimar com cr\xEDticas ou incompreens\xF5es
-- Manter-se fiel mesmo na aridez espiritual
-- Ter coragem de corrigir quando necess\xE1rio
-
-"Tudo posso naquele que me fortalece" (Fl 4,13)`,
-            orderIndex: 0,
-            estimatedMinutes: 8,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson2_3.id,
-            type: "text",
-            title: "Temperan\xE7a: Equil\xEDbrio e Modera\xE7\xE3o",
-            content: `A temperan\xE7a modera a atra\xE7\xE3o pelos prazeres sens\xEDveis e assegura o dom\xEDnio da vontade sobre os instintos.
-
-**\xC1reas de exerc\xEDcio:**
-- **Alimenta\xE7\xE3o**: Comer e beber com modera\xE7\xE3o
-- **Sono**: Descanso adequado sem pregui\xE7a
-- **Divers\xE3o**: Lazer saud\xE1vel e equilibrado
-- **Sexualidade**: Vivida conforme estado de vida
-- **Consumo**: Evitar materialismo e apego
-
-**Virtudes relacionadas:**
-- Humildade: N\xE3o se exaltar
-- Mansid\xE3o: Dominar a ira
-- Mod\xE9stia: Apresenta\xE7\xE3o digna
-
-**No minist\xE9rio:**
-- Vestir-se adequadamente
-- Evitar excessos antes de servir
-- Manter equil\xEDbrio entre servi\xE7o e vida pessoal
-- N\xE3o buscar reconhecimento ou destaque
-
-"Sede s\xF3brios e vigiai" (1Pd 5,8)`,
-            orderIndex: 1,
-            estimatedMinutes: 7,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 2.3: ${spiritLesson2_3.title} (2 sections)`);
-      }
-    }
-    const spiritModule3 = {
-      trackId: "spirituality-track-1",
-      title: "Maria e os Santos: Companheiros de Jornada",
-      description: "A comunh\xE3o dos santos e a intercess\xE3o de Maria",
-      category: "espiritualidade",
-      orderIndex: 2,
-      estimatedDuration: 50,
-      isActive: true,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    const [spiritMod3] = await db.insert(formationModules).values(spiritModule3).onConflictDoNothing().returning();
-    if (spiritMod3) {
-      console.log(`  \u2713 Module 3: ${spiritModule3.title}`);
-      const [spiritLesson3_1] = await db.insert(formationLessons).values({
-        moduleId: spiritMod3.id,
-        trackId: "spirituality-track-1",
-        title: "Maria, M\xE3e da Eucaristia",
-        description: "A rela\xE7\xE3o de Maria com a Eucaristia e seu exemplo para n\xF3s",
-        lessonNumber: 1,
-        durationMinutes: 25,
-        orderIndex: 0,
-        objectives: [
-          "Compreender o papel de Maria na Eucaristia",
-          "Imitar as atitudes marianas",
-          "Confiar na intercess\xE3o de Nossa Senhora"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson3_1) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson3_1.id,
-            type: "text",
-            title: "Maria e a Eucaristia",
-            content: `Maria tem uma rela\xE7\xE3o \xFAnica com a Eucaristia:
-
-**Ela \xE9:**
-- **M\xE3e da Eucaristia**: Gerou em seu ventre o Corpo que se tornou alimento
-- **Primeira sagr\xE1rio**: Guardou Jesus em seu corpo
-- **Modelo eucar\xEDstico**: Viveu em comunh\xE3o perfeita com Cristo
-
-S\xE3o Jo\xE3o Paulo II ensinou: "Maria pode guiar-nos para este Sant\xEDssimo Sacramento, porque tem com Ele uma rela\xE7\xE3o profunda" (Ecclesia de Eucharistia, 53).
-
-**A Visita\xE7\xE3o:**
-Quando Maria leva Jesus a Isabel, \xE9 como uma "prociss\xE3o eucar\xEDstica". Ela nos ensina a levar Cristo aos outros.`,
-            orderIndex: 0,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson3_1.id,
-            type: "text",
-            title: "Atitudes Marianas para o Ministro",
-            content: `**F\xE9:**
-"Eis aqui a serva do Senhor" (Lc 1,38)
-- Crer na palavra de Deus
-- Aceitar os planos divinos
-- Confiar mesmo sem compreender tudo
-
-**Humildade:**
-"Fez em mim grandes coisas" (Lc 1,49)
-- Reconhecer tudo como dom de Deus
-- N\xE3o buscar destaque pessoal
-- Servir com simplicidade
-
-**Disponibilidade:**
-"Fazei tudo o que Ele vos disser" (Jo 2,5)
-- Estar pronto para servir
-- Obedecer com prontid\xE3o
-- Indicar sempre Jesus, n\xE3o a si mesmo
-
-**Sil\xEAncio:**
-"Maria guardava todas estas coisas no cora\xE7\xE3o" (Lc 2,51)
-- Contemplar os mist\xE9rios de Deus
-- Discri\xE7\xE3o no servi\xE7o
-- Ora\xE7\xE3o silenciosa`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson3_1.id,
-            type: "text",
-            title: "Devo\xE7\xE3o Mariana do Ministro",
-            content: `**Pr\xE1ticas recomendadas:**
-- **Ter\xE7o di\xE1rio**: Meditar os mist\xE9rios com Maria
-- **Angelus**: Tr\xEAs vezes ao dia
-- **Consagra\xE7\xE3o a Maria**: Entregar-se aos cuidados maternos
-- **Escapul\xE1rio**: Usar como sinal de prote\xE7\xE3o
-- **S\xE1bado mariano**: Dedicar especialmente \xE0 Nossa Senhora
-
-**Ora\xE7\xE3o antes do minist\xE9rio:**
-"Maria, M\xE3e da Eucaristia,
-Ensina-me a amar teu Filho presente no Sacramento.
-D\xE1-me tuas m\xE3os puras para distribuir a Comunh\xE3o,
-Tua humildade para servir,
-E teu cora\xE7\xE3o para adorar.
-Que eu seja, como tu, portador de Jesus para o mundo.
-Am\xE9m."
-
-"A Virgem Maria com seu exemplo nos orienta para este Sant\xEDssimo Sacramento" (CIC 2674)`,
-            orderIndex: 2,
-            estimatedMinutes: 5,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 3.1: ${spiritLesson3_1.title} (3 sections)`);
-      }
-      const [spiritLesson3_2] = await db.insert(formationLessons).values({
-        moduleId: spiritMod3.id,
-        trackId: "spirituality-track-1",
-        title: "Os Santos: Exemplos de Santidade",
-        description: "Aprendendo com os santos que amaram a Eucaristia",
-        lessonNumber: 2,
-        durationMinutes: 25,
-        orderIndex: 1,
-        objectives: [
-          "Conhecer santos eucar\xEDsticos",
-          "Aprender com seus exemplos",
-          "Invocar sua intercess\xE3o"
-        ],
-        isActive: true,
-        createdAt: /* @__PURE__ */ new Date()
-      }).onConflictDoNothing().returning();
-      if (spiritLesson3_2) {
-        await db.insert(formationLessonSections).values([
-          {
-            lessonId: spiritLesson3_2.id,
-            type: "text",
-            title: "Santos Eucar\xEDsticos",
-            content: `Muitos santos se destacaram por seu amor \xE0 Eucaristia:
-
-**S\xE3o Tars\xEDcio (s\xE9c. III)**
-- M\xE1rtir da Eucaristia
-- Morreu protegendo o Sant\xEDssimo Sacramento
-- Padroeiro dos coroinhas e ministros
-- Exemplo de coragem e fidelidade
-
-**S\xE3o Francisco de Assis (1182-1226)**
-- Profunda rever\xEAncia \xE0 Eucaristia
-- Dizia: "O homem deve tremer, o mundo estremecer e o c\xE9u alegrar-se quando Cristo est\xE1 no altar"
-- Insistia na dignidade dos vasos sagrados e do altar
-
-**S\xE3o Tom\xE1s de Aquino (1225-1274)**
-- Doutor Eucar\xEDstico
-- Escreveu hinos eucar\xEDsticos (Tantum Ergo, Pange Lingua)
-- Dedicou sua intelig\xEAncia a explicar o mist\xE9rio eucar\xEDstico
-
-**Santa Teresa de Calcut\xE1 (1910-1997)**
-- Via Jesus nos pobres e na Eucaristia
-- Dizia: "A Eucaristia est\xE1 ligada \xE0 Paix\xE3o e \xE0 pobreza"
-- Hora di\xE1ria de adora\xE7\xE3o eucar\xEDstica`,
-            orderIndex: 0,
-            estimatedMinutes: 12,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson3_2.id,
-            type: "text",
-            title: "Mais Santos para Inspirar",
-            content: `**Santa Clara de Assis**
-- Adora\xE7\xE3o perp\xE9tua em seu mosteiro
-- Afastou inimigos expondo o Sant\xEDssimo
-
-**S\xE3o Pedro Juli\xE3o Eymard**
-- Fundador dos Sacramentinos
-- "Ap\xF3stolo da Eucaristia"
-- Promoveu a adora\xE7\xE3o eucar\xEDstica
-
-**Santo Padre Pio**
-- Missas de v\xE1rias horas por seu fervor
-- Estigmas como uni\xE3o \xE0 Paix\xE3o de Cristo
-- A\xE7\xE3o de gra\xE7as prolongada ap\xF3s a Missa
-
-**Santa Faustina Kowalska**
-- Vis\xF5es de Jesus Eucar\xEDstico
-- Ensinou sobre a miseric\xF3rdia de Cristo presente na Eucaristia
-
-Cada santo nos mostra um caminho para amar mais a Eucaristia!`,
-            orderIndex: 1,
-            estimatedMinutes: 10,
-            createdAt: /* @__PURE__ */ new Date()
-          },
-          {
-            lessonId: spiritLesson3_2.id,
-            type: "text",
-            title: "Comunh\xE3o dos Santos",
-            content: `A Igreja \xE9 una: os que est\xE3o no c\xE9u, no purgat\xF3rio e na terra formam uma s\xF3 fam\xEDlia.
-
-**Intercess\xE3o dos santos:**
-- N\xE3o adoramos os santos, mas os veneramos
-- Pedimos sua intercess\xE3o junto a Deus
-- Eles s\xE3o nossos irm\xE3os mais velhos na f\xE9
-
-**Como invocar os santos:**
-- Escolher um santo patrono pessoal
-- Conhecer sua vida e virtudes
-- Imit\xE1-los no amor a Cristo
-- Pedir sua intercess\xE3o nas necessidades
-
-**Ora\xE7\xE3o de invoca\xE7\xE3o:**
-"S\xE3o Tars\xEDcio, m\xE1rtir da Eucaristia,
-Intercede por n\xF3s, ministros extraordin\xE1rios.
-D\xE1-nos tua coragem para defender a f\xE9,
-Teu amor ao Sant\xEDssimo Sacramento,
-E tua pureza de cora\xE7\xE3o.
-Que sejamos dignos de servir ao Corpo de Cristo.
-Am\xE9m."`,
-            orderIndex: 2,
-            estimatedMinutes: 3,
-            createdAt: /* @__PURE__ */ new Date()
-          }
-        ]);
-        console.log(`    \u2713 Lesson 3.2: ${spiritLesson3_2.title} (3 sections)`);
-      }
-    }
-    console.log("\n\u2705 Formation seed completed successfully!");
-    console.log("\n\u{1F4CA} Summary:");
-    console.log("  \u2022 2 tracks created");
-    console.log("  \u2022 6 modules created (3 per track)");
-    console.log("  \u2022 15 lessons created");
-    console.log("  \u2022 Multiple sections per lesson");
-    return {
-      success: true,
-      message: "Formation content seeded successfully",
-      stats: {
-        tracks: 2,
-        modules: 6,
-        lessons: 15
-      }
-    };
-  } catch (error) {
-    console.error("\u274C Error seeding formation:", error);
-    throw error;
   }
+  if (lessonIds.length > 0) {
+    const staleLessons = await db.select({ id: formationLessons.id }).from(formationLessons).where(
+      and24(
+        eq31(formationLessons.trackId, MESC_FORMATION_TRACK_ID),
+        notInArray2(formationLessons.id, lessonIds)
+      )
+    );
+    for (const lesson of staleLessons) {
+      await db.delete(formationLessonSections).where(eq31(formationLessonSections.lessonId, lesson.id));
+    }
+    await db.delete(formationLessons).where(
+      and24(
+        eq31(formationLessons.trackId, MESC_FORMATION_TRACK_ID),
+        notInArray2(formationLessons.id, lessonIds)
+      )
+    );
+  }
+  if (moduleIds.length > 0) {
+    await db.delete(formationModules).where(
+      and24(
+        eq31(formationModules.trackId, MESC_FORMATION_TRACK_ID),
+        notInArray2(formationModules.id, moduleIds)
+      )
+    );
+  }
+  for (const module of records.modules) {
+    await db.insert(formationModules).values({
+      ...module,
+      createdAt: now
+    }).onConflictDoUpdate({
+      target: formationModules.id,
+      set: {
+        trackId: module.trackId,
+        title: module.title,
+        description: module.description,
+        category: module.category,
+        content: module.content,
+        durationMinutes: module.durationMinutes,
+        orderIndex: module.orderIndex
+      }
+    });
+  }
+  for (const lesson of records.lessons) {
+    await db.insert(formationLessons).values({
+      ...lesson,
+      createdAt: now,
+      updatedAt: now
+    }).onConflictDoUpdate({
+      target: formationLessons.id,
+      set: {
+        moduleId: lesson.moduleId,
+        trackId: lesson.trackId,
+        title: lesson.title,
+        description: lesson.description,
+        lessonNumber: lesson.lessonNumber,
+        durationMinutes: lesson.durationMinutes,
+        objectives: lesson.objectives,
+        isActive: lesson.isActive,
+        orderIndex: lesson.orderIndex,
+        updatedAt: now
+      }
+    });
+  }
+  for (const section of records.sections) {
+    await db.insert(formationLessonSections).values({
+      ...section,
+      createdAt: now,
+      updatedAt: now
+    }).onConflictDoUpdate({
+      target: formationLessonSections.id,
+      set: {
+        lessonId: section.lessonId,
+        type: section.type,
+        title: section.title,
+        content: section.content,
+        orderIndex: section.orderIndex,
+        isRequired: section.isRequired,
+        estimatedMinutes: section.estimatedMinutes,
+        updatedAt: now
+      }
+    });
+  }
+  const stats = {
+    tracks: 1,
+    modules: records.modules.length,
+    lessons: records.lessons.length,
+    sections: records.sections.length
+  };
+  console.log("\u2705 Forma\xE7\xE3o oficial MESC sincronizada.", stats);
+  return {
+    success: true,
+    message: "Formation content synced from MESC_Formation",
+    stats
+  };
 }
-var formation_seed_default;
+var legacyFormationTrackIds, formation_seed_default;
 var init_formation_seed = __esm({
   async "server/seeds/formation-seed.ts"() {
     "use strict";
     await init_db();
     init_schema();
+    init_mescFormationContent();
+    legacyFormationTrackIds = [
+      "liturgy-track-1",
+      "spirituality-track-1",
+      "practical-track-1"
+    ];
+    if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+      seedFormation().then(() => process.exit(0)).catch((error) => {
+        console.error("\u274C Erro ao sincronizar forma\xE7\xE3o oficial MESC:", error);
+        process.exit(1);
+      });
+    }
     formation_seed_default = seedFormation;
   }
 });
@@ -8742,7 +7753,7 @@ __export(whatsappHandler_exports, {
 });
 import axios from "axios";
 import OpenAI from "openai";
-import { eq as eq37, and as and29, gte as gte17, asc as asc3, or as or11 } from "drizzle-orm";
+import { eq as eq37, and as and30, gte as gte17, asc as asc3, or as or11 } from "drizzle-orm";
 import { format as format11, startOfDay } from "date-fns";
 import { ptBR as ptBR4 } from "date-fns/locale";
 async function sendWhatsappMessage(phone, message) {
@@ -8797,7 +7808,7 @@ async function getNextSchedule(ministerId) {
     position: schedules.position,
     location: schedules.location
   }).from(schedules).where(
-    and29(
+    and30(
       eq37(schedules.ministerId, ministerId),
       gte17(schedules.date, today)
     )
@@ -8822,7 +7833,7 @@ async function getAvailableSubstitutions() {
     date: schedules.date,
     time: schedules.time
   }).from(substitutionRequests).innerJoin(users, eq37(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq37(substitutionRequests.scheduleId, schedules.id)).where(
-    and29(
+    and30(
       eq37(substitutionRequests.status, "available"),
       gte17(schedules.date, today)
     )
@@ -8990,15 +8001,15 @@ __export(static_exports, {
 });
 import express from "express";
 import fs from "fs";
-import path from "path";
+import path2 from "path";
 function serveStatic(app2) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  const distPath = path2.resolve(import.meta.dirname, "public");
   if (!fs.existsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app2.use("/assets", express.static(path.join(distPath, "assets"), {
+  app2.use("/assets", express.static(path2.join(distPath, "assets"), {
     maxAge: "1y",
     immutable: true
   }));
@@ -9028,7 +8039,7 @@ function serveStatic(app2) {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(path2.resolve(distPath, "index.html"));
   });
 }
 var init_static = __esm({
@@ -11221,6 +10232,7 @@ var MOBILE_NOTIFICATION_EVENT_KEYS = [
   "questionnaire_closed",
   "schedule_published",
   "substitution_requested",
+  "sanctuary_event_published",
   "substitute_accepted",
   "formation_available",
   "schedule_reminder"
@@ -14824,6 +13836,26 @@ var learningService = new LearningService();
 // server/routes/scheduleGeneration.ts
 await init_communityContext();
 
+// server/utils/scheduleAuthorization.ts
+init_roles();
+function isAuxiliarOneOrTwoForMass(userId, assignments) {
+  if (!userId) {
+    return false;
+  }
+  return assignments.some(
+    (assignment) => assignment.ministerId === userId && (assignment.position === 1 || assignment.position === 2)
+  );
+}
+function canRearrangeMassSchedule(input) {
+  if (isAdmin(input.role)) {
+    return true;
+  }
+  return isAuxiliarOneOrTwoForMass(input.userId, input.assignments);
+}
+function canDeleteEntireMass(role) {
+  return isAdmin(role);
+}
+
 // server/types/schedules.ts
 function getErrorMessage4(error) {
   if (error instanceof Error) return error.message;
@@ -16228,7 +15260,7 @@ router6.delete("/:id", authenticateToken, requireRole(["gestor", "coordenador"])
     res.status(500).json({ error: "Failed to remove minister from schedule" });
   }
 });
-router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router6.patch("/batch-update", authenticateToken, async (req, res) => {
   try {
     console.log("[batch-update] Request body:", req.body);
     const schema = z4.object({
@@ -16253,7 +15285,17 @@ router6.patch("/batch-update", authenticateToken, requireRole(["gestor", "coorde
       "details:",
       existingSchedules.map((s) => ({ id: s.id.substring(0, 8), pos: s.position, minister: s.ministerId?.substring(0, 8) }))
     );
+    if (!canRearrangeMassSchedule({
+      role: req.user?.role,
+      userId: req.user?.id,
+      assignments: existingSchedules
+    })) {
+      return res.status(403).json({ message: "Sem permiss\xE3o para reorganizar esta escala" });
+    }
     if (ministers.length === 0) {
+      if (!canDeleteEntireMass(req.user?.role)) {
+        return res.status(403).json({ message: "Apenas a coordena\xE7\xE3o pode remover a missa inteira do calend\xE1rio" });
+      }
       console.log("[batch-update] All ministers removed - deleting entire mass and related substitutions");
       for (const schedule of existingSchedules) {
         await db.delete(substitutionRequests).where(eq17(substitutionRequests.scheduleId, schedule.id));
@@ -17862,6 +16904,29 @@ var isMissingSchedulesDateColumnError = (error) => {
   return message.includes("does not exist") && message.includes('"date"') || message.includes("no such column: schedules.date") || message.includes("no such column: date");
 };
 var router9 = Router9();
+router9.get("/special-events/month/:year/:month", authenticateToken, async (req, res) => {
+  try {
+    const year = Number(req.params.year);
+    const month = Number(req.params.month);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Ano ou m\xEAs inv\xE1lido" });
+    }
+    const startDateStr = `${year}-${month.toString().padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
+    const events = await db.select().from(specialEvents).where(
+      and17(
+        eq23(specialEvents.isActive, true),
+        gte10(specialEvents.eventDate, startDateStr),
+        lte9(specialEvents.eventDate, endDateStr)
+      )
+    ).orderBy(specialEvents.eventDate, specialEvents.eventTime, specialEvents.name);
+    res.json(events);
+  } catch (error) {
+    console.error("Error fetching schedule special events:", error);
+    res.status(500).json({ message: "Erro ao buscar eventos do Santu\xE1rio" });
+  }
+});
 router9.get("/minister/upcoming", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -21412,7 +20477,13 @@ router15.post("/", authenticateToken, async (req, res) => {
       await sendPushNotificationToUsers([finalSubstituteId], {
         title: "\u{1F4CB} Pedido de Substitui\xE7\xE3o",
         body: `${requesterName} solicitou que voc\xEA o substitua na missa de ${formattedDate} \xE0s ${schedule.time || ""}`,
-        url: "/substitutions"
+        url: "/substitutions",
+        data: mobileNotificationData("substitution_requested", {
+          substitutionId: newRequest.id,
+          scheduleId,
+          requesterId,
+          directed: true
+        })
       });
       notifyUsers([finalSubstituteId], {
         id: "sub-request-" + newRequest.id,
@@ -21454,7 +20525,13 @@ router15.post("/", authenticateToken, async (req, res) => {
         await sendPushNotificationToUsers(recipientIds, {
           title: notificationTitle,
           body: notificationMessage,
-          url: "/substitutions"
+          url: "/substitutions",
+          data: mobileNotificationData("substitution_requested", {
+            substitutionId: newRequest.id,
+            scheduleId,
+            requesterId,
+            directed: false
+          })
         });
         notifyUsers(recipientIds, {
           id: "sub-request-" + newRequest.id,
@@ -22047,7 +21124,7 @@ var mass_pendencies_default = router16;
 await init_db();
 init_schema();
 import { Router as Router17 } from "express";
-import { and as and24, eq as eq32, asc as asc2, count as count6 } from "drizzle-orm";
+import { and as and25, eq as eq32, asc as asc2, count as count6 } from "drizzle-orm";
 init_roles();
 await init_storage();
 await init_pushNotifications();
@@ -22072,7 +21149,7 @@ function requireAdmin(req, res, next) {
 }
 async function notifyFormationAvailable(input) {
   try {
-    const ministers = await db.select({ id: users.id }).from(users).where(and24(eq32(users.role, "ministro"), eq32(users.status, "active")));
+    const ministers = await db.select({ id: users.id }).from(users).where(and25(eq32(users.role, "ministro"), eq32(users.status, "active")));
     const recipientIds = [...new Set(ministers.map((minister) => minister.id))];
     if (recipientIds.length === 0) {
       return;
@@ -22631,13 +21708,14 @@ router17.get("/stats", async (req, res) => {
     const [modulesCount] = await db.select({ total: count6() }).from(formationModules);
     const [lessonsCount] = await db.select({ total: count6() }).from(formationLessons);
     const [sectionsCount] = await db.select({ total: count6() }).from(formationLessonSections);
+    const [videoSectionsCount] = await db.select({ total: count6() }).from(formationLessonSections).where(eq32(formationLessonSections.type, "video"));
     const [activeTracksCount] = await db.select({ total: count6() }).from(formationTracks).where(eq32(formationTracks.isActive, true));
     const [activeLessonsCount] = await db.select({ total: count6() }).from(formationLessons).where(eq32(formationLessons.isActive, true));
     res.json({
       tracks: { total: tracksCount.total, active: activeTracksCount.total },
       modules: { total: modulesCount.total },
       lessons: { total: lessonsCount.total, active: activeLessonsCount.total },
-      sections: { total: sectionsCount.total }
+      sections: { total: sectionsCount.total, videos: videoSectionsCount.total }
     });
   } catch (error) {
     console.error("Error fetching admin stats:", error);
@@ -22709,29 +21787,164 @@ router17.patch("/lessons/:id/toggle-active", async (req, res) => {
 });
 var formationAdmin_default = router17;
 
-// server/routes/version.ts
+// server/routes/dbBackfill.ts
+await init_db();
 import { Router as Router18 } from "express";
+import { sql as sql17 } from "drizzle-orm";
+
+// server/routes/dbBackfillSql.ts
+var B64 = "Q1JFQVRFIFRZUEUgInB1YmxpYyIuImJhZGdlX2NhdGVnb3J5IiBBUyBFTlVNKCdwYXJ0aWNpcGF0aW9uJywgJ2Zvcm1hdGlvbicsICdjb21tdW5pdHknLCAnc3RyZWFrJywgJ21pbGVzdG9uZScsICdzcGVjaWFsJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJiYWRnZV9yYXJpdHkiIEFTIEVOVU0oJ2NvbW1vbicsICd1bmNvbW1vbicsICdyYXJlJywgJ2VwaWMnLCAnbGVnZW5kYXJ5Jyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJjZWxlYnJhdGlvbl9yYW5rIiBBUyBFTlVNKCdTT0xFTU5JVFknLCAnRkVBU1QnLCAnTUVNT1JJQUwnLCAnT1BUSU9OQUxfTUVNT1JJQUwnLCAnRkVSSUFMJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJjb25maXJtYXRpb25fc3RhdHVzIiBBUyBFTlVNKCdwZW5kaW5nJywgJ2NvbmZpcm1lZCcsICdkZWNsaW5lZCcsICdub19yZXNwb25zZScsICdub19zaG93Jyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJmb3JtYXRpb25fY2F0ZWdvcnkiIEFTIEVOVU0oJ2xpdHVyZ2lhJywgJ2VzcGlyaXR1YWxpZGFkZScsICdwcmF0aWNhJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJmb3JtYXRpb25fc3RhdHVzIiBBUyBFTlVNKCdub3Rfc3RhcnRlZCcsICdpbl9wcm9ncmVzcycsICdjb21wbGV0ZWQnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuImxlYXJuZWRfcGF0dGVybl90eXBlIiBBUyBFTlVNKCdtaW5pc3Rlcl9yZW1vdmFsJywgJ21pbmlzdGVyX2FkZGl0aW9uJywgJ3Bvc2l0aW9uX3ByZWZlcmVuY2UnLCAndGltZV9wcmVmZXJlbmNlJywgJ21hc3NfdHlwZV9wcmVmZXJlbmNlJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJsZXNzb25fY29udGVudF90eXBlIiBBUyBFTlVNKCd0ZXh0JywgJ3ZpZGVvJywgJ2F1ZGlvJywgJ2RvY3VtZW50JywgJ3F1aXonLCAnaW50ZXJhY3RpdmUnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuImxpdHVyZ2ljYWxfY29sb3IiIEFTIEVOVU0oJ3doaXRlJywgJ3JlZCcsICdncmVlbicsICdwdXJwbGUnLCAncm9zZScsICdibGFjaycpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVFlQRSAicHVibGljIi4ibGl0dXJnaWNhbF9jeWNsZSIgQVMgRU5VTSgnQScsICdCJywgJ0MnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuIm1hc3NfdHlwZSIgQVMgRU5VTSgnbWlzc2FfZGlhcmlhJywgJ21pc3NhX2RvbWluaWNhbCcsICdtaXNzYV9jdXJhX2xpYmVydGFjYW8nLCAnbWlzc2Ffc2FncmFkb19jb3JhY2FvJywgJ21pc3NhX2ltYWN1bGFkb19jb3JhY2FvJywgJ21pc3NhX3Nhb19qdWRhcycsICdhZG9yYWNhbycsICdub3ZlbmEnLCAnZmVzdGFfcGFkcm9laXJvJywgJ2ZpbmFkb3MnLCAnZXZlbnRvX2VzcGVjaWFsJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJtYXRlcmlhbF90eXBlIiBBUyBFTlVNKCdwZGYnLCAnZG9jdW1lbnQnLCAndmlkZW8nLCAnYXVkaW8nLCAnaW1hZ2UnLCAncHJlc2VudGF0aW9uJywgJ290aGVyJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJub3RpZmljYXRpb25fdHlwZSIgQVMgRU5VTSgnc2NoZWR1bGUnLCAnc3Vic3RpdHV0aW9uJywgJ2Zvcm1hdGlvbicsICdhbm5vdW5jZW1lbnQnLCAncmVtaW5kZXInKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuInBvaW50X2FjdGlvbiIgQVMgRU5VTSgnbWFzc19zZXJ2ZWQnLCAnc3Vic3RpdHV0aW9uX29mZmVyZWQnLCAnc3Vic3RpdHV0aW9uX2FjY2VwdGVkJywgJ21hdGVyaWFsX2NvbXBsZXRlZCcsICdxdWl6X2NvbXBsZXRlZCcsICdxdWl6X3BlcmZlY3QnLCAnc3RyZWFrX2JvbnVzJywgJ2JhZGdlX2Vhcm5lZCcsICdsb2dpbl9ib251cycsICdmaXJzdF9hY3Rpb24nLCAnY29tbXVuaXR5X2hlbHAnLCAnc3BlY2lhbF9ldmVudCcpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVFlQRSAicHVibGljIi4icmVjdXJyZW5jZV90eXBlIiBBUyBFTlVNKCd3ZWVrbHknLCAnbW9udGhseScsICd5ZWFybHknLCAnb25lX3RpbWUnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuInNjaGVkdWxlX2dlbmVyYXRpb25fc3RhdHVzIiBBUyBFTlVNKCdkcmFmdCcsICdwdWJsaXNoZWQnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuInNjaGVkdWxlX3N0YXR1cyIgQVMgRU5VTSgnZHJhZnQnLCAncHVibGlzaGVkJywgJ2NvbXBsZXRlZCcpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVFlQRSAicHVibGljIi4ic2NoZWR1bGVfdHlwZSIgQVMgRU5VTSgnbWlzc2EnLCAnY2VsZWJyYWNhbycsICdldmVudG8nKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuInN1YnN0aXR1dGlvbl9zdGF0dXMiIEFTIEVOVU0oJ2F2YWlsYWJsZScsICdwZW5kaW5nJywgJ2FwcHJvdmVkJywgJ3JlamVjdGVkJywgJ2NhbmNlbGxlZCcsICdhdXRvX2FwcHJvdmVkJyk7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUWVBFICJwdWJsaWMiLiJ1cmdlbmN5X2xldmVsIiBBUyBFTlVNKCdsb3cnLCAnbWVkaXVtJywgJ2hpZ2gnLCAnY3JpdGljYWwnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRZUEUgInB1YmxpYyIuInVzZXJfcm9sZSIgQVMgRU5VTSgnZ2VzdG9yJywgJ3JlaXRvcicsICdjb29yZGVuYWRvcl9jb211bmlkYWRlJywgJ2Nvb3JkZW5hZG9yX3Bhcm9xdWlhbCcsICdtaW5pc3RybycpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVFlQRSAicHVibGljIi4idXNlcl9zdGF0dXMiIEFTIEVOVU0oJ2FjdGl2ZScsICdpbmFjdGl2ZScsICdwZW5kaW5nJywgJ2RlbGV0ZWQnKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJhY3RpdmVfc2Vzc2lvbnMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkic2Vzc2lvbl90b2tlbiIgdmFyY2hhcigxMDApIE5PVCBOVUxMLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJImxhc3RfYWN0aXZpdHlfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJImV4cGlyZXNfYXQiIHRpbWVzdGFtcCBOT1QgTlVMTCwKCSJpcF9hZGRyZXNzIiB2YXJjaGFyKDQ1KSwKCSJ1c2VyX2FnZW50IiB0ZXh0LAoJImlzX2FjdGl2ZSIgYm9vbGVhbiBERUZBVUxUIHRydWUsCglDT05TVFJBSU5UICJhY3RpdmVfc2Vzc2lvbnNfc2Vzc2lvbl90b2tlbl91bmlxdWUiIFVOSVFVRSgic2Vzc2lvbl90b2tlbiIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgImFjdGl2aXR5X2xvZ3MiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkiYWN0aW9uIiB2YXJjaGFyKDEwMCkgTk9UIE5VTEwsCgkiZGV0YWlscyIganNvbmIsCgkiaXBfYWRkcmVzcyIgdmFyY2hhcig0NSksCgkidXNlcl9hZ2VudCIgdGV4dCwKCSJzZXNzaW9uX2lkIiB2YXJjaGFyKDI1NSksCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkgTk9UIE5VTEwKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiYWRvcmF0aW9uX2RyYXdfcmVzdWx0cyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiZHJhd19pZCIgdXVpZCBOT1QgTlVMTCwKCSJtaW5pc3Rlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJtb25kYXlfb2Zfd2VlayIgaW50ZWdlciBOT1QgTlVMTCwKCSJpc192b2x1bnRhcnkiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCUNPTlNUUkFJTlQgInVuaXF1ZV9hZG9yYXRpb25fZHJhd19taW5pc3Rlcl93ZWVrIiBVTklRVUUoImRyYXdfaWQiLCJtaW5pc3Rlcl9pZCIsIm1vbmRheV9vZl93ZWVrIikKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiYWRvcmF0aW9uX2RyYXdzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJtb250aCIgaW50ZWdlciBOT1QgTlVMTCwKCSJ5ZWFyIiBpbnRlZ2VyIE5PVCBOVUxMLAoJInRvdGFsX21pbmlzdGVyc190b19kcmF3IiBpbnRlZ2VyIE5PVCBOVUxMLAoJImNyZWF0ZWRfYnkiIHZhcmNoYXIgTk9UIE5VTEwsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiYmFkZ2VzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJjb2RlIiB2YXJjaGFyKDUwKSBOT1QgTlVMTCwKCSJuYW1lIiB2YXJjaGFyKDEwMCkgTk9UIE5VTEwsCgkiZGVzY3JpcHRpb24iIHRleHQsCgkiY2F0ZWdvcnkiICJiYWRnZV9jYXRlZ29yeSIgTk9UIE5VTEwsCgkicmFyaXR5IiAiYmFkZ2VfcmFyaXR5IiBERUZBVUxUICdjb21tb24nIE5PVCBOVUxMLAoJImljb25fbmFtZSIgdmFyY2hhcig1MCksCgkiaWNvbl9jb2xvciIgdmFyY2hhcigyMCksCgkicG9pbnRzX2F3YXJkZWQiIGludGVnZXIgREVGQVVMVCAwLAoJInJlcXVpcmVtZW50IiBqc29uYiwKCSJpc19hY3RpdmUiIGJvb2xlYW4gREVGQVVMVCB0cnVlLAoJImlzX3NlY3JldCIgYm9vbGVhbiBERUZBVUxUIGZhbHNlLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJQ09OU1RSQUlOVCAiYmFkZ2VzX2NvZGVfdW5pcXVlIiBVTklRVUUoImNvZGUiKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJjb21tdW5pdGllcyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkicGFyaXNoX25hbWUiIHZhcmNoYXIoMjU1KSBERUZBVUxUICdTYW50dcOhcmlvIFPDo28gSnVkYXMgVGFkZXUgZGUgU29yb2NhYmEnIE5PVCBOVUxMLAoJIm5hbWUiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJzbHVnIiB2YXJjaGFyKDY0KSBOT1QgTlVMTCwKCSJjb2xvcl9oZXgiIHZhcmNoYXIoNykgTk9UIE5VTEwsCgkiaXNfbWF0cml6IiBib29sZWFuIERFRkFVTFQgZmFsc2UgTk9UIE5VTEwsCgkiYWN0aXZlIiBib29sZWFuIERFRkFVTFQgdHJ1ZSBOT1QgTlVMTCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSBOT1QgTlVMTCwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSBOT1QgTlVMTCwKCUNPTlNUUkFJTlQgImNvbW11bml0aWVzX3NsdWdfdW5pcXVlIiBVTklRVUUoInNsdWciKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJmYW1pbGllcyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkibmFtZSIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJInByZWZlcl9zZXJ2ZV90b2dldGhlciIgYm9vbGVhbiBERUZBVUxUIHRydWUsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiZmFtaWx5X3JlbGF0aW9uc2hpcHMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkicmVsYXRlZF91c2VyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJInJlbGF0aW9uc2hpcF90eXBlIiB2YXJjaGFyKDUwKSBOT1QgTlVMTCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJmb3JtYXRpb25fY2VydGlmaWNhdGVzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJ1c2VyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJInRyYWNrX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJImNlcnRpZmljYXRlX251bWJlciIgdmFyY2hhcig1MCkgTk9UIE5VTEwsCgkidXNlcl9uYW1lIiB2YXJjaGFyKDI1NSkgTk9UIE5VTEwsCgkidHJhY2tfdGl0bGUiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJ0cmFja19jYXRlZ29yeSIgImZvcm1hdGlvbl9jYXRlZ29yeSIgTk9UIE5VTEwsCgkidG90YWxfbGVzc29ucyIgaW50ZWdlciBOT1QgTlVMTCwKCSJ0b3RhbF9ob3VycyIgaW50ZWdlciBOT1QgTlVMTCwKCSJpc3N1ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpIE5PVCBOVUxMLAoJImlzc3VlZF9ieSIgdmFyY2hhciwKCSJ2YWxpZF91bnRpbCIgdGltZXN0YW1wLAoJInZlcmlmaWNhdGlvbl9jb2RlIiB2YXJjaGFyKDIwKSBOT1QgTlVMTCwKCSJtZXRhZGF0YSIganNvbmIsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJmb3JtYXRpb25fY2VydGlmaWNhdGVzX2NlcnRpZmljYXRlX251bWJlcl91bmlxdWUiIFVOSVFVRSgiY2VydGlmaWNhdGVfbnVtYmVyIiksCglDT05TVFJBSU5UICJmb3JtYXRpb25fY2VydGlmaWNhdGVzX3ZlcmlmaWNhdGlvbl9jb2RlX3VuaXF1ZSIgVU5JUVVFKCJ2ZXJpZmljYXRpb25fY29kZSIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgImZvcm1hdGlvbl9sZXNzb25fcHJvZ3Jlc3MiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkibGVzc29uX2lkIiB1dWlkIE5PVCBOVUxMLAoJInN0YXR1cyIgImZvcm1hdGlvbl9zdGF0dXMiIERFRkFVTFQgJ25vdF9zdGFydGVkJyBOT1QgTlVMTCwKCSJwcm9ncmVzc19wZXJjZW50YWdlIiBpbnRlZ2VyIERFRkFVTFQgMCwKCSJ0aW1lX3NwZW50X21pbnV0ZXMiIGludGVnZXIgREVGQVVMVCAwLAoJImNvbXBsZXRlZF9zZWN0aW9ucyIganNvbmIsCgkibGFzdF9hY2Nlc3NlZF9hdCIgdGltZXN0YW1wLAoJImNvbXBsZXRlZF9hdCIgdGltZXN0YW1wLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJQ09OU1RSQUlOVCAidXFfZm9ybWF0aW9uX2xlc3Nvbl9wcm9ncmVzc191c2VyX2xlc3NvbiIgVU5JUVVFKCJ1c2VyX2lkIiwibGVzc29uX2lkIikKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiZm9ybWF0aW9uX2xlc3Nvbl9zZWN0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkibGVzc29uX2lkIiB1dWlkIE5PVCBOVUxMLAoJInR5cGUiICJsZXNzb25fY29udGVudF90eXBlIiBERUZBVUxUICd0ZXh0JywKCSJ0aXRsZSIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJImNvbnRlbnQiIHRleHQsCgkidmlkZW9fdXJsIiB2YXJjaGFyKDUxMiksCgkiYXVkaW9fdXJsIiB2YXJjaGFyKDUxMiksCgkiZG9jdW1lbnRfdXJsIiB2YXJjaGFyKDUxMiksCgkiaW1hZ2VfdXJsIiB2YXJjaGFyKDUxMiksCgkicXVpel9kYXRhIiBqc29uYiwKCSJvcmRlcl9pbmRleCIgaW50ZWdlciBERUZBVUxUIDAsCgkiaXNfcmVxdWlyZWQiIGJvb2xlYW4gREVGQVVMVCB0cnVlLAoJImVzdGltYXRlZF9taW51dGVzIiBpbnRlZ2VyLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgImZvcm1hdGlvbl9sZXNzb25zIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJtb2R1bGVfaWQiIHV1aWQgTk9UIE5VTEwsCgkidHJhY2tfaWQiIHZhcmNoYXIsCgkidGl0bGUiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJkZXNjcmlwdGlvbiIgdGV4dCwKCSJsZXNzb25fbnVtYmVyIiBpbnRlZ2VyIE5PVCBOVUxMLAoJImR1cmF0aW9uX21pbnV0ZXMiIGludGVnZXIsCgkib2JqZWN0aXZlcyIganNvbmIsCgkiaXNfYWN0aXZlIiBib29sZWFuIERFRkFVTFQgdHJ1ZSwKCSJvcmRlcl9pbmRleCIgaW50ZWdlciBERUZBVUxUIDAsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiZm9ybWF0aW9uX21hdGVyaWFscyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkidGl0bGUiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJkZXNjcmlwdGlvbiIgdGV4dCwKCSJ0eXBlIiAibWF0ZXJpYWxfdHlwZSIgREVGQVVMVCAncGRmJyBOT1QgTlVMTCwKCSJjYXRlZ29yeSIgImZvcm1hdGlvbl9jYXRlZ29yeSIsCgkidHJhY2tfaWQiIHZhcmNoYXIsCgkiZmlsZV9uYW1lIiB2YXJjaGFyKDI1NSkgTk9UIE5VTEwsCgkiZmlsZV9zaXplIiBpbnRlZ2VyIE5PVCBOVUxMLAoJIm1pbWVfdHlwZSIgdmFyY2hhcigxMDApIE5PVCBOVUxMLAoJImZpbGVfZGF0YSIgdGV4dCwKCSJleHRlcm5hbF91cmwiIHZhcmNoYXIoNTEyKSwKCSJ0aHVtYm5haWxfZGF0YSIgdGV4dCwKCSJ0YWdzIiBqc29uYiBERUZBVUxUICdbXSc6Ompzb25iLAoJInVwbG9hZGVkX2J5IiB2YXJjaGFyIE5PVCBOVUxMLAoJImRvd25sb2FkX2NvdW50IiBpbnRlZ2VyIERFRkFVTFQgMCwKCSJpc19wdWJsaXNoZWQiIGJvb2xlYW4gREVGQVVMVCB0cnVlLAoJImlzX2FjdGl2ZSIgYm9vbGVhbiBERUZBVUxUIHRydWUsCgkiYWlfYW5hbHl6ZWQiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSwKCSJhaV9zdW1tYXJ5IiB0ZXh0LAoJImFpX3N1Z2dlc3RlZF9jYXRlZ29yeSIgImZvcm1hdGlvbl9jYXRlZ29yeSIsCgkiYWlfc3VnZ2VzdGVkX3RhZ3MiIGpzb25iLAoJImFpX2tleV90b3BpY3MiIGpzb25iLAoJImFpX2NvbnRlbnRfcXVhbGl0eSIgdmFyY2hhcigyMCksCgkiYWlfcXVhbGl0eV9ub3RlcyIganNvbmIsCgkiYWlfcXVpel9xdWVzdGlvbnMiIGpzb25iLAoJImFpX2FuYWx5emVkX2F0IiB0aW1lc3RhbXAsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiZm9ybWF0aW9uX21vZHVsZXMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInRyYWNrX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJInRpdGxlIiB2YXJjaGFyKDI1NSkgTk9UIE5VTEwsCgkiZGVzY3JpcHRpb24iIHRleHQsCgkiY2F0ZWdvcnkiICJmb3JtYXRpb25fY2F0ZWdvcnkiLAoJImNvbnRlbnQiIHRleHQsCgkidmlkZW9fdXJsIiB2YXJjaGFyKDUxMiksCgkiZHVyYXRpb25fbWludXRlcyIgaW50ZWdlciwKCSJvcmRlcl9pbmRleCIgaW50ZWdlciBERUZBVUxUIDAsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAiZm9ybWF0aW9uX3Byb2dyZXNzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJ1c2VyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJIm1vZHVsZV9pZCIgdXVpZCBOT1QgTlVMTCwKCSJzdGF0dXMiICJmb3JtYXRpb25fc3RhdHVzIiBERUZBVUxUICdub3Rfc3RhcnRlZCcgTk9UIE5VTEwsCgkicHJvZ3Jlc3NfcGVyY2VudGFnZSIgaW50ZWdlciBERUZBVUxUIDAsCgkiY29tcGxldGVkX2F0IiB0aW1lc3RhbXAsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJ1cV9mb3JtYXRpb25fcHJvZ3Jlc3NfdXNlcl9tb2R1bGUiIFVOSVFVRSgidXNlcl9pZCIsIm1vZHVsZV9pZCIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgImZvcm1hdGlvbl90cmFja3MiICgKCSJpZCIgdmFyY2hhciBQUklNQVJZIEtFWSBOT1QgTlVMTCwKCSJ0aXRsZSIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJImRlc2NyaXB0aW9uIiB0ZXh0LAoJImNhdGVnb3J5IiAiZm9ybWF0aW9uX2NhdGVnb3J5IiBOT1QgTlVMTCwKCSJvcmRlcl9pbmRleCIgaW50ZWdlciBERUZBVUxUIDAsCgkiaWNvbiIgdmFyY2hhcigxMjgpLAoJImlzX2FjdGl2ZSIgYm9vbGVhbiBERUZBVUxUIHRydWUsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAibGVhZGVyYm9hcmRfY2FjaGUiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInBlcmlvZCIgdmFyY2hhcigyMCkgTk9UIE5VTEwsCgkidXNlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJyYW5rIiBpbnRlZ2VyIE5PVCBOVUxMLAoJInBvaW50cyIgaW50ZWdlciBOT1QgTlVMTCwKCSJsZXZlbCIgaW50ZWdlciBERUZBVUxUIDEsCgkidXNlcl9uYW1lIiB2YXJjaGFyKDI1NSksCgkidXNlcl9waG90b191cmwiIHRleHQsCgkiY2FsY3VsYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJ1bmlxdWVfbGVhZGVyYm9hcmRfZW50cnkiIFVOSVFVRSgicGVyaW9kIiwidXNlcl9pZCIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgImxlYXJuZWRfcGF0dGVybnMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInBhdHRlcm5fdHlwZSIgImxlYXJuZWRfcGF0dGVybl90eXBlIiBOT1QgTlVMTCwKCSJtaW5pc3Rlcl9pZCIgdmFyY2hhciwKCSJtYXNzX3R5cGUiICJtYXNzX3R5cGUiLAoJImRheV9vZl93ZWVrIiBpbnRlZ2VyLAoJInRpbWVfc2xvdCIgdGltZSwKCSJvY2N1cnJlbmNlX2NvdW50IiBpbnRlZ2VyIERFRkFVTFQgMSwKCSJjb25maWRlbmNlIiBpbnRlZ2VyIERFRkFVTFQgNTAsCgkid2VpZ2h0X2FkanVzdG1lbnQiIGludGVnZXIgREVGQVVMVCAwLAoJImxhc3Rfb2NjdXJyZW5jZSIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkibm90ZXMiIHRleHQsCgkiaXNfYWN0aXZlIiBib29sZWFuIERFRkFVTFQgdHJ1ZSwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJsZXZlbF9kZWZpbml0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkibGV2ZWwiIGludGVnZXIgTk9UIE5VTEwsCgkibmFtZSIgdmFyY2hhcigxMDApIE5PVCBOVUxMLAoJIm1pbl9wb2ludHMiIGludGVnZXIgTk9UIE5VTEwsCgkibWF4X3BvaW50cyIgaW50ZWdlciwKCSJpY29uX25hbWUiIHZhcmNoYXIoNTApLAoJImNvbG9yIiB2YXJjaGFyKDIwKSwKCSJiZW5lZml0cyIganNvbmIsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJsZXZlbF9kZWZpbml0aW9uc19sZXZlbF91bmlxdWUiIFVOSVFVRSgibGV2ZWwiKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJsaXR1cmdpY2FsX2NlbGVicmF0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiZGF0ZSIgZGF0ZSBOT1QgTlVMTCwKCSJuYW1lIiB2YXJjaGFyKDI1NSkgTk9UIE5VTEwsCgkicmFuayIgImNlbGVicmF0aW9uX3JhbmsiIE5PVCBOVUxMLAoJImNvbG9yIiAibGl0dXJnaWNhbF9jb2xvciIgTk9UIE5VTEwsCgkiaXNfbW92YWJsZSIgYm9vbGVhbiBERUZBVUxUIGZhbHNlLAoJInNwZWNpYWxfbWFzc19jb25maWciIGpzb25iLAoJInNhaW50X29mX3RoZV9kYXkiIHZhcmNoYXIoMjU1KSwKCSJyZWFkaW5ncyIganNvbmIsCgkibm90ZXMiIHRleHQsCgkieWVhcl9pZCIgdXVpZCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJsaXR1cmdpY2FsX21hc3Nfb3ZlcnJpZGVzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJjZWxlYnJhdGlvbl9pZCIgdXVpZCwKCSJkYXRlIiBkYXRlIE5PVCBOVUxMLAoJInRpbWUiIHRpbWUgTk9UIE5VTEwsCgkibWluX21pbmlzdGVycyIgaW50ZWdlciBOT1QgTlVMTCwKCSJtYXhfbWluaXN0ZXJzIiBpbnRlZ2VyIE5PVCBOVUxMLAoJImRlc2NyaXB0aW9uIiB2YXJjaGFyKDI1NSksCgkicmVhc29uIiB0ZXh0LAoJImNyZWF0ZWRfYnkiIHZhcmNoYXIsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAibGl0dXJnaWNhbF9zZWFzb25zIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJ5ZWFyX2lkIiB1dWlkIE5PVCBOVUxMLAoJIm5hbWUiIHZhcmNoYXIoMTAwKSBOT1QgTlVMTCwKCSJjb2xvciIgImxpdHVyZ2ljYWxfY29sb3IiIE5PVCBOVUxMLAoJInN0YXJ0X2RhdGUiIGRhdGUgTk9UIE5VTEwsCgkiZW5kX2RhdGUiIGRhdGUgTk9UIE5VTEwsCgkib3JkZXJfaW5kZXgiIGludGVnZXIgREVGQVVMVCAwLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgImxpdHVyZ2ljYWxfeWVhcnMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInllYXIiIGludGVnZXIgTk9UIE5VTEwsCgkiY3ljbGUiICJsaXR1cmdpY2FsX2N5Y2xlIiBOT1QgTlVMTCwKCSJzdGFydF9kYXRlIiBkYXRlIE5PVCBOVUxMLAoJImVuZF9kYXRlIiBkYXRlIE5PVCBOVUxMLAoJImVhc3Rlcl9kYXRlIiBkYXRlIE5PVCBOVUxMLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJQ09OU1RSQUlOVCAibGl0dXJnaWNhbF95ZWFyc195ZWFyX3VuaXF1ZSIgVU5JUVVFKCJ5ZWFyIikKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAibWFzc19jb25maWd1cmF0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiY29tbXVuaXR5X2lkIiB1dWlkIE5PVCBOVUxMLAoJIm5hbWUiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJkZXNjcmlwdGlvbiIgdGV4dCwKCSJyZWN1cnJlbmNlX3R5cGUiICJyZWN1cnJlbmNlX3R5cGUiIE5PVCBOVUxMLAoJImRheV9vZl93ZWVrIiBpbnRlZ2VyLAoJImRheV9vZl9tb250aCIgaW50ZWdlciwKCSJtb250aCIgaW50ZWdlciwKCSJvY2N1cnJlbmNlX2luX21vbnRoIiBpbnRlZ2VyLAoJInRpbWUiIHRpbWUgTk9UIE5VTEwsCgkiZHVyYXRpb25fbWludXRlcyIgaW50ZWdlciBERUZBVUxUIDYwLAoJIm1pbl9taW5pc3RlcnMiIGludGVnZXIgREVGQVVMVCAzIE5PVCBOVUxMLAoJIm1heF9taW5pc3RlcnMiIGludGVnZXIgREVGQVVMVCA2IE5PVCBOVUxMLAoJIm1hc3NfdHlwZSIgIm1hc3NfdHlwZSIgTk9UIE5VTEwsCgkibG9jYXRpb24iIHZhcmNoYXIoMjU1KSwKCSJleGNsdWRlZF9kYXRlcyIganNvbmIgREVGQVVMVCAnW10nOjpqc29uYiwKCSJ2YWxpZF9mcm9tIiBkYXRlLAoJInZhbGlkX3VudGlsIiBkYXRlLAoJInByaW9yaXR5IiBpbnRlZ2VyIERFRkFVTFQgMCwKCSJpc19hY3RpdmUiIGJvb2xlYW4gREVGQVVMVCB0cnVlLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgIm1hc3NfZXhlY3V0aW9uX2xvZ3MiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJImNvbW11bml0eV9pZCIgdXVpZCBOT1QgTlVMTCwKCSJzY2hlZHVsZV9pZCIgdXVpZCBOT1QgTlVMTCwKCSJhdXhpbGlhcnlfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkiY2hhbmdlc19tYWRlIiBqc29uYiwKCSJjb21tZW50cyIgdGV4dCwKCSJtYXNzX3F1YWxpdHkiIGludGVnZXIsCgkiYXR0ZW5kYW5jZSIganNvbmIsCgkiaW5jaWRlbnRzIiBqc29uYiwKCSJoaWdobGlnaHRzIiB0ZXh0LAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgIm1hc3NfdGltZXNfY29uZmlnIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJjb21tdW5pdHlfaWQiIHV1aWQgTk9UIE5VTEwsCgkiZGF5X29mX3dlZWsiIGludGVnZXIgTk9UIE5VTEwsCgkidGltZSIgdGltZSBOT1QgTlVMTCwKCSJtaW5fbWluaXN0ZXJzIiBpbnRlZ2VyIERFRkFVTFQgMyBOT1QgTlVMTCwKCSJtYXhfbWluaXN0ZXJzIiBpbnRlZ2VyIERFRkFVTFQgNiBOT1QgTlVMTCwKCSJpc19hY3RpdmUiIGJvb2xlYW4gREVGQVVMVCB0cnVlLAoJInNwZWNpYWxfZXZlbnQiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSwKCSJldmVudF9uYW1lIiB2YXJjaGFyKDI1NSksCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAibWF0ZXJpYWxfYWNjZXNzX2xvZ3MiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJIm1hdGVyaWFsX2lkIiB1dWlkIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkiYWN0aW9uIiB2YXJjaGFyKDIwKSBOT1QgTlVMTCwKCSJhY2Nlc3NlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAibWluaXN0ZXJfY2hlY2tfaW5zIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJjb21tdW5pdHlfaWQiIHV1aWQgTk9UIE5VTEwsCgkic2NoZWR1bGVfaWQiIHV1aWQgTk9UIE5VTEwsCgkibWluaXN0ZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkicG9zaXRpb24iIGludGVnZXIgTk9UIE5VTEwsCgkiY2hlY2tlZF9pbl9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkiY2hlY2tlZF9pbl9ieSIgdmFyY2hhciwKCSJzdGF0dXMiIHZhcmNoYXIoMjApIERFRkFVTFQgJ3ByZXNlbnQnLAoJIm5vdGVzIiB0ZXh0Cik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgIm1vYmlsZV9kZXZpY2VzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJ1c2VyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJImRldmljZV9pZCIgdmFyY2hhcigxMjgpIE5PVCBOVUxMLAoJInBsYXRmb3JtIiB2YXJjaGFyKDE2KSBOT1QgTlVMTCwKCSJhcHBfdmVyc2lvbiIgdmFyY2hhcig2NCksCgkicHVzaF90b2tlbiIgdGV4dCwKCSJwdXNoX3Byb3ZpZGVyIiB2YXJjaGFyKDMyKSwKCSJwdXNoX2VuYWJsZWQiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSBOT1QgTlVMTCwKCSJub3RpZmljYXRpb25fcHJlZmVyZW5jZXMiIGpzb25iIERFRkFVTFQgJ3t9Jzo6anNvbmIsCgkiYmlvbWV0cmljX2NhcGFibGUiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSBOT1QgTlVMTCwKCSJiaW9tZXRyaWNfZW5hYmxlZCIgYm9vbGVhbiBERUZBVUxUIGZhbHNlIE5PVCBOVUxMLAoJImxhc3Rfc2Vlbl9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkicmV2b2tlZF9hdCIgdGltZXN0YW1wLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJQ09OU1RSQUlOVCAidXFfbW9iaWxlX2RldmljZXNfdXNlcl9kZXZpY2UiIFVOSVFVRSgidXNlcl9pZCIsImRldmljZV9pZCIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgIm1vYmlsZV9pZGVtcG90ZW5jeV9rZXlzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJ1c2VyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJImlkZW1wb3RlbmN5X2tleSIgdXVpZCBOT1QgTlVMTCwKCSJtZXRob2QiIHZhcmNoYXIoMTApIE5PVCBOVUxMLAoJInBhdGgiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJyZXF1ZXN0X2hhc2giIHZhcmNoYXIoMTI4KSBOT1QgTlVMTCwKCSJzdGF0dXMiIHZhcmNoYXIoMjApIERFRkFVTFQgJ2luX3Byb2dyZXNzJyBOT1QgTlVMTCwKCSJyZXNwb25zZV9zdGF0dXMiIGludGVnZXIsCgkicmVzcG9uc2VfYm9keSIgdGV4dCwKCSJsb2NrZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJImNvbXBsZXRlZF9hdCIgdGltZXN0YW1wLAoJImV4cGlyZXNfYXQiIHRpbWVzdGFtcCBOT1QgTlVMTCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJtb2JpbGVfcmVmcmVzaF90b2tlbnMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkiZGV2aWNlX2RiX2lkIiB1dWlkIE5PVCBOVUxMLAoJInRva2VuX2hhc2giIHZhcmNoYXIoMTI4KSBOT1QgTlVMTCwKCSJ0b2tlbl9mYW1pbHlfaWQiIHV1aWQgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJyZXBsYWNlZF9ieV90b2tlbl9pZCIgdXVpZCwKCSJleHBpcmVzX2F0IiB0aW1lc3RhbXAgTk9UIE5VTEwsCgkicm90YXRlZF9hdCIgdGltZXN0YW1wLAoJInJldm9rZWRfYXQiIHRpbWVzdGFtcCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJpcF9hZGRyZXNzIiB2YXJjaGFyKDQ1KSwKCSJ1c2VyX2FnZW50IiB0ZXh0Cik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgIm5vdGlmaWNhdGlvbnMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkidHlwZSIgIm5vdGlmaWNhdGlvbl90eXBlIiBOT1QgTlVMTCwKCSJ0aXRsZSIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJIm1lc3NhZ2UiIHRleHQgTk9UIE5VTEwsCgkiZGF0YSIganNvbmIsCgkicmVhZCIgYm9vbGVhbiBERUZBVUxUIGZhbHNlLAoJInJlYWRfYXQiIHRpbWVzdGFtcCwKCSJhY3Rpb25fdXJsIiB2YXJjaGFyKDI1NSksCgkicHJpb3JpdHkiIHZhcmNoYXIoMTApIERFRkFVTFQgJ25vcm1hbCcsCgkiZXhwaXJlc19hdCIgdGltZXN0YW1wLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInBhc3N3b3JkX3Jlc2V0X3JlcXVlc3RzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJ1c2VyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJInJlcXVlc3RlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkgTk9UIE5VTEwsCgkicmVhc29uIiB0ZXh0LAoJInN0YXR1cyIgdmFyY2hhcigyMCkgREVGQVVMVCAncGVuZGluZycgTk9UIE5VTEwsCgkicHJvY2Vzc2VkX2J5IiB2YXJjaGFyLAoJInByb2Nlc3NlZF9hdCIgdGltZXN0YW1wLAoJImFkbWluX25vdGVzIiB0ZXh0LAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInBvaW50X3RyYW5zYWN0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkidXNlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJhY3Rpb24iICJwb2ludF9hY3Rpb24iIE5PVCBOVUxMLAoJInBvaW50cyIgaW50ZWdlciBOT1QgTlVMTCwKCSJkZXNjcmlwdGlvbiIgdGV4dCwKCSJyZWxhdGVkX2VudGl0eV90eXBlIiB2YXJjaGFyKDUwKSwKCSJyZWxhdGVkX2VudGl0eV9pZCIgdmFyY2hhcigxMDApLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInB1c2hfc3Vic2NyaXB0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkidXNlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJlbmRwb2ludCIgdGV4dCBOT1QgTlVMTCwKCSJwMjU2ZGhfa2V5IiB0ZXh0IE5PVCBOVUxMLAoJImF1dGhfa2V5IiB0ZXh0IE5PVCBOVUxMLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInF1ZXN0aW9uX21hc3NfbWFwcGluZ3MiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInF1ZXN0aW9ubmFpcmVfaWQiIHV1aWQgTk9UIE5VTEwsCgkicXVlc3Rpb25faWQiIHZhcmNoYXIoMTAwKSBOT1QgTlVMTCwKCSJtYXNzX2NvbmZpZ3VyYXRpb25faWQiIHV1aWQsCgkic3BlY2lhbF9ldmVudF9pZCIgdXVpZCwKCSJ0YXJnZXRfZGF0ZSIgZGF0ZSwKCSJ0YXJnZXRfdGltZSIgdGltZSwKCSJtaW5fbWluaXN0ZXJzIiBpbnRlZ2VyLAoJIm1heF9taW5pc3RlcnMiIGludGVnZXIsCgkibm90ZXMiIHRleHQsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJ1bmlxdWVfcXVlc3Rpb25fbWFwcGluZyIgVU5JUVVFKCJxdWVzdGlvbm5haXJlX2lkIiwicXVlc3Rpb25faWQiKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlcyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiY29tbXVuaXR5X2lkIiB1dWlkIE5PVCBOVUxMLAoJInF1ZXN0aW9ubmFpcmVfaWQiIHV1aWQgTk9UIE5VTEwsCgkidXNlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJyZXNwb25zZXMiIGpzb25iIE5PVCBOVUxMLAoJImF2YWlsYWJsZV9zdW5kYXlzIiBqc29uYiwKCSJwcmVmZXJyZWRfbWFzc190aW1lcyIganNvbmIsCgkiYWx0ZXJuYXRpdmVfdGltZXMiIGpzb25iLAoJImRhaWx5X21hc3NfYXZhaWxhYmlsaXR5IiBqc29uYiwKCSJzcGVjaWFsX2V2ZW50cyIganNvbmIsCgkiY2FuX3N1YnN0aXR1dGUiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSwKCSJub3RlcyIgdGV4dCwKCSJ1bm1hcHBlZF9yZXNwb25zZXMiIGpzb25iLAoJInByb2Nlc3Npbmdfd2FybmluZ3MiIGpzb25iLAoJInNoYXJlZF93aXRoX2ZhbWlseV9pZHMiIGpzb25iLAoJImlzX3NoYXJlZF9yZXNwb25zZSIgYm9vbGVhbiBERUZBVUxUIGZhbHNlLAoJInNoYXJlZF9mcm9tX3VzZXJfaWQiIHZhcmNoYXIsCgkic3VibWl0dGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJkZWxldGVkX2F0IiB0aW1lc3RhbXAsCgkiaXNfZGVsZXRlZCIgYm9vbGVhbiBERUZBVUxUIGZhbHNlIE5PVCBOVUxMLAoJQ09OU1RSQUlOVCAicXVlc3Rpb25uYWlyZV9yZXNwb25zZXNfdXNlcl9xdWVzdGlvbm5haXJlX2tleSIgVU5JUVVFKCJ1c2VyX2lkIiwicXVlc3Rpb25uYWlyZV9pZCIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInF1ZXN0aW9ubmFpcmVzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJjb21tdW5pdHlfaWQiIHV1aWQgTk9UIE5VTEwsCgkidGl0bGUiIHZhcmNoYXIoMjU1KSBOT1QgTlVMTCwKCSJkZXNjcmlwdGlvbiIgdGV4dCwKCSJtb250aCIgaW50ZWdlciBOT1QgTlVMTCwKCSJ5ZWFyIiBpbnRlZ2VyIE5PVCBOVUxMLAoJInN0YXR1cyIgdmFyY2hhcigyMCkgREVGQVVMVCAnZHJhZnQnIE5PVCBOVUxMLAoJInF1ZXN0aW9ucyIganNvbmIgTk9UIE5VTEwsCgkiZGVhZGxpbmUiIHRpbWVzdGFtcCwKCSJ0YXJnZXRfdXNlcl9pZHMiIGpzb25iLAoJIm5vdGlmaWVkX3VzZXJfaWRzIiBqc29uYiwKCSJjcmVhdGVkX2J5X2lkIiB2YXJjaGFyLAoJInZlcnNpb24iIGludGVnZXIgREVGQVVMVCAxIE5PVCBOVUxMLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInVwZGF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInNhaW50cyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkibmFtZSIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJImZlYXN0X2RheSIgdmFyY2hhcigxMCkgTk9UIE5VTEwsCgkidGl0bGUiIHZhcmNoYXIoMjU1KSwKCSJwYXRyb25fb2YiIHRleHQsCgkiYmlvZ3JhcGh5IiB0ZXh0LAoJImltYWdlX3VybCIgdmFyY2hhcig1MDApLAoJImlzX2JyYXppbGlhbiIgYm9vbGVhbiBERUZBVUxUIGZhbHNlLAoJInJhbmsiICJjZWxlYnJhdGlvbl9yYW5rIiBERUZBVUxUICdPUFRJT05BTF9NRU1PUklBTCcgTk9UIE5VTEwsCgkibGl0dXJnaWNhbF9jb2xvciIgImxpdHVyZ2ljYWxfY29sb3IiIERFRkFVTFQgJ3doaXRlJyBOT1QgTlVMTCwKCSJjb2xsZWN0X3ByYXllciIgdGV4dCwKCSJmaXJzdF9yZWFkaW5nIiBqc29uYiwKCSJyZXNwb25zb3JpYWxfcHNhbG0iIGpzb25iLAoJImdvc3BlbCIganNvbmIsCgkicHJheWVyX29mX3RoZV9mYWl0aGZ1bCIgdGV4dCwKCSJjb21tdW5pb25fYW50aXBob24iIHRleHQsCgkiYXR0cmlidXRlcyIganNvbmIsCgkicXVvdGVzIiBqc29uYiwKCSJyZWxhdGVkX3NhaW50cyIganNvbmIsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAic2NoZWR1bGVfY29uZmlybWF0aW9ucyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiY29tbXVuaXR5X2lkIiB1dWlkIE5PVCBOVUxMLAoJInNjaGVkdWxlX2lkIiB1dWlkIE5PVCBOVUxMLAoJIm1pbmlzdGVyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJInN0YXR1cyIgImNvbmZpcm1hdGlvbl9zdGF0dXMiIERFRkFVTFQgJ3BlbmRpbmcnIE5PVCBOVUxMLAoJInJlcXVlc3RlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkicmVzcG9uZGVkX2F0IiB0aW1lc3RhbXAsCgkicmVtaW5kZXJfc2VudF9hdCIgdGltZXN0YW1wLAoJInJlbWluZGVyX2NvdW50IiBpbnRlZ2VyIERFRkFVTFQgMCwKCSJkZWNsaW5lX3JlYXNvbiIgdGV4dCwKCSJub3RlcyIgdGV4dCwKCSJyZXF1ZXN0ZWRfYnkiIHZhcmNoYXIsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCkKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAic2NoZWR1bGVfZ2VuZXJhdGlvbnMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJIm1vbnRoIiBpbnRlZ2VyIE5PVCBOVUxMLAoJInllYXIiIGludGVnZXIgTk9UIE5VTEwsCgkic3RhdHVzIiAic2NoZWR1bGVfZ2VuZXJhdGlvbl9zdGF0dXMiIERFRkFVTFQgJ2RyYWZ0JyBOT1QgTlVMTCwKCSJvcmlnaW5hbF9zY2hlZHVsZSIganNvbmIgTk9UIE5VTEwsCgkiZmluYWxfc2NoZWR1bGUiIGpzb25iLAoJImRpZmZlcmVuY2VzIiBqc29uYiwKCSJnZW5lcmF0aW9uX21ldHJpY3MiIGpzb25iLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJInB1Ymxpc2hlZF9hdCIgdGltZXN0YW1wLAoJImNyZWF0ZWRfYnlfaWQiIHZhcmNoYXIKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAic2NoZWR1bGVzIiAoCgkiaWQiIHV1aWQgUFJJTUFSWSBLRVkgREVGQVVMVCBnZW5fcmFuZG9tX3V1aWQoKSBOT1QgTlVMTCwKCSJjb21tdW5pdHlfaWQiIHV1aWQgTk9UIE5VTEwsCgkiZGF0ZSIgZGF0ZSBOT1QgTlVMTCwKCSJ0aW1lIiB0aW1lIE5PVCBOVUxMLAoJInR5cGUiICJzY2hlZHVsZV90eXBlIiBERUZBVUxUICdtaXNzYScgTk9UIE5VTEwsCgkibG9jYXRpb24iIHZhcmNoYXIoMjU1KSwKCSJtaW5pc3Rlcl9pZCIgdmFyY2hhciwKCSJwb3NpdGlvbiIgaW50ZWdlciBERUZBVUxUIDAsCgkic3RhdHVzIiB2YXJjaGFyKDIwKSBERUZBVUxUICdzY2hlZHVsZWQnIE5PVCBOVUxMLAoJInN1YnN0aXR1dGVfaWQiIHZhcmNoYXIsCgkibm90ZXMiIHRleHQsCgkib25fc2l0ZV9hZGp1c3RtZW50cyIganNvbmIsCgkiY3JlYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJ1cV9zY2hlZHVsZXNfY29tbXVuaXR5X2RhdGVfdGltZV9wb3NpdGlvbiIgVU5JUVVFKCJjb21tdW5pdHlfaWQiLCJkYXRlIiwidGltZSIsInBvc2l0aW9uIikKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAic2Vzc2lvbnMiICgKCSJzaWQiIHZhcmNoYXIgUFJJTUFSWSBLRVkgTk9UIE5VTEwsCgkic2VzcyIganNvbmIgTk9UIE5VTEwsCgkiZXhwaXJlIiB0aW1lc3RhbXAgTk9UIE5VTEwKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAic3BlY2lhbF9ldmVudHMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJImNvbW11bml0eV9pZCIgdXVpZCBOT1QgTlVMTCwKCSJuYW1lIiB2YXJjaGFyKDI1NSkgTk9UIE5VTEwsCgkiZGVzY3JpcHRpb24iIHRleHQsCgkiZXZlbnRfZGF0ZSIgZGF0ZSBOT1QgTlVMTCwKCSJldmVudF90aW1lIiB0aW1lIE5PVCBOVUxMLAoJImR1cmF0aW9uX21pbnV0ZXMiIGludGVnZXIgREVGQVVMVCA2MCwKCSJtaW5fbWluaXN0ZXJzIiBpbnRlZ2VyIERFRkFVTFQgMyBOT1QgTlVMTCwKCSJtYXhfbWluaXN0ZXJzIiBpbnRlZ2VyIERFRkFVTFQgNiBOT1QgTlVMTCwKCSJtYXNzX3R5cGUiICJtYXNzX3R5cGUiIE5PVCBOVUxMLAoJImxvY2F0aW9uIiB2YXJjaGFyKDI1NSksCgkicHJpb3JpdHkiIGludGVnZXIgREVGQVVMVCAxMDAsCgkic3VwcHJlc3Nlc19tYXNzX3R5cGVzIiBqc29uYiBERUZBVUxUICdbXSc6Ompzb25iLAoJImlzX2FjdGl2ZSIgYm9vbGVhbiBERUZBVUxUIHRydWUsCgkiY3JlYXRlZF9ieSIgdmFyY2hhciwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJzdGFuZGJ5X21pbmlzdGVycyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiY29tbXVuaXR5X2lkIiB1dWlkIE5PVCBOVUxMLAoJInNjaGVkdWxlX2lkIiB1dWlkIE5PVCBOVUxMLAoJIm1pbmlzdGVyX2lkIiB2YXJjaGFyIE5PVCBOVUxMLAoJImNvbmZpcm1lZF9hdmFpbGFibGUiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSwKCSJjaGVja19pbl90aW1lIiB0aW1lc3RhbXAsCgkiY2FsbGVkX2F0IiB0aW1lc3RhbXAsCgkiY2FsbGVkX2J5IiB2YXJjaGFyLAoJInJlc3BvbmRlZF9hdCIgdGltZXN0YW1wLAoJInJlc3BvbnNlIiB2YXJjaGFyKDUwKSwKCSJyZXNwb25zZV9tZXNzYWdlIiB0ZXh0LAoJImFzc2lnbmVkX3Bvc2l0aW9uIiBpbnRlZ2VyLAoJImNyZWF0ZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVEFCTEUgInN1YnN0aXR1dGlvbl9yZXF1ZXN0cyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkiY29tbXVuaXR5X2lkIiB1dWlkIE5PVCBOVUxMLAoJInNjaGVkdWxlX2lkIiB1dWlkIE5PVCBOVUxMLAoJInJlcXVlc3Rlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJzdWJzdGl0dXRlX2lkIiB2YXJjaGFyLAoJInJlYXNvbiIgdGV4dCwKCSJzdGF0dXMiICJzdWJzdGl0dXRpb25fc3RhdHVzIiBERUZBVUxUICdhdmFpbGFibGUnIE5PVCBOVUxMLAoJInVyZ2VuY3kiICJ1cmdlbmN5X2xldmVsIiBERUZBVUxUICdtZWRpdW0nIE5PVCBOVUxMLAoJImFwcHJvdmVkX2J5IiB2YXJjaGFyLAoJImFwcHJvdmVkX2F0IiB0aW1lc3RhbXAsCgkicmVzcG9uc2VfbWVzc2FnZSIgdGV4dCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKQopOwotLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIFRBQkxFICJ1c2VyX2JhZGdlcyIgKAoJImlkIiB1dWlkIFBSSU1BUlkgS0VZIERFRkFVTFQgZ2VuX3JhbmRvbV91dWlkKCkgTk9UIE5VTEwsCgkidXNlcl9pZCIgdmFyY2hhciBOT1QgTlVMTCwKCSJiYWRnZV9pZCIgdXVpZCBOT1QgTlVMTCwKCSJlYXJuZWRfYXQiIHRpbWVzdGFtcCBERUZBVUxUIG5vdygpLAoJImlzX2ZlYXR1cmVkIiBib29sZWFuIERFRkFVTFQgZmFsc2UsCgkicHJvZ3Jlc3MiIGludGVnZXIgREVGQVVMVCAxMDAsCgkibWV0YWRhdGEiIGpzb25iLAoJQ09OU1RSQUlOVCAidW5pcXVlX3VzZXJfYmFkZ2UiIFVOSVFVRSgidXNlcl9pZCIsImJhZGdlX2lkIikKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAidXNlcl9wb2ludHMiICgKCSJpZCIgdXVpZCBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJInVzZXJfaWQiIHZhcmNoYXIgTk9UIE5VTEwsCgkidG90YWxfcG9pbnRzIiBpbnRlZ2VyIERFRkFVTFQgMCwKCSJjdXJyZW50X3N0cmVhayIgaW50ZWdlciBERUZBVUxUIDAsCgkibG9uZ2VzdF9zdHJlYWsiIGludGVnZXIgREVGQVVMVCAwLAoJImxldmVsIiBpbnRlZ2VyIERFRkFVTFQgMSwKCSJsZXZlbF9wcm9ncmVzcyIgaW50ZWdlciBERUZBVUxUIDAsCgkibWFzc2VzX3NlcnZlZCIgaW50ZWdlciBERUZBVUxUIDAsCgkic3Vic3RpdHV0aW9uc19oZWxwZWQiIGludGVnZXIgREVGQVVMVCAwLAoJIm1hdGVyaWFsc19jb21wbGV0ZWQiIGludGVnZXIgREVGQVVMVCAwLAoJInF1aXp6ZXNfY29tcGxldGVkIiBpbnRlZ2VyIERFRkFVTFQgMCwKCSJsYXN0X2FjdGl2aXR5X2F0IiB0aW1lc3RhbXAsCgkidXBkYXRlZF9hdCIgdGltZXN0YW1wIERFRkFVTFQgbm93KCksCglDT05TVFJBSU5UICJ1c2VyX3BvaW50c191c2VyX2lkX3VuaXF1ZSIgVU5JUVVFKCJ1c2VyX2lkIikKKTsKLS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBUQUJMRSAidXNlcnMiICgKCSJpZCIgdmFyY2hhciBQUklNQVJZIEtFWSBERUZBVUxUIGdlbl9yYW5kb21fdXVpZCgpIE5PVCBOVUxMLAoJImVtYWlsIiB2YXJjaGFyKDI1NSkgTk9UIE5VTEwsCgkiZmlyc3RfbmFtZSIgdmFyY2hhciwKCSJsYXN0X25hbWUiIHZhcmNoYXIsCgkicHJvZmlsZV9pbWFnZV91cmwiIHZhcmNoYXIsCgkibmFtZSIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJInBob25lIiB2YXJjaGFyKDIwKSwKCSJ3aGF0c2FwcCIgdmFyY2hhcigyMCksCgkicGFzc3dvcmRfaGFzaCIgdmFyY2hhcigyNTUpIE5PVCBOVUxMLAoJInJvbGUiICJ1c2VyX3JvbGUiIERFRkFVTFQgJ21pbmlzdHJvJyBOT1QgTlVMTCwKCSJzdGF0dXMiICJ1c2VyX3N0YXR1cyIgREVGQVVMVCAncGVuZGluZycgTk9UIE5VTEwsCgkicmVxdWlyZXNfcGFzc3dvcmRfY2hhbmdlIiBib29sZWFuIERFRkFVTFQgdHJ1ZSwKCSJsYXN0X2xvZ2luIiB0aW1lc3RhbXAsCgkiam9pbl9kYXRlIiBkYXRlLAoJInBob3RvX3VybCIgdGV4dCwKCSJpbWFnZV9kYXRhIiB0ZXh0LAoJImltYWdlX2NvbnRlbnRfdHlwZSIgdmFyY2hhcig1MCksCgkiZmFtaWx5X2lkIiB1dWlkLAoJImhvbWVfY29tbXVuaXR5X2lkIiB1dWlkIE5PVCBOVUxMLAoJImJpcnRoX2RhdGUiIGRhdGUsCgkiYWRkcmVzcyIgdGV4dCwKCSJjaXR5IiB2YXJjaGFyKDEwMCksCgkiemlwX2NvZGUiIHZhcmNoYXIoMTApLAoJIm1hcml0YWxfc3RhdHVzIiB2YXJjaGFyKDIwKSwKCSJiYXB0aXNtX2RhdGUiIGRhdGUsCgkiYmFwdGlzbV9wYXJpc2giIHZhcmNoYXIoMjU1KSwKCSJjb25maXJtYXRpb25fZGF0ZSIgZGF0ZSwKCSJjb25maXJtYXRpb25fcGFyaXNoIiB2YXJjaGFyKDI1NSksCgkibWFycmlhZ2VfZGF0ZSIgZGF0ZSwKCSJtYXJyaWFnZV9wYXJpc2giIHZhcmNoYXIoMjU1KSwKCSJwcmVmZXJyZWRfcG9zaXRpb24iIGludGVnZXIsCgkicHJlZmVycmVkX3Bvc2l0aW9ucyIganNvbmIgREVGQVVMVCAnW10nOjpqc29uYiwKCSJhdm9pZF9wb3NpdGlvbnMiIGpzb25iIERFRkFVTFQgJ1tdJzo6anNvbmIsCgkicHJlZmVycmVkX3RpbWVzIiBqc29uYiwKCSJhdmFpbGFibGVfZm9yX3NwZWNpYWxfZXZlbnRzIiBib29sZWFuIERFRkFVTFQgdHJ1ZSwKCSJjYW5fc2VydmVfYXNfY291cGxlIiBib29sZWFuIERFRkFVTFQgZmFsc2UsCgkic3BvdXNlX21pbmlzdGVyX2lkIiB1dWlkLAoJImV4dHJhX2FjdGl2aXRpZXMiIGpzb25iIERFRkFVTFQgJ3sic2lja0NvbW11bmlvbiI6ZmFsc2UsIm1vbmRheUFkb3JhdGlvbiI6ZmFsc2UsImhlbHBPdGhlclBhc3RvcmFscyI6ZmFsc2UsImZlc3RpdmVFdmVudHMiOmZhbHNlfSc6Ompzb25iLAoJIm1pbmlzdHJ5X3N0YXJ0X2RhdGUiIGRhdGUsCgkiZXhwZXJpZW5jZSIgdGV4dCwKCSJzcGVjaWFsX3NraWxscyIgdGV4dCwKCSJsaXR1cmdpY2FsX3RyYWluaW5nIiBib29sZWFuIERFRkFVTFQgZmFsc2UsCgkibGFzdF9zZXJ2aWNlIiB0aW1lc3RhbXAsCgkidG90YWxfc2VydmljZXMiIGludGVnZXIgREVGQVVMVCAwLAoJImZvcm1hdGlvbl9jb21wbGV0ZWQiIGJvb2xlYW4gREVGQVVMVCBmYWxzZSwKCSJyZWxpYWJpbGl0eV9zY29yZSIgaW50ZWdlciBERUZBVUxUIDEwMCwKCSJzdWJzdGl0dXRpb25fcmVxdWVzdF9jb3VudCIgaW50ZWdlciBERUZBVUxUIDAsCgkic3Vic3RpdHV0aW9uX2Z1bGZpbGxlZF9jb3VudCIgaW50ZWdlciBERUZBVUxUIDAsCgkibWFudWFsX3JlbW92YWxfY291bnQiIGludGVnZXIgREVGQVVMVCAwLAoJIm5vX3Nob3dfY291bnQiIGludGVnZXIgREVGQVVMVCAwLAoJImxhc3RfcmVsaWFiaWxpdHlfdXBkYXRlIiB0aW1lc3RhbXAsCgkicmVsaWFiaWxpdHlfbm90ZXMiIHRleHQsCgkib2JzZXJ2YXRpb25zIiB0ZXh0LAoJInNjaGVkdWxlX2Rpc3BsYXlfbmFtZSIgdmFyY2hhcigxMDApLAoJIm1pbmlzdGVyX3R5cGUiIHZhcmNoYXIoNTApLAoJImFwcHJvdmVkX2F0IiB0aW1lc3RhbXAsCgkiYXBwcm92ZWRfYnlfaWQiIHZhcmNoYXIsCgkicmVqZWN0aW9uX3JlYXNvbiIgdGV4dCwKCSJjcmVhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCSJ1cGRhdGVkX2F0IiB0aW1lc3RhbXAgREVGQVVMVCBub3coKSwKCUNPTlNUUkFJTlQgInVzZXJzX2VtYWlsX3VuaXF1ZSIgVU5JUVVFKCJlbWFpbCIpCik7Ci0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiYWN0aXZlX3Nlc3Npb25zIiBBREQgQ09OU1RSQUlOVCAiYWN0aXZlX3Nlc3Npb25zX3VzZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgidXNlcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgY2FzY2FkZSBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiYWN0aXZpdHlfbG9ncyIgQUREIENPTlNUUkFJTlQgImFjdGl2aXR5X2xvZ3NfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJhZG9yYXRpb25fZHJhd19yZXN1bHRzIiBBREQgQ09OU1RSQUlOVCAiYWRvcmF0aW9uX2RyYXdfcmVzdWx0c19kcmF3X2lkX2Fkb3JhdGlvbl9kcmF3c19pZF9mayIgRk9SRUlHTiBLRVkgKCJkcmF3X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iYWRvcmF0aW9uX2RyYXdzIigiaWQiKSBPTiBERUxFVEUgY2FzY2FkZSBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiYWRvcmF0aW9uX2RyYXdfcmVzdWx0cyIgQUREIENPTlNUUkFJTlQgImFkb3JhdGlvbl9kcmF3X3Jlc3VsdHNfbWluaXN0ZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgibWluaXN0ZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImFkb3JhdGlvbl9kcmF3cyIgQUREIENPTlNUUkFJTlQgImFkb3JhdGlvbl9kcmF3c19jcmVhdGVkX2J5X3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNyZWF0ZWRfYnkiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiZmFtaWx5X3JlbGF0aW9uc2hpcHMiIEFERCBDT05TVFJBSU5UICJmYW1pbHlfcmVsYXRpb25zaGlwc191c2VyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInVzZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImZhbWlseV9yZWxhdGlvbnNoaXBzIiBBREQgQ09OU1RSQUlOVCAiZmFtaWx5X3JlbGF0aW9uc2hpcHNfcmVsYXRlZF91c2VyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInJlbGF0ZWRfdXNlcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgY2FzY2FkZSBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiZm9ybWF0aW9uX2NlcnRpZmljYXRlcyIgQUREIENPTlNUUkFJTlQgImZvcm1hdGlvbl9jZXJ0aWZpY2F0ZXNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJmb3JtYXRpb25fY2VydGlmaWNhdGVzIiBBREQgQ09OU1RSQUlOVCAiZm9ybWF0aW9uX2NlcnRpZmljYXRlc190cmFja19pZF9mb3JtYXRpb25fdHJhY2tzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInRyYWNrX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iZm9ybWF0aW9uX3RyYWNrcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImZvcm1hdGlvbl9jZXJ0aWZpY2F0ZXMiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fY2VydGlmaWNhdGVzX2lzc3VlZF9ieV91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJpc3N1ZWRfYnkiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIHNldCBudWxsIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJmb3JtYXRpb25fbGVzc29uX3Byb2dyZXNzIiBBREQgQ09OU1RSQUlOVCAiZm9ybWF0aW9uX2xlc3Nvbl9wcm9ncmVzc191c2VyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInVzZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImZvcm1hdGlvbl9sZXNzb25fcHJvZ3Jlc3MiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fbGVzc29uX3Byb2dyZXNzX2xlc3Nvbl9pZF9mb3JtYXRpb25fbGVzc29uc19pZF9mayIgRk9SRUlHTiBLRVkgKCJsZXNzb25faWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJmb3JtYXRpb25fbGVzc29ucyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImZvcm1hdGlvbl9sZXNzb25fc2VjdGlvbnMiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fbGVzc29uX3NlY3Rpb25zX2xlc3Nvbl9pZF9mb3JtYXRpb25fbGVzc29uc19pZF9mayIgRk9SRUlHTiBLRVkgKCJsZXNzb25faWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJmb3JtYXRpb25fbGVzc29ucyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiZm9ybWF0aW9uX2xlc3NvbnMiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fbGVzc29uc19tb2R1bGVfaWRfZm9ybWF0aW9uX21vZHVsZXNfaWRfZmsiIEZPUkVJR04gS0VZICgibW9kdWxlX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iZm9ybWF0aW9uX21vZHVsZXMiKCJpZCIpIE9OIERFTEVURSBubyBhY3Rpb24gT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImZvcm1hdGlvbl9tYXRlcmlhbHMiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fbWF0ZXJpYWxzX3RyYWNrX2lkX2Zvcm1hdGlvbl90cmFja3NfaWRfZmsiIEZPUkVJR04gS0VZICgidHJhY2tfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJmb3JtYXRpb25fdHJhY2tzIigiaWQiKSBPTiBERUxFVEUgc2V0IG51bGwgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImZvcm1hdGlvbl9tYXRlcmlhbHMiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fbWF0ZXJpYWxzX3VwbG9hZGVkX2J5X3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInVwbG9hZGVkX2J5IikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiZm9ybWF0aW9uX21vZHVsZXMiIEFERCBDT05TVFJBSU5UICJmb3JtYXRpb25fbW9kdWxlc190cmFja19pZF9mb3JtYXRpb25fdHJhY2tzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInRyYWNrX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iZm9ybWF0aW9uX3RyYWNrcyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiZm9ybWF0aW9uX3Byb2dyZXNzIiBBREQgQ09OU1RSQUlOVCAiZm9ybWF0aW9uX3Byb2dyZXNzX3VzZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgidXNlcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgY2FzY2FkZSBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAiZm9ybWF0aW9uX3Byb2dyZXNzIiBBREQgQ09OU1RSQUlOVCAiZm9ybWF0aW9uX3Byb2dyZXNzX21vZHVsZV9pZF9mb3JtYXRpb25fbW9kdWxlc19pZF9mayIgRk9SRUlHTiBLRVkgKCJtb2R1bGVfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJmb3JtYXRpb25fbW9kdWxlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImxlYWRlcmJvYXJkX2NhY2hlIiBBREQgQ09OU1RSQUlOVCAibGVhZGVyYm9hcmRfY2FjaGVfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJsZWFybmVkX3BhdHRlcm5zIiBBREQgQ09OU1RSQUlOVCAibGVhcm5lZF9wYXR0ZXJuc19taW5pc3Rlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJtaW5pc3Rlcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgY2FzY2FkZSBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAibGl0dXJnaWNhbF9jZWxlYnJhdGlvbnMiIEFERCBDT05TVFJBSU5UICJsaXR1cmdpY2FsX2NlbGVicmF0aW9uc195ZWFyX2lkX2xpdHVyZ2ljYWxfeWVhcnNfaWRfZmsiIEZPUkVJR04gS0VZICgieWVhcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImxpdHVyZ2ljYWxfeWVhcnMiKCJpZCIpIE9OIERFTEVURSBubyBhY3Rpb24gT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImxpdHVyZ2ljYWxfbWFzc19vdmVycmlkZXMiIEFERCBDT05TVFJBSU5UICJsaXR1cmdpY2FsX21hc3Nfb3ZlcnJpZGVzX2NlbGVicmF0aW9uX2lkX2xpdHVyZ2ljYWxfY2VsZWJyYXRpb25zX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNlbGVicmF0aW9uX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4ibGl0dXJnaWNhbF9jZWxlYnJhdGlvbnMiKCJpZCIpIE9OIERFTEVURSBubyBhY3Rpb24gT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgImxpdHVyZ2ljYWxfbWFzc19vdmVycmlkZXMiIEFERCBDT05TVFJBSU5UICJsaXR1cmdpY2FsX21hc3Nfb3ZlcnJpZGVzX2NyZWF0ZWRfYnlfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgiY3JlYXRlZF9ieSIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgbm8gYWN0aW9uIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJsaXR1cmdpY2FsX3NlYXNvbnMiIEFERCBDT05TVFJBSU5UICJsaXR1cmdpY2FsX3NlYXNvbnNfeWVhcl9pZF9saXR1cmdpY2FsX3llYXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInllYXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJsaXR1cmdpY2FsX3llYXJzIigiaWQiKSBPTiBERUxFVEUgbm8gYWN0aW9uIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJtYXNzX2NvbmZpZ3VyYXRpb25zIiBBREQgQ09OU1RSQUlOVCAibWFzc19jb25maWd1cmF0aW9uc19jb21tdW5pdHlfaWRfY29tbXVuaXRpZXNfaWRfZmsiIEZPUkVJR04gS0VZICgiY29tbXVuaXR5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iY29tbXVuaXRpZXMiKCJpZCIpIE9OIERFTEVURSByZXN0cmljdCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAibWFzc19leGVjdXRpb25fbG9ncyIgQUREIENPTlNUUkFJTlQgIm1hc3NfZXhlY3V0aW9uX2xvZ3NfY29tbXVuaXR5X2lkX2NvbW11bml0aWVzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNvbW11bml0eV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImNvbW11bml0aWVzIigiaWQiKSBPTiBERUxFVEUgcmVzdHJpY3QgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgIm1hc3NfZXhlY3V0aW9uX2xvZ3MiIEFERCBDT05TVFJBSU5UICJtYXNzX2V4ZWN1dGlvbl9sb2dzX3NjaGVkdWxlX2lkX3NjaGVkdWxlc19pZF9mayIgRk9SRUlHTiBLRVkgKCJzY2hlZHVsZV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInNjaGVkdWxlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgIm1hc3NfZXhlY3V0aW9uX2xvZ3MiIEFERCBDT05TVFJBSU5UICJtYXNzX2V4ZWN1dGlvbl9sb2dzX2F1eGlsaWFyeV9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJhdXhpbGlhcnlfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAibWFzc190aW1lc19jb25maWciIEFERCBDT05TVFJBSU5UICJtYXNzX3RpbWVzX2NvbmZpZ19jb21tdW5pdHlfaWRfY29tbXVuaXRpZXNfaWRfZmsiIEZPUkVJR04gS0VZICgiY29tbXVuaXR5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iY29tbXVuaXRpZXMiKCJpZCIpIE9OIERFTEVURSByZXN0cmljdCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAibWF0ZXJpYWxfYWNjZXNzX2xvZ3MiIEFERCBDT05TVFJBSU5UICJtYXRlcmlhbF9hY2Nlc3NfbG9nc19tYXRlcmlhbF9pZF9mb3JtYXRpb25fbWF0ZXJpYWxzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoIm1hdGVyaWFsX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iZm9ybWF0aW9uX21hdGVyaWFscyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgIm1hdGVyaWFsX2FjY2Vzc19sb2dzIiBBREQgQ09OU1RSQUlOVCAibWF0ZXJpYWxfYWNjZXNzX2xvZ3NfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJtaW5pc3Rlcl9jaGVja19pbnMiIEFERCBDT05TVFJBSU5UICJtaW5pc3Rlcl9jaGVja19pbnNfY29tbXVuaXR5X2lkX2NvbW11bml0aWVzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNvbW11bml0eV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImNvbW11bml0aWVzIigiaWQiKSBPTiBERUxFVEUgcmVzdHJpY3QgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgIm1pbmlzdGVyX2NoZWNrX2lucyIgQUREIENPTlNUUkFJTlQgIm1pbmlzdGVyX2NoZWNrX2luc19zY2hlZHVsZV9pZF9zY2hlZHVsZXNfaWRfZmsiIEZPUkVJR04gS0VZICgic2NoZWR1bGVfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJzY2hlZHVsZXMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJtaW5pc3Rlcl9jaGVja19pbnMiIEFERCBDT05TVFJBSU5UICJtaW5pc3Rlcl9jaGVja19pbnNfbWluaXN0ZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgibWluaXN0ZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAibWluaXN0ZXJfY2hlY2tfaW5zIiBBREQgQ09OU1RSQUlOVCAibWluaXN0ZXJfY2hlY2tfaW5zX2NoZWNrZWRfaW5fYnlfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgiY2hlY2tlZF9pbl9ieSIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgbm8gYWN0aW9uIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJtb2JpbGVfZGV2aWNlcyIgQUREIENPTlNUUkFJTlQgIm1vYmlsZV9kZXZpY2VzX3VzZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgidXNlcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgY2FzY2FkZSBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAibW9iaWxlX2lkZW1wb3RlbmN5X2tleXMiIEFERCBDT05TVFJBSU5UICJtb2JpbGVfaWRlbXBvdGVuY3lfa2V5c191c2VyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInVzZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgIm1vYmlsZV9yZWZyZXNoX3Rva2VucyIgQUREIENPTlNUUkFJTlQgIm1vYmlsZV9yZWZyZXNoX3Rva2Vuc191c2VyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInVzZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgIm1vYmlsZV9yZWZyZXNoX3Rva2VucyIgQUREIENPTlNUUkFJTlQgIm1vYmlsZV9yZWZyZXNoX3Rva2Vuc19kZXZpY2VfZGJfaWRfbW9iaWxlX2RldmljZXNfaWRfZmsiIEZPUkVJR04gS0VZICgiZGV2aWNlX2RiX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4ibW9iaWxlX2RldmljZXMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJub3RpZmljYXRpb25zIiBBREQgQ09OU1RSQUlOVCAibm90aWZpY2F0aW9uc191c2VyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInVzZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInBhc3N3b3JkX3Jlc2V0X3JlcXVlc3RzIiBBREQgQ09OU1RSQUlOVCAicGFzc3dvcmRfcmVzZXRfcmVxdWVzdHNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJwYXNzd29yZF9yZXNldF9yZXF1ZXN0cyIgQUREIENPTlNUUkFJTlQgInBhc3N3b3JkX3Jlc2V0X3JlcXVlc3RzX3Byb2Nlc3NlZF9ieV91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJwcm9jZXNzZWRfYnkiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIHNldCBudWxsIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJwb2ludF90cmFuc2FjdGlvbnMiIEFERCBDT05TVFJBSU5UICJwb2ludF90cmFuc2FjdGlvbnNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJwdXNoX3N1YnNjcmlwdGlvbnMiIEFERCBDT05TVFJBSU5UICJwdXNoX3N1YnNjcmlwdGlvbnNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJxdWVzdGlvbl9tYXNzX21hcHBpbmdzIiBBREQgQ09OU1RSQUlOVCAicXVlc3Rpb25fbWFzc19tYXBwaW5nc19xdWVzdGlvbm5haXJlX2lkX3F1ZXN0aW9ubmFpcmVzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInF1ZXN0aW9ubmFpcmVfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJxdWVzdGlvbm5haXJlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInF1ZXN0aW9uX21hc3NfbWFwcGluZ3MiIEFERCBDT05TVFJBSU5UICJxdWVzdGlvbl9tYXNzX21hcHBpbmdzX21hc3NfY29uZmlndXJhdGlvbl9pZF9tYXNzX2NvbmZpZ3VyYXRpb25zX2lkX2ZrIiBGT1JFSUdOIEtFWSAoIm1hc3NfY29uZmlndXJhdGlvbl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuIm1hc3NfY29uZmlndXJhdGlvbnMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAicXVlc3Rpb25fbWFzc19tYXBwaW5ncyIgQUREIENPTlNUUkFJTlQgInF1ZXN0aW9uX21hc3NfbWFwcGluZ3Nfc3BlY2lhbF9ldmVudF9pZF9zcGVjaWFsX2V2ZW50c19pZF9mayIgRk9SRUlHTiBLRVkgKCJzcGVjaWFsX2V2ZW50X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4ic3BlY2lhbF9ldmVudHMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAicXVlc3Rpb25uYWlyZV9yZXNwb25zZXMiIEFERCBDT05TVFJBSU5UICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlc19jb21tdW5pdHlfaWRfY29tbXVuaXRpZXNfaWRfZmsiIEZPUkVJR04gS0VZICgiY29tbXVuaXR5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iY29tbXVuaXRpZXMiKCJpZCIpIE9OIERFTEVURSByZXN0cmljdCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAicXVlc3Rpb25uYWlyZV9yZXNwb25zZXMiIEFERCBDT05TVFJBSU5UICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlc19xdWVzdGlvbm5haXJlX2lkX3F1ZXN0aW9ubmFpcmVzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoInF1ZXN0aW9ubmFpcmVfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJxdWVzdGlvbm5haXJlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInF1ZXN0aW9ubmFpcmVfcmVzcG9uc2VzIiBBREQgQ09OU1RSQUlOVCAicXVlc3Rpb25uYWlyZV9yZXNwb25zZXNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlcyIgQUREIENPTlNUUkFJTlQgInF1ZXN0aW9ubmFpcmVfcmVzcG9uc2VzX3NoYXJlZF9mcm9tX3VzZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgic2hhcmVkX2Zyb21fdXNlcl9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInVzZXJzIigiaWQiKSBPTiBERUxFVEUgc2V0IG51bGwgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInF1ZXN0aW9ubmFpcmVzIiBBREQgQ09OU1RSQUlOVCAicXVlc3Rpb25uYWlyZXNfY29tbXVuaXR5X2lkX2NvbW11bml0aWVzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNvbW11bml0eV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImNvbW11bml0aWVzIigiaWQiKSBPTiBERUxFVEUgcmVzdHJpY3QgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInF1ZXN0aW9ubmFpcmVzIiBBREQgQ09OU1RSQUlOVCAicXVlc3Rpb25uYWlyZXNfY3JlYXRlZF9ieV9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJjcmVhdGVkX2J5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic2NoZWR1bGVfY29uZmlybWF0aW9ucyIgQUREIENPTlNUUkFJTlQgInNjaGVkdWxlX2NvbmZpcm1hdGlvbnNfY29tbXVuaXR5X2lkX2NvbW11bml0aWVzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNvbW11bml0eV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImNvbW11bml0aWVzIigiaWQiKSBPTiBERUxFVEUgcmVzdHJpY3QgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInNjaGVkdWxlX2NvbmZpcm1hdGlvbnMiIEFERCBDT05TVFJBSU5UICJzY2hlZHVsZV9jb25maXJtYXRpb25zX3NjaGVkdWxlX2lkX3NjaGVkdWxlc19pZF9mayIgRk9SRUlHTiBLRVkgKCJzY2hlZHVsZV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInNjaGVkdWxlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInNjaGVkdWxlX2NvbmZpcm1hdGlvbnMiIEFERCBDT05TVFJBSU5UICJzY2hlZHVsZV9jb25maXJtYXRpb25zX21pbmlzdGVyX2lkX3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoIm1pbmlzdGVyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJzY2hlZHVsZV9jb25maXJtYXRpb25zIiBBREQgQ09OU1RSQUlOVCAic2NoZWR1bGVfY29uZmlybWF0aW9uc19yZXF1ZXN0ZWRfYnlfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgicmVxdWVzdGVkX2J5IikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBubyBhY3Rpb24gT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInNjaGVkdWxlX2dlbmVyYXRpb25zIiBBREQgQ09OU1RSQUlOVCAic2NoZWR1bGVfZ2VuZXJhdGlvbnNfY3JlYXRlZF9ieV9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJjcmVhdGVkX2J5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic2NoZWR1bGVzIiBBREQgQ09OU1RSQUlOVCAic2NoZWR1bGVzX2NvbW11bml0eV9pZF9jb21tdW5pdGllc19pZF9mayIgRk9SRUlHTiBLRVkgKCJjb21tdW5pdHlfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJjb21tdW5pdGllcyIoImlkIikgT04gREVMRVRFIHJlc3RyaWN0IE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJzY2hlZHVsZXMiIEFERCBDT05TVFJBSU5UICJzY2hlZHVsZXNfbWluaXN0ZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgibWluaXN0ZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIHNldCBudWxsIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJzY2hlZHVsZXMiIEFERCBDT05TVFJBSU5UICJzY2hlZHVsZXNfc3Vic3RpdHV0ZV9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJzdWJzdGl0dXRlX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic3BlY2lhbF9ldmVudHMiIEFERCBDT05TVFJBSU5UICJzcGVjaWFsX2V2ZW50c19jb21tdW5pdHlfaWRfY29tbXVuaXRpZXNfaWRfZmsiIEZPUkVJR04gS0VZICgiY29tbXVuaXR5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iY29tbXVuaXRpZXMiKCJpZCIpIE9OIERFTEVURSByZXN0cmljdCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic3BlY2lhbF9ldmVudHMiIEFERCBDT05TVFJBSU5UICJzcGVjaWFsX2V2ZW50c19jcmVhdGVkX2J5X3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImNyZWF0ZWRfYnkiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIHNldCBudWxsIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJzdGFuZGJ5X21pbmlzdGVycyIgQUREIENPTlNUUkFJTlQgInN0YW5kYnlfbWluaXN0ZXJzX2NvbW11bml0eV9pZF9jb21tdW5pdGllc19pZF9mayIgRk9SRUlHTiBLRVkgKCJjb21tdW5pdHlfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJjb21tdW5pdGllcyIoImlkIikgT04gREVMRVRFIHJlc3RyaWN0IE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJzdGFuZGJ5X21pbmlzdGVycyIgQUREIENPTlNUUkFJTlQgInN0YW5kYnlfbWluaXN0ZXJzX3NjaGVkdWxlX2lkX3NjaGVkdWxlc19pZF9mayIgRk9SRUlHTiBLRVkgKCJzY2hlZHVsZV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInNjaGVkdWxlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInN0YW5kYnlfbWluaXN0ZXJzIiBBREQgQ09OU1RSQUlOVCAic3RhbmRieV9taW5pc3RlcnNfbWluaXN0ZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgibWluaXN0ZXJfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJ1c2VycyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic3RhbmRieV9taW5pc3RlcnMiIEFERCBDT05TVFJBSU5UICJzdGFuZGJ5X21pbmlzdGVyc19jYWxsZWRfYnlfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgiY2FsbGVkX2J5IikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBubyBhY3Rpb24gT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInN1YnN0aXR1dGlvbl9yZXF1ZXN0cyIgQUREIENPTlNUUkFJTlQgInN1YnN0aXR1dGlvbl9yZXF1ZXN0c19jb21tdW5pdHlfaWRfY29tbXVuaXRpZXNfaWRfZmsiIEZPUkVJR04gS0VZICgiY29tbXVuaXR5X2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4iY29tbXVuaXRpZXMiKCJpZCIpIE9OIERFTEVURSByZXN0cmljdCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic3Vic3RpdHV0aW9uX3JlcXVlc3RzIiBBREQgQ09OU1RSQUlOVCAic3Vic3RpdHV0aW9uX3JlcXVlc3RzX3NjaGVkdWxlX2lkX3NjaGVkdWxlc19pZF9mayIgRk9SRUlHTiBLRVkgKCJzY2hlZHVsZV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuInNjaGVkdWxlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInN1YnN0aXR1dGlvbl9yZXF1ZXN0cyIgQUREIENPTlNUUkFJTlQgInN1YnN0aXR1dGlvbl9yZXF1ZXN0c19yZXF1ZXN0ZXJfaWRfdXNlcnNfaWRfZmsiIEZPUkVJR04gS0VZICgicmVxdWVzdGVyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJzdWJzdGl0dXRpb25fcmVxdWVzdHMiIEFERCBDT05TVFJBSU5UICJzdWJzdGl0dXRpb25fcmVxdWVzdHNfc3Vic3RpdHV0ZV9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJzdWJzdGl0dXRlX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBzZXQgbnVsbCBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAic3Vic3RpdHV0aW9uX3JlcXVlc3RzIiBBREQgQ09OU1RSQUlOVCAic3Vic3RpdHV0aW9uX3JlcXVlc3RzX2FwcHJvdmVkX2J5X3VzZXJzX2lkX2ZrIiBGT1JFSUdOIEtFWSAoImFwcHJvdmVkX2J5IikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBubyBhY3Rpb24gT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInVzZXJfYmFkZ2VzIiBBREQgQ09OU1RSQUlOVCAidXNlcl9iYWRnZXNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJ1c2VyX2JhZGdlcyIgQUREIENPTlNUUkFJTlQgInVzZXJfYmFkZ2VzX2JhZGdlX2lkX2JhZGdlc19pZF9mayIgRk9SRUlHTiBLRVkgKCJiYWRnZV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImJhZGdlcyIoImlkIikgT04gREVMRVRFIGNhc2NhZGUgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQUxURVIgVEFCTEUgInVzZXJfcG9pbnRzIiBBREQgQ09OU1RSQUlOVCAidXNlcl9wb2ludHNfdXNlcl9pZF91c2Vyc19pZF9mayIgRk9SRUlHTiBLRVkgKCJ1c2VyX2lkIikgUkVGRVJFTkNFUyAicHVibGljIi4idXNlcnMiKCJpZCIpIE9OIERFTEVURSBjYXNjYWRlIE9OIFVQREFURSBubyBhY3Rpb247LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkFMVEVSIFRBQkxFICJ1c2VycyIgQUREIENPTlNUUkFJTlQgInVzZXJzX2ZhbWlseV9pZF9mYW1pbGllc19pZF9mayIgRk9SRUlHTiBLRVkgKCJmYW1pbHlfaWQiKSBSRUZFUkVOQ0VTICJwdWJsaWMiLiJmYW1pbGllcyIoImlkIikgT04gREVMRVRFIG5vIGFjdGlvbiBPTiBVUERBVEUgbm8gYWN0aW9uOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApBTFRFUiBUQUJMRSAidXNlcnMiIEFERCBDT05TVFJBSU5UICJ1c2Vyc19ob21lX2NvbW11bml0eV9pZF9jb21tdW5pdGllc19pZF9mayIgRk9SRUlHTiBLRVkgKCJob21lX2NvbW11bml0eV9pZCIpIFJFRkVSRU5DRVMgInB1YmxpYyIuImNvbW11bml0aWVzIigiaWQiKSBPTiBERUxFVEUgcmVzdHJpY3QgT04gVVBEQVRFIG5vIGFjdGlvbjstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfYWN0aXZlX3Nlc3Npb25zX3VzZXIiIE9OICJhY3RpdmVfc2Vzc2lvbnMiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9hY3RpdmVfc2Vzc2lvbnNfYWN0aXZlIiBPTiAiYWN0aXZlX3Nlc3Npb25zIiBVU0lORyBidHJlZSAoImlzX2FjdGl2ZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9hY3RpdmVfc2Vzc2lvbnNfZXhwaXJlcyIgT04gImFjdGl2ZV9zZXNzaW9ucyIgVVNJTkcgYnRyZWUgKCJleHBpcmVzX2F0Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2FjdGl2ZV9zZXNzaW9uc19hY3Rpdml0eSIgT04gImFjdGl2ZV9zZXNzaW9ucyIgVVNJTkcgYnRyZWUgKCJsYXN0X2FjdGl2aXR5X2F0Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2FjdGl2aXR5X2xvZ3NfdXNlciIgT04gImFjdGl2aXR5X2xvZ3MiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9hY3Rpdml0eV9sb2dzX2FjdGlvbiIgT04gImFjdGl2aXR5X2xvZ3MiIFVTSU5HIGJ0cmVlICgiYWN0aW9uIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2FjdGl2aXR5X2xvZ3NfY3JlYXRlZCIgT04gImFjdGl2aXR5X2xvZ3MiIFVTSU5HIGJ0cmVlICgiY3JlYXRlZF9hdCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9hZG9yYXRpb25fZHJhd19yZXN1bHRzX2RyYXciIE9OICJhZG9yYXRpb25fZHJhd19yZXN1bHRzIiBVU0lORyBidHJlZSAoImRyYXdfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfYWRvcmF0aW9uX2RyYXdfcmVzdWx0c19taW5pc3RlciIgT04gImFkb3JhdGlvbl9kcmF3X3Jlc3VsdHMiIFVTSU5HIGJ0cmVlICgibWluaXN0ZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfYWRvcmF0aW9uX2RyYXdzX21vbnRoX3llYXIiIE9OICJhZG9yYXRpb25fZHJhd3MiIFVTSU5HIGJ0cmVlICgieWVhciIsIm1vbnRoIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2JhZGdlc19jYXRlZ29yeSIgT04gImJhZGdlcyIgVVNJTkcgYnRyZWUgKCJjYXRlZ29yeSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9iYWRnZXNfYWN0aXZlIiBPTiAiYmFkZ2VzIiBVU0lORyBidHJlZSAoImlzX2FjdGl2ZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9jb21tdW5pdGllc19zbHVnIiBPTiAiY29tbXVuaXRpZXMiIFVTSU5HIGJ0cmVlICgic2x1ZyIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9jb21tdW5pdGllc19hY3RpdmUiIE9OICJjb21tdW5pdGllcyIgVVNJTkcgYnRyZWUgKCJhY3RpdmUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfY2VydGlmaWNhdGVzX3VzZXIiIE9OICJmb3JtYXRpb25fY2VydGlmaWNhdGVzIiBVU0lORyBidHJlZSAoInVzZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfY2VydGlmaWNhdGVzX3RyYWNrIiBPTiAiZm9ybWF0aW9uX2NlcnRpZmljYXRlcyIgVVNJTkcgYnRyZWUgKCJ0cmFja19pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9jZXJ0aWZpY2F0ZXNfdmVyaWZpY2F0aW9uIiBPTiAiZm9ybWF0aW9uX2NlcnRpZmljYXRlcyIgVVNJTkcgYnRyZWUgKCJ2ZXJpZmljYXRpb25fY29kZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9mb3JtYXRpb25fbGVzc29uX3Byb2dyZXNzX3VzZXIiIE9OICJmb3JtYXRpb25fbGVzc29uX3Byb2dyZXNzIiBVU0lORyBidHJlZSAoInVzZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfZm9ybWF0aW9uX2xlc3Nvbl9wcm9ncmVzc19sZXNzb24iIE9OICJmb3JtYXRpb25fbGVzc29uX3Byb2dyZXNzIiBVU0lORyBidHJlZSAoImxlc3Nvbl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tYXRlcmlhbHNfY2F0ZWdvcnkiIE9OICJmb3JtYXRpb25fbWF0ZXJpYWxzIiBVU0lORyBidHJlZSAoImNhdGVnb3J5Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21hdGVyaWFsc190cmFjayIgT04gImZvcm1hdGlvbl9tYXRlcmlhbHMiIFVTSU5HIGJ0cmVlICgidHJhY2tfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbWF0ZXJpYWxzX3R5cGUiIE9OICJmb3JtYXRpb25fbWF0ZXJpYWxzIiBVU0lORyBidHJlZSAoInR5cGUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbWF0ZXJpYWxzX3VwbG9hZGVkX2J5IiBPTiAiZm9ybWF0aW9uX21hdGVyaWFscyIgVVNJTkcgYnRyZWUgKCJ1cGxvYWRlZF9ieSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9mb3JtYXRpb25fcHJvZ3Jlc3NfdXNlciIgT04gImZvcm1hdGlvbl9wcm9ncmVzcyIgVVNJTkcgYnRyZWUgKCJ1c2VyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2Zvcm1hdGlvbl9wcm9ncmVzc19tb2R1bGUiIE9OICJmb3JtYXRpb25fcHJvZ3Jlc3MiIFVTSU5HIGJ0cmVlICgibW9kdWxlX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xlYWRlcmJvYXJkX3BlcmlvZCIgT04gImxlYWRlcmJvYXJkX2NhY2hlIiBVU0lORyBidHJlZSAoInBlcmlvZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9sZWFkZXJib2FyZF9yYW5rIiBPTiAibGVhZGVyYm9hcmRfY2FjaGUiIFVTSU5HIGJ0cmVlICgicGVyaW9kIiwicmFuayIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9sZWFybmVkX3BhdHRlcm5zX21pbmlzdGVyIiBPTiAibGVhcm5lZF9wYXR0ZXJucyIgVVNJTkcgYnRyZWUgKCJtaW5pc3Rlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9sZWFybmVkX3BhdHRlcm5zX3R5cGUiIE9OICJsZWFybmVkX3BhdHRlcm5zIiBVU0lORyBidHJlZSAoInBhdHRlcm5fdHlwZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9sZWFybmVkX3BhdHRlcm5zX21hc3NfdHlwZSIgT04gImxlYXJuZWRfcGF0dGVybnMiIFVTSU5HIGJ0cmVlICgibWFzc190eXBlIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xlYXJuZWRfcGF0dGVybnNfYWN0aXZlIiBPTiAibGVhcm5lZF9wYXR0ZXJucyIgVVNJTkcgYnRyZWUgKCJpc19hY3RpdmUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbGVhcm5lZF9wYXR0ZXJuc19sb29rdXAiIE9OICJsZWFybmVkX3BhdHRlcm5zIiBVU0lORyBidHJlZSAoIm1pbmlzdGVyX2lkIiwibWFzc190eXBlIiwiZGF5X29mX3dlZWsiLCJ0aW1lX3Nsb3QiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbGV2ZWxfZGVmaW5pdGlvbnNfbGV2ZWwiIE9OICJsZXZlbF9kZWZpbml0aW9ucyIgVVNJTkcgYnRyZWUgKCJsZXZlbCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9sZXZlbF9kZWZpbml0aW9uc19wb2ludHMiIE9OICJsZXZlbF9kZWZpbml0aW9ucyIgVVNJTkcgYnRyZWUgKCJtaW5fcG9pbnRzIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xpdHVyZ2ljYWxfY2VsZWJyYXRpb25zX2RhdGUiIE9OICJsaXR1cmdpY2FsX2NlbGVicmF0aW9ucyIgVVNJTkcgYnRyZWUgKCJkYXRlIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xpdHVyZ2ljYWxfY2VsZWJyYXRpb25zX3JhbmsiIE9OICJsaXR1cmdpY2FsX2NlbGVicmF0aW9ucyIgVVNJTkcgYnRyZWUgKCJyYW5rIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xpdHVyZ2ljYWxfY2VsZWJyYXRpb25zX3llYXIiIE9OICJsaXR1cmdpY2FsX2NlbGVicmF0aW9ucyIgVVNJTkcgYnRyZWUgKCJ5ZWFyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xpdHVyZ2ljYWxfbWFzc19vdmVycmlkZXNfZGF0ZSIgT04gImxpdHVyZ2ljYWxfbWFzc19vdmVycmlkZXMiIFVTSU5HIGJ0cmVlICgiZGF0ZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9saXR1cmdpY2FsX21hc3Nfb3ZlcnJpZGVzX2NlbGVicmF0aW9uIiBPTiAibGl0dXJnaWNhbF9tYXNzX292ZXJyaWRlcyIgVVNJTkcgYnRyZWUgKCJjZWxlYnJhdGlvbl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9saXR1cmdpY2FsX3NlYXNvbnNfeWVhciIgT04gImxpdHVyZ2ljYWxfc2Vhc29ucyIgVVNJTkcgYnRyZWUgKCJ5ZWFyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X2xpdHVyZ2ljYWxfc2Vhc29uc19kYXRlcyIgT04gImxpdHVyZ2ljYWxfc2Vhc29ucyIgVVNJTkcgYnRyZWUgKCJzdGFydF9kYXRlIiwiZW5kX2RhdGUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbGl0dXJnaWNhbF95ZWFyc195ZWFyIiBPTiAibGl0dXJnaWNhbF95ZWFycyIgVVNJTkcgYnRyZWUgKCJ5ZWFyIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21hc3NfY29uZmlndXJhdGlvbnNfdHlwZSIgT04gIm1hc3NfY29uZmlndXJhdGlvbnMiIFVTSU5HIGJ0cmVlICgibWFzc190eXBlIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21hc3NfY29uZmlndXJhdGlvbnNfcmVjdXJyZW5jZSIgT04gIm1hc3NfY29uZmlndXJhdGlvbnMiIFVTSU5HIGJ0cmVlICgicmVjdXJyZW5jZV90eXBlIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21hc3NfY29uZmlndXJhdGlvbnNfYWN0aXZlIiBPTiAibWFzc19jb25maWd1cmF0aW9ucyIgVVNJTkcgYnRyZWUgKCJpc19hY3RpdmUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbWFzc19jb25maWd1cmF0aW9uc19kYXlfb2Zfd2VlayIgT04gIm1hc3NfY29uZmlndXJhdGlvbnMiIFVTSU5HIGJ0cmVlICgiZGF5X29mX3dlZWsiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbWFzc19leGVjdXRpb25fbG9nc19zY2hlZHVsZSIgT04gIm1hc3NfZXhlY3V0aW9uX2xvZ3MiIFVTSU5HIGJ0cmVlICgic2NoZWR1bGVfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbWFzc19leGVjdXRpb25fbG9nc19hdXhpbGlhcnkiIE9OICJtYXNzX2V4ZWN1dGlvbl9sb2dzIiBVU0lORyBidHJlZSAoImF1eGlsaWFyeV9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tYXRlcmlhbF9hY2Nlc3NfbWF0ZXJpYWwiIE9OICJtYXRlcmlhbF9hY2Nlc3NfbG9ncyIgVVNJTkcgYnRyZWUgKCJtYXRlcmlhbF9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tYXRlcmlhbF9hY2Nlc3NfdXNlciIgT04gIm1hdGVyaWFsX2FjY2Vzc19sb2dzIiBVU0lORyBidHJlZSAoInVzZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbWluaXN0ZXJfY2hlY2tfaW5zX3NjaGVkdWxlIiBPTiAibWluaXN0ZXJfY2hlY2tfaW5zIiBVU0lORyBidHJlZSAoInNjaGVkdWxlX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21pbmlzdGVyX2NoZWNrX2luc19taW5pc3RlciIgT04gIm1pbmlzdGVyX2NoZWNrX2lucyIgVVNJTkcgYnRyZWUgKCJtaW5pc3Rlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tb2JpbGVfZGV2aWNlc191c2VyIiBPTiAibW9iaWxlX2RldmljZXMiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tb2JpbGVfZGV2aWNlc19kZXZpY2UiIE9OICJtb2JpbGVfZGV2aWNlcyIgVVNJTkcgYnRyZWUgKCJkZXZpY2VfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbW9iaWxlX2RldmljZXNfcmV2b2tlZCIgT04gIm1vYmlsZV9kZXZpY2VzIiBVU0lORyBidHJlZSAoInJldm9rZWRfYXQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbW9iaWxlX2RldmljZXNfcGxhdGZvcm0iIE9OICJtb2JpbGVfZGV2aWNlcyIgVVNJTkcgYnRyZWUgKCJwbGF0Zm9ybSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVU5JUVVFIElOREVYICJtb2JpbGVfaWRlbXBvdGVuY3lfa2V5c191c2VyX2tleV9pZHgiIE9OICJtb2JpbGVfaWRlbXBvdGVuY3lfa2V5cyIgVVNJTkcgYnRyZWUgKCJ1c2VyX2lkIiwiaWRlbXBvdGVuY3lfa2V5Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21vYmlsZV9pZGVtcG90ZW5jeV91c2VyIiBPTiAibW9iaWxlX2lkZW1wb3RlbmN5X2tleXMiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tb2JpbGVfaWRlbXBvdGVuY3lfc3RhdHVzIiBPTiAibW9iaWxlX2lkZW1wb3RlbmN5X2tleXMiIFVTSU5HIGJ0cmVlICgic3RhdHVzIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21vYmlsZV9pZGVtcG90ZW5jeV9leHBpcmVzIiBPTiAibW9iaWxlX2lkZW1wb3RlbmN5X2tleXMiIFVTSU5HIGJ0cmVlICgiZXhwaXJlc19hdCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVU5JUVVFIElOREVYICJtb2JpbGVfcmVmcmVzaF90b2tlbnNfaGFzaF9pZHgiIE9OICJtb2JpbGVfcmVmcmVzaF90b2tlbnMiIFVTSU5HIGJ0cmVlICgidG9rZW5faGFzaCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9tb2JpbGVfcmVmcmVzaF90b2tlbnNfdXNlciIgT04gIm1vYmlsZV9yZWZyZXNoX3Rva2VucyIgVVNJTkcgYnRyZWUgKCJ1c2VyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21vYmlsZV9yZWZyZXNoX3Rva2Vuc19kZXZpY2UiIE9OICJtb2JpbGVfcmVmcmVzaF90b2tlbnMiIFVTSU5HIGJ0cmVlICgiZGV2aWNlX2RiX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21vYmlsZV9yZWZyZXNoX3Rva2Vuc19mYW1pbHkiIE9OICJtb2JpbGVfcmVmcmVzaF90b2tlbnMiIFVTSU5HIGJ0cmVlICgidG9rZW5fZmFtaWx5X2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X21vYmlsZV9yZWZyZXNoX3Rva2Vuc19leHBpcmVzIiBPTiAibW9iaWxlX3JlZnJlc2hfdG9rZW5zIiBVU0lORyBidHJlZSAoImV4cGlyZXNfYXQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbW9iaWxlX3JlZnJlc2hfdG9rZW5zX3Jldm9rZWQiIE9OICJtb2JpbGVfcmVmcmVzaF90b2tlbnMiIFVTSU5HIGJ0cmVlICgicmV2b2tlZF9hdCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9ub3RpZmljYXRpb25zX3VzZXJfcmVhZCIgT04gIm5vdGlmaWNhdGlvbnMiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIsInJlYWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfbm90aWZpY2F0aW9uc191c2VyX2NyZWF0ZWQiIE9OICJub3RpZmljYXRpb25zIiBVU0lORyBidHJlZSAoInVzZXJfaWQiLCJjcmVhdGVkX2F0Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X25vdGlmaWNhdGlvbnNfZXhwaXJlcyIgT04gIm5vdGlmaWNhdGlvbnMiIFVTSU5HIGJ0cmVlICgiZXhwaXJlc19hdCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9wYXNzd29yZF9yZXNldF9zdGF0dXMiIE9OICJwYXNzd29yZF9yZXNldF9yZXF1ZXN0cyIgVVNJTkcgYnRyZWUgKCJzdGF0dXMiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfcGFzc3dvcmRfcmVzZXRfdXNlciIgT04gInBhc3N3b3JkX3Jlc2V0X3JlcXVlc3RzIiBVU0lORyBidHJlZSAoInVzZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfcG9pbnRfdHJhbnNhY3Rpb25zX3VzZXIiIE9OICJwb2ludF90cmFuc2FjdGlvbnMiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9wb2ludF90cmFuc2FjdGlvbnNfYWN0aW9uIiBPTiAicG9pbnRfdHJhbnNhY3Rpb25zIiBVU0lORyBidHJlZSAoImFjdGlvbiIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9wb2ludF90cmFuc2FjdGlvbnNfY3JlYXRlZCIgT04gInBvaW50X3RyYW5zYWN0aW9ucyIgVVNJTkcgYnRyZWUgKCJjcmVhdGVkX2F0Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBVTklRVUUgSU5ERVggInB1c2hfc3Vic2NyaXB0aW9uc19lbmRwb2ludF9pZHgiIE9OICJwdXNoX3N1YnNjcmlwdGlvbnMiIFVTSU5HIGJ0cmVlICgiZW5kcG9pbnQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfcHVzaF9zdWJzY3JpcHRpb25zX3VzZXIiIE9OICJwdXNoX3N1YnNjcmlwdGlvbnMiIFVTSU5HIGJ0cmVlICgidXNlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9xdWVzdGlvbl9tYXNzX21hcHBpbmdzX3F1ZXN0aW9ubmFpcmUiIE9OICJxdWVzdGlvbl9tYXNzX21hcHBpbmdzIiBVU0lORyBidHJlZSAoInF1ZXN0aW9ubmFpcmVfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfcXVlc3Rpb25fbWFzc19tYXBwaW5nc19jb25maWciIE9OICJxdWVzdGlvbl9tYXNzX21hcHBpbmdzIiBVU0lORyBidHJlZSAoIm1hc3NfY29uZmlndXJhdGlvbl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9xdWVzdGlvbl9tYXNzX21hcHBpbmdzX2V2ZW50IiBPTiAicXVlc3Rpb25fbWFzc19tYXBwaW5ncyIgVVNJTkcgYnRyZWUgKCJzcGVjaWFsX2V2ZW50X2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3F1ZXN0aW9ubmFpcmVfcmVzcG9uc2VzX3F1ZXN0aW9ubmFpcmUiIE9OICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlcyIgVVNJTkcgYnRyZWUgKCJxdWVzdGlvbm5haXJlX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3F1ZXN0aW9ubmFpcmVfcmVzcG9uc2VzX3VzZXIiIE9OICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlcyIgVVNJTkcgYnRyZWUgKCJ1c2VyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3F1ZXN0aW9ubmFpcmVfcmVzcG9uc2VzX2RlbGV0ZWQiIE9OICJxdWVzdGlvbm5haXJlX3Jlc3BvbnNlcyIgVVNJTkcgYnRyZWUgKCJpc19kZWxldGVkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3NhaW50c19mZWFzdF9kYXkiIE9OICJzYWludHMiIFVTSU5HIGJ0cmVlICgiZmVhc3RfZGF5Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3NhaW50c19uYW1lIiBPTiAic2FpbnRzIiBVU0lORyBidHJlZSAoIm5hbWUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2FpbnRzX2JyYXppbGlhbiIgT04gInNhaW50cyIgVVNJTkcgYnRyZWUgKCJpc19icmF6aWxpYW4iKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVfY29uZmlybWF0aW9uc19zY2hlZHVsZSIgT04gInNjaGVkdWxlX2NvbmZpcm1hdGlvbnMiIFVTSU5HIGJ0cmVlICgic2NoZWR1bGVfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVfY29uZmlybWF0aW9uc19taW5pc3RlciIgT04gInNjaGVkdWxlX2NvbmZpcm1hdGlvbnMiIFVTSU5HIGJ0cmVlICgibWluaXN0ZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVfY29uZmlybWF0aW9uc19zdGF0dXMiIE9OICJzY2hlZHVsZV9jb25maXJtYXRpb25zIiBVU0lORyBidHJlZSAoInN0YXR1cyIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgVU5JUVVFIElOREVYICJpZHhfc2NoZWR1bGVfY29uZmlybWF0aW9uc191bmlxdWUiIE9OICJzY2hlZHVsZV9jb25maXJtYXRpb25zIiBVU0lORyBidHJlZSAoInNjaGVkdWxlX2lkIiwibWluaXN0ZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVfZ2VuZXJhdGlvbnNfbW9udGhfeWVhciIgT04gInNjaGVkdWxlX2dlbmVyYXRpb25zIiBVU0lORyBidHJlZSAoIm1vbnRoIiwieWVhciIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zY2hlZHVsZV9nZW5lcmF0aW9uc19zdGF0dXMiIE9OICJzY2hlZHVsZV9nZW5lcmF0aW9ucyIgVVNJTkcgYnRyZWUgKCJzdGF0dXMiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVfZ2VuZXJhdGlvbnNfY3JlYXRlZF9ieSIgT04gInNjaGVkdWxlX2dlbmVyYXRpb25zIiBVU0lORyBidHJlZSAoImNyZWF0ZWRfYnlfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVzX2NvbW11bml0eV9kYXRlIiBPTiAic2NoZWR1bGVzIiBVU0lORyBidHJlZSAoImNvbW11bml0eV9pZCIsImRhdGUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVzX2RhdGUiIE9OICJzY2hlZHVsZXMiIFVTSU5HIGJ0cmVlICgiZGF0ZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zY2hlZHVsZXNfbWluaXN0ZXIiIE9OICJzY2hlZHVsZXMiIFVTSU5HIGJ0cmVlICgibWluaXN0ZXJfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVzX2RhdGVfdGltZSIgT04gInNjaGVkdWxlcyIgVVNJTkcgYnRyZWUgKCJkYXRlIiwidGltZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zY2hlZHVsZXNfc3RhdHVzIiBPTiAic2NoZWR1bGVzIiBVU0lORyBidHJlZSAoInN0YXR1cyIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zY2hlZHVsZXNfbWluaXN0ZXJfZGF0ZSIgT04gInNjaGVkdWxlcyIgVVNJTkcgYnRyZWUgKCJtaW5pc3Rlcl9pZCIsImRhdGUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc2NoZWR1bGVzX2RhdGVfc3RhdHVzIiBPTiAic2NoZWR1bGVzIiBVU0lORyBidHJlZSAoImRhdGUiLCJzdGF0dXMiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJJRFhfc2Vzc2lvbl9leHBpcmUiIE9OICJzZXNzaW9ucyIgVVNJTkcgYnRyZWUgKCJleHBpcmUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc3BlY2lhbF9ldmVudHNfZGF0ZSIgT04gInNwZWNpYWxfZXZlbnRzIiBVU0lORyBidHJlZSAoImV2ZW50X2RhdGUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc3BlY2lhbF9ldmVudHNfdHlwZSIgT04gInNwZWNpYWxfZXZlbnRzIiBVU0lORyBidHJlZSAoIm1hc3NfdHlwZSIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zcGVjaWFsX2V2ZW50c19hY3RpdmUiIE9OICJzcGVjaWFsX2V2ZW50cyIgVVNJTkcgYnRyZWUgKCJpc19hY3RpdmUiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfc3RhbmRieV9taW5pc3RlcnNfc2NoZWR1bGUiIE9OICJzdGFuZGJ5X21pbmlzdGVycyIgVVNJTkcgYnRyZWUgKCJzY2hlZHVsZV9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zdGFuZGJ5X21pbmlzdGVyc19taW5pc3RlciIgT04gInN0YW5kYnlfbWluaXN0ZXJzIiBVU0lORyBidHJlZSAoIm1pbmlzdGVyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3N0YW5kYnlfbWluaXN0ZXJzX2NhbGxlZCIgT04gInN0YW5kYnlfbWluaXN0ZXJzIiBVU0lORyBidHJlZSAoImNhbGxlZF9hdCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zdWJzdGl0dXRpb25fcmVxdWVzdGVyIiBPTiAic3Vic3RpdHV0aW9uX3JlcXVlc3RzIiBVU0lORyBidHJlZSAoInJlcXVlc3Rlcl9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zdWJzdGl0dXRpb25fc3Vic3RpdHV0ZSIgT04gInN1YnN0aXR1dGlvbl9yZXF1ZXN0cyIgVVNJTkcgYnRyZWUgKCJzdWJzdGl0dXRlX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3N1YnN0aXR1dGlvbl9zdGF0dXMiIE9OICJzdWJzdGl0dXRpb25fcmVxdWVzdHMiIFVTSU5HIGJ0cmVlICgic3RhdHVzIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3N1YnN0aXR1dGlvbl9zY2hlZHVsZSIgT04gInN1YnN0aXR1dGlvbl9yZXF1ZXN0cyIgVVNJTkcgYnRyZWUgKCJzY2hlZHVsZV9pZCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF9zdWJzdGl0dXRpb25fc2NoZWR1bGVfc3RhdHVzIiBPTiAic3Vic3RpdHV0aW9uX3JlcXVlc3RzIiBVU0lORyBidHJlZSAoInNjaGVkdWxlX2lkIiwic3RhdHVzIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3N1YnN0aXR1dGlvbl9yZXF1ZXN0ZXJfY3JlYXRlZCIgT04gInN1YnN0aXR1dGlvbl9yZXF1ZXN0cyIgVVNJTkcgYnRyZWUgKCJyZXF1ZXN0ZXJfaWQiLCJjcmVhdGVkX2F0Iik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3VzZXJfYmFkZ2VzX3VzZXIiIE9OICJ1c2VyX2JhZGdlcyIgVVNJTkcgYnRyZWUgKCJ1c2VyX2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3VzZXJfYmFkZ2VzX2JhZGdlIiBPTiAidXNlcl9iYWRnZXMiIFVTSU5HIGJ0cmVlICgiYmFkZ2VfaWQiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfdXNlcl9wb2ludHNfdG90YWwiIE9OICJ1c2VyX3BvaW50cyIgVVNJTkcgYnRyZWUgKCJ0b3RhbF9wb2ludHMiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfdXNlcl9wb2ludHNfbGV2ZWwiIE9OICJ1c2VyX3BvaW50cyIgVVNJTkcgYnRyZWUgKCJsZXZlbCIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF91c2Vyc19ob21lX2NvbW11bml0eSIgT04gInVzZXJzIiBVU0lORyBidHJlZSAoImhvbWVfY29tbXVuaXR5X2lkIik7LS0+IHN0YXRlbWVudC1icmVha3BvaW50CkNSRUFURSBJTkRFWCAiaWR4X3VzZXJzX3N0YXR1cyIgT04gInVzZXJzIiBVU0lORyBidHJlZSAoInN0YXR1cyIpOy0tPiBzdGF0ZW1lbnQtYnJlYWtwb2ludApDUkVBVEUgSU5ERVggImlkeF91c2Vyc19yb2xlX3N0YXR1cyIgT04gInVzZXJzIiBVU0lORyBidHJlZSAoInJvbGUiLCJzdGF0dXMiKTstLT4gc3RhdGVtZW50LWJyZWFrcG9pbnQKQ1JFQVRFIElOREVYICJpZHhfdXNlcnNfZW1haWwiIE9OICJ1c2VycyIgVVNJTkcgYnRyZWUgKCJlbWFpbCIpOw==";
+var BACKFILL_DDL = Buffer.from(B64, "base64").toString("utf8");
+
+// server/routes/dbBackfill.ts
 var router18 = Router18();
+var DUPLICATE_CODES = /* @__PURE__ */ new Set([
+  "42P07",
+  // duplicate_table
+  "42710",
+  // duplicate_object (constraint, type)
+  "42P06",
+  // duplicate_schema
+  "42P16",
+  // invalid_table_definition (already partitioned etc.)
+  "42701",
+  // duplicate_column
+  "42P04",
+  // duplicate_database
+  "42723"
+  // duplicate_function
+]);
+var REQUIRED_TABLES = [
+  "formation_tracks",
+  "formation_modules",
+  "formation_lessons",
+  "formation_lesson_sections",
+  "formation_materials",
+  "formation_progress",
+  "formation_lesson_progress",
+  "formation_certificates",
+  "badges",
+  "user_badges",
+  "user_points",
+  "point_transactions",
+  "adoration_draws",
+  "adoration_draw_results"
+];
+function errCode(e) {
+  return e?.code || e?.cause?.code || e?.originalError?.code;
+}
+function tokenOk(req) {
+  const secret = process.env.DB_BACKFILL_SECRET;
+  if (!secret) return false;
+  const provided = req.query.token || req.headers["x-backfill-token"] || "";
+  return provided.length > 0 && provided === secret;
+}
+async function listPublicTables() {
+  const result = await db.execute(sql17`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+    ORDER BY table_name
+  `);
+  const rows = Array.isArray(result) ? result : result?.rows ?? [];
+  return rows.map((r) => r.table_name);
+}
+router18.get("/", async (req, res) => {
+  if (!tokenOk(req)) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const mode = String(req.query.mode || "inspect");
+  try {
+    const existing = await listPublicTables();
+    const missingBefore = REQUIRED_TABLES.filter((t) => !existing.includes(t));
+    if (mode === "inspect") {
+      return res.json({
+        mode,
+        existingCount: existing.length,
+        existing,
+        missing: missingBefore,
+        note: missingBefore.length === 0 ? "All required tables already present." : "Run with ?mode=apply&confirm=1 to create missing tables (additive)."
+      });
+    }
+    if (mode === "apply") {
+      if (req.query.confirm !== "1") {
+        return res.status(400).json({ error: "confirmation required: add &confirm=1" });
+      }
+      const statements = BACKFILL_DDL.split("--> statement-breakpoint").map((s) => s.trim()).filter((s) => s.length > 0);
+      let applied = 0;
+      const skipped = [];
+      const failed = [];
+      for (const stmt of statements) {
+        try {
+          await db.execute(sql17.raw(stmt));
+          applied += 1;
+        } catch (e) {
+          const code = errCode(e);
+          if (code && DUPLICATE_CODES.has(code)) {
+            skipped.push(1);
+          } else {
+            failed.push({
+              code,
+              message: e?.message || String(e),
+              sql: stmt.slice(0, 120)
+            });
+          }
+        }
+      }
+      let seed = null;
+      let seedError = null;
+      try {
+        const { default: seedFormation2 } = await init_formation_seed().then(() => formation_seed_exports);
+        seed = await seedFormation2();
+      } catch (e) {
+        seedError = e?.message || String(e);
+      }
+      const after = await listPublicTables();
+      const stillMissing = REQUIRED_TABLES.filter((t) => !after.includes(t));
+      return res.json({
+        mode,
+        totalStatements: statements.length,
+        applied,
+        skippedDuplicates: skipped.length,
+        failedCount: failed.length,
+        failed: failed.slice(0, 25),
+        createdTables: REQUIRED_TABLES.filter(
+          (t) => missingBefore.includes(t) && !stillMissing.includes(t)
+        ),
+        stillMissing,
+        seed,
+        seedError
+      });
+    }
+    return res.status(400).json({ error: `unknown mode: ${mode}` });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || String(e), code: errCode(e) });
+  }
+});
+var dbBackfill_default = router18;
+
+// server/routes/version.ts
+import { Router as Router19 } from "express";
+var router19 = Router19();
 var SYSTEM_VERSION = "5.4.2";
 var BUILD_TIME = (/* @__PURE__ */ new Date()).toISOString();
-router18.get("/", (req, res) => {
+router19.get("/", (req, res) => {
   res.json({
     version: SYSTEM_VERSION,
     buildTime: BUILD_TIME,
     timestamp: Date.now()
   });
 });
-var version_default = router18;
+var version_default = router19;
 
 // server/routes/dashboard.ts
 await init_db();
 init_schema();
 init_roles();
-import { Router as Router19 } from "express";
-import { eq as eq33, and as and25, gte as gte15, lte as lte13, sql as sql17, or as or9, isNull as isNull4, count as count7, desc as desc10, inArray as inArray16 } from "drizzle-orm";
+import { Router as Router20 } from "express";
+import { eq as eq33, and as and26, gte as gte15, lte as lte13, sql as sql18, or as or9, isNull as isNull4, count as count7, desc as desc10, inArray as inArray17 } from "drizzle-orm";
 import { format as format10, addDays as addDays6, subDays, startOfMonth as startOfMonth4, endOfMonth as endOfMonth4 } from "date-fns";
-var router19 = Router19();
-router19.get("/urgent-alerts", async (req, res) => {
+var router20 = Router20();
+router20.get("/urgent-alerts", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const next48Hours = addDays6(now, 2);
@@ -22739,16 +21952,16 @@ router19.get("/urgent-alerts", async (req, res) => {
     const incompleteMasses = await db.select({
       date: schedules.date,
       time: schedules.time,
-      totalSlots: sql17`COUNT(*)`,
-      filledSlots: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
-      vacancies: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
+      totalSlots: sql18`COUNT(*)`,
+      filledSlots: sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
+      vacancies: sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`
     }).from(schedules).where(
-      and25(
+      and26(
         eq33(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         lte13(schedules.date, format10(next7Days, "yyyy-MM-dd"))
       )
-    ).groupBy(schedules.date, schedules.time).having(sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
+    ).groupBy(schedules.date, schedules.time).having(sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`);
     const criticalMasses = incompleteMasses.filter((mass) => {
       const massDate = /* @__PURE__ */ new Date(mass.date + "T12:00:00");
       return massDate <= next48Hours;
@@ -22774,7 +21987,7 @@ router19.get("/urgent-alerts", async (req, res) => {
       massDate: schedules.date,
       massTime: schedules.time
     }).from(substitutionRequests).innerJoin(users, eq33(substitutionRequests.requesterId, users.id)).innerJoin(schedules, eq33(substitutionRequests.scheduleId, schedules.id)).where(
-      and25(
+      and26(
         eq33(schedules.status, "published"),
         or9(
           eq33(substitutionRequests.status, "pending"),
@@ -22809,19 +22022,19 @@ router19.get("/urgent-alerts", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch urgent alerts" });
   }
 });
-router19.get("/next-week-masses", async (req, res) => {
+router20.get("/next-week-masses", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const next7Days = addDays6(now, 7);
     const masses = await db.select({
       date: schedules.date,
       massTime: schedules.time,
-      totalSlots: sql17`COUNT(*)`,
-      totalAssigned: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
-      totalVacancies: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
-      requiredMinisters: sql17`COUNT(*)`,
+      totalSlots: sql18`COUNT(*)`,
+      totalAssigned: sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NOT NULL THEN 1 END)`,
+      totalVacancies: sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
+      requiredMinisters: sql18`COUNT(*)`,
       // All slots are required
-      hasPendingSubstitutions: sql17`EXISTS(
+      hasPendingSubstitutions: sql18`EXISTS(
           SELECT 1 FROM ${substitutionRequests}
           WHERE ${substitutionRequests.scheduleId} IN (
             SELECT id FROM ${schedules} AS s2
@@ -22830,7 +22043,7 @@ router19.get("/next-week-masses", async (req, res) => {
           AND ${substitutionRequests.status} IN ('pending', 'available')
         )`
     }).from(schedules).where(
-      and25(
+      and26(
         eq33(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         lte13(schedules.date, format10(next7Days, "yyyy-MM-dd"))
@@ -22863,36 +22076,36 @@ router19.get("/next-week-masses", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch next week masses" });
   }
 });
-router19.get("/ministry-stats", async (req, res) => {
+router20.get("/ministry-stats", async (req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const thirtyDaysAgo = subDays(now, 30);
     const thisMonthStart = startOfMonth4(now);
     const thisMonthEnd = endOfMonth4(now);
     const [activeMinistersResult] = await db.select({ count: count7() }).from(users).where(
-      and25(
+      and26(
         eq33(users.status, "active"),
-        inArray16(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
+        inArray17(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       )
     );
     const inactiveMinisters = await db.select({
       id: users.id,
       name: users.name,
       lastService: users.lastService,
-      daysSinceService: sql17`EXTRACT(DAY FROM NOW() - ${users.lastService})`
+      daysSinceService: sql18`EXTRACT(DAY FROM NOW() - ${users.lastService})`
     }).from(users).where(
-      and25(
+      and26(
         eq33(users.status, "active"),
-        inArray16(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
+        inArray17(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
         or9(
           lte13(users.lastService, thirtyDaysAgo),
           isNull4(users.lastService)
         )
       )
-    ).orderBy(desc10(sql17`EXTRACT(DAY FROM NOW() - ${users.lastService})`));
+    ).orderBy(desc10(sql18`EXTRACT(DAY FROM NOW() - ${users.lastService})`));
     const [monthStats] = await db.select({
-      totalMasses: sql17`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
-      fullyStaffedMasses: sql17`COUNT(DISTINCT CASE
+      totalMasses: sql18`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`,
+      fullyStaffedMasses: sql18`COUNT(DISTINCT CASE
           WHEN NOT EXISTS(
             SELECT 1 FROM schedules AS s2
             WHERE s2.date = ${schedules.date}
@@ -22902,7 +22115,7 @@ router19.get("/ministry-stats", async (req, res) => {
           ) THEN (${schedules.date}, ${schedules.time})
         END)`
     }).from(schedules).where(
-      and25(
+      and26(
         eq33(schedules.status, "published"),
         gte15(schedules.date, format10(thisMonthStart, "yyyy-MM-dd")),
         lte13(schedules.date, format10(thisMonthEnd, "yyyy-MM-dd"))
@@ -22912,7 +22125,7 @@ router19.get("/ministry-stats", async (req, res) => {
       id: questionnaires.id,
       status: questionnaires.status
     }).from(questionnaires).where(
-      and25(
+      and26(
         eq33(questionnaires.month, now.getMonth() + 1),
         eq33(questionnaires.year, now.getFullYear())
       )
@@ -22928,7 +22141,7 @@ router19.get("/ministry-stats", async (req, res) => {
       );
       const userId = req.user?.id;
       if (userId) {
-        const [userResponse] = await db.select().from(questionnaireResponses).where(and25(
+        const [userResponse] = await db.select().from(questionnaireResponses).where(and26(
           eq33(questionnaireResponses.userId, userId),
           eq33(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
           eq33(questionnaireResponses.isDeleted, false)
@@ -22937,7 +22150,7 @@ router19.get("/ministry-stats", async (req, res) => {
       }
     }
     const [pendingSubsCount] = await db.select({ count: count7() }).from(substitutionRequests).where(
-      and25(
+      and26(
         or9(
           eq33(substitutionRequests.status, "pending"),
           eq33(substitutionRequests.status, "available")
@@ -22945,9 +22158,9 @@ router19.get("/ministry-stats", async (req, res) => {
       )
     );
     const [incompleteMassesCount] = await db.select({
-      count: sql17`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
+      count: sql18`COUNT(DISTINCT (${schedules.date}, ${schedules.time}))`
     }).from(schedules).where(
-      and25(
+      and26(
         eq33(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         isNull4(schedules.ministerId)
@@ -22975,7 +22188,7 @@ router19.get("/ministry-stats", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch ministry stats" });
   }
 });
-router19.get("/incomplete", async (req, res) => {
+router20.get("/incomplete", async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const now = /* @__PURE__ */ new Date();
@@ -22983,20 +22196,20 @@ router19.get("/incomplete", async (req, res) => {
     const incomplete = await db.select({
       date: schedules.date,
       massTime: schedules.time,
-      vacancies: sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
-      totalSlots: sql17`COUNT(*)`,
-      positions: sql17`ARRAY_AGG(
+      vacancies: sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END)`,
+      totalSlots: sql18`COUNT(*)`,
+      positions: sql18`ARRAY_AGG(
           CASE WHEN ${schedules.ministerId} IS NULL
           THEN ${schedules.position}
           END
         ) FILTER (WHERE ${schedules.ministerId} IS NULL)`
     }).from(schedules).where(
-      and25(
+      and26(
         eq33(schedules.status, "published"),
         gte15(schedules.date, format10(now, "yyyy-MM-dd")),
         lte13(schedules.date, format10(futureDate, "yyyy-MM-dd"))
       )
-    ).groupBy(schedules.date, schedules.time).having(sql17`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
+    ).groupBy(schedules.date, schedules.time).having(sql18`COUNT(CASE WHEN ${schedules.ministerId} IS NULL THEN 1 END) > 0`).orderBy(schedules.date, schedules.time);
     res.json({
       success: true,
       data: incomplete.map((item) => ({
@@ -23012,28 +22225,28 @@ router19.get("/incomplete", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch incomplete schedules" });
   }
 });
-var dashboard_default = router19;
+var dashboard_default = router20;
 
 // server/routes/pushSubscriptions.ts
 await init_storage();
-import { Router as Router20 } from "express";
+import { Router as Router21 } from "express";
 await init_pushNotifications();
-import { z as z8 } from "zod";
-var router20 = Router20();
-var pushSubscriptionSchema2 = z8.object({
-  endpoint: z8.string().url(),
-  keys: z8.object({
-    p256dh: z8.string(),
-    auth: z8.string()
+import { z as z9 } from "zod";
+var router21 = Router21();
+var pushSubscriptionSchema2 = z9.object({
+  endpoint: z9.string().url(),
+  keys: z9.object({
+    p256dh: z9.string(),
+    auth: z9.string()
   })
 });
-router20.get("/vapid-public-key", (req, res) => {
+router21.get("/vapid-public-key", (req, res) => {
   if (!pushConfig.enabled || !pushConfig.publicKey) {
     return res.status(503).json({ error: "Push notifications not configured" });
   }
   res.json({ publicKey: pushConfig.publicKey });
 });
-router20.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
+router21.post("/subscribe", csrfProtection, authenticateToken, async (req, res) => {
   try {
     if (!pushConfig.enabled) {
       return res.status(503).json({ error: "Push notifications not available" });
@@ -23055,13 +22268,13 @@ router20.post("/subscribe", csrfProtection, authenticateToken, async (req, res) 
     res.json({ success: true, message: "Subscribed to push notifications" });
   } catch (error) {
     console.error("[PUSH API] Subscribe error:", error);
-    if (error instanceof z8.ZodError) {
+    if (error instanceof z9.ZodError) {
       return res.status(400).json({ error: "Invalid subscription data" });
     }
     res.status(500).json({ error: "Failed to subscribe" });
   }
 });
-router20.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
+router21.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res) => {
   try {
     const { endpoint } = req.body;
     if (!endpoint) {
@@ -23074,7 +22287,7 @@ router20.post("/unsubscribe", csrfProtection, authenticateToken, async (req, res
     res.status(500).json({ error: "Failed to unsubscribe" });
   }
 });
-router20.get("/subscriptions", authenticateToken, async (req, res) => {
+router21.get("/subscriptions", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const subscriptions = await storage.getPushSubscriptionsByUserIds([userId]);
@@ -23089,16 +22302,16 @@ router20.get("/subscriptions", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to get subscriptions" });
   }
 });
-var pushSubscriptions_default = router20;
+var pushSubscriptions_default = router21;
 
 // server/routes/certificates.ts
-import { Router as Router21 } from "express";
+import { Router as Router22 } from "express";
 init_roles();
 
 // server/services/certificateService.ts
 await init_db();
 init_schema();
-import { eq as eq34, and as and26, count as count8, sql as sql18 } from "drizzle-orm";
+import { eq as eq34, and as and27, count as count8, sql as sql19 } from "drizzle-orm";
 
 // server/utils/certificateGenerator.ts
 import { jsPDF as jsPDF2 } from "jspdf";
@@ -23293,7 +22506,7 @@ async function getTrackCompletionStatus(userId, trackId) {
       id: formationLessons.id,
       durationMinutes: formationLessons.durationMinutes
     }).from(formationLessons).where(
-      and26(
+      and27(
         eq34(formationLessons.trackId, track.id),
         eq34(formationLessons.isActive, true)
       )
@@ -23308,9 +22521,9 @@ async function getTrackCompletionStatus(userId, trackId) {
         status: formationLessonProgress.status,
         completedAt: formationLessonProgress.completedAt
       }).from(formationLessonProgress).where(
-        and26(
+        and27(
           eq34(formationLessonProgress.userId, userId),
-          sql18`${formationLessonProgress.lessonId} IN (${sql18.join(lessonIds.map((id) => sql18`${id}`), sql18`, `)})`
+          sql19`${formationLessonProgress.lessonId} IN (${sql19.join(lessonIds.map((id) => sql19`${id}`), sql19`, `)})`
         )
       );
       for (const p of progress) {
@@ -23324,7 +22537,7 @@ async function getTrackCompletionStatus(userId, trackId) {
     }
     const isCompleted = lessonIds.length > 0 && completedLessons === lessonIds.length;
     const existingCert = await db.select({ id: formationCertificates.id }).from(formationCertificates).where(
-      and26(
+      and27(
         eq34(formationCertificates.userId, userId),
         eq34(formationCertificates.trackId, track.id)
       )
@@ -23357,7 +22570,7 @@ async function issueCertificate(userId, trackId, issuedById) {
   }
   if (status.hasCertificate) {
     const existing = await db.select().from(formationCertificates).where(
-      and26(
+      and27(
         eq34(formationCertificates.userId, userId),
         eq34(formationCertificates.trackId, trackId)
       )
@@ -23374,10 +22587,10 @@ async function issueCertificate(userId, trackId, issuedById) {
   const lessons = await db.select({ id: formationLessons.id }).from(formationLessons).where(eq34(formationLessons.trackId, trackId));
   const lessonIds = lessons.map((l) => l.id);
   const completedProgress = await db.select({ lessonId: formationLessonProgress.lessonId }).from(formationLessonProgress).where(
-    and26(
+    and27(
       eq34(formationLessonProgress.userId, userId),
       eq34(formationLessonProgress.status, "completed"),
-      sql18`${formationLessonProgress.lessonId} IN (${sql18.join(lessonIds.map((id) => sql18`${id}`), sql18`, `)})`
+      sql19`${formationLessonProgress.lessonId} IN (${sql19.join(lessonIds.map((id) => sql19`${id}`), sql19`, `)})`
     )
   );
   const [certificate] = await db.insert(formationCertificates).values({
@@ -23435,8 +22648,8 @@ async function getCertificateById(certificateId) {
 }
 
 // server/routes/certificates.ts
-var router21 = Router21();
-router21.get("/status", authenticateToken, async (req, res) => {
+var router22 = Router22();
+router22.get("/status", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -23450,7 +22663,7 @@ router21.get("/status", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao obter status das trilhas" });
   }
 });
-router21.get("/", authenticateToken, async (req, res) => {
+router22.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -23463,7 +22676,7 @@ router21.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao obter certificados" });
   }
 });
-router21.post("/issue", authenticateToken, async (req, res) => {
+router22.post("/issue", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -23483,7 +22696,7 @@ router21.post("/issue", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao emitir certificado" });
   }
 });
-router21.get("/:id", authenticateToken, async (req, res) => {
+router22.get("/:id", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
@@ -23501,7 +22714,7 @@ router21.get("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao obter certificado" });
   }
 });
-router21.get("/:id/pdf", authenticateToken, async (req, res) => {
+router22.get("/:id/pdf", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
@@ -23527,7 +22740,7 @@ router21.get("/:id/pdf", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao gerar PDF do certificado" });
   }
 });
-router21.get("/verify/:code", async (req, res) => {
+router22.get("/verify/:code", async (req, res) => {
   try {
     const { code } = req.params;
     if (!code || code.length !== 6) {
@@ -23558,7 +22771,7 @@ router21.get("/verify/:code", async (req, res) => {
     res.status(500).json({ error: "Erro ao verificar certificado" });
   }
 });
-router21.post("/issue-for-user", authenticateToken, async (req, res) => {
+router22.post("/issue-for-user", authenticateToken, async (req, res) => {
   try {
     const issuerId = req.user?.id;
     const userRole = req.user?.role;
@@ -23579,15 +22792,15 @@ router21.post("/issue-for-user", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erro ao emitir certificado" });
   }
 });
-var certificates_default = router21;
+var certificates_default = router22;
 
 // server/routes/insights.ts
-import { Router as Router22 } from "express";
+import { Router as Router23 } from "express";
 
 // server/services/insightsService.ts
 await init_db();
 init_schema();
-import { eq as eq35, and as and27, gte as gte16, lte as lte14, desc as desc11, count as count9, avg as avg2 } from "drizzle-orm";
+import { eq as eq35, and as and28, gte as gte16, lte as lte14, desc as desc11, count as count9, avg as avg2 } from "drizzle-orm";
 function calculateNoShowRisk(noShowCount, totalServices, reliabilityScore) {
   if (totalServices === 0) return "medium";
   const noShowRate = noShowCount / totalServices * 100;
@@ -23624,7 +22837,7 @@ async function getMinisterRiskProfiles() {
     lastService: users.lastService,
     lastLogin: users.lastLogin
   }).from(users).where(
-    and27(
+    and28(
       eq35(users.status, "active"),
       eq35(users.role, "ministro")
     )
@@ -23694,13 +22907,13 @@ async function getTimeSlotInsights() {
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
   const [currentQuestionnaire] = await db.select().from(questionnaires).where(
-    and27(
+    and28(
       eq35(questionnaires.month, currentMonth),
       eq35(questionnaires.year, currentYear)
     )
   ).limit(1);
   const [reliableCount] = await db.select({ count: count9() }).from(users).where(
-    and27(
+    and28(
       eq35(users.status, "active"),
       eq35(users.role, "ministro"),
       gte16(users.reliabilityScore, 75)
@@ -23756,7 +22969,7 @@ async function getSubstitutionPatterns() {
     substitutionFulfilledCount: users.substitutionFulfilledCount,
     totalServices: users.totalServices
   }).from(users).where(
-    and27(
+    and28(
       eq35(users.status, "active"),
       eq35(users.role, "ministro"),
       gte16(users.substitutionRequestCount, 1)
@@ -23846,7 +23059,7 @@ async function getEngagementTrends() {
     const monthStart = new Date(date2.getFullYear(), date2.getMonth(), 1);
     const monthEnd = new Date(date2.getFullYear(), date2.getMonth() + 1, 0);
     const [activeCount] = await db.select({ count: count9() }).from(activityLogs).where(
-      and27(
+      and28(
         gte16(activityLogs.createdAt, monthStart),
         lte14(activityLogs.createdAt, monthEnd)
       )
@@ -23997,10 +23210,10 @@ async function getScheduleRiskAssessment(date2) {
 }
 
 // server/routes/insights.ts
-var router22 = Router22();
-router22.use(authenticateToken);
-router22.use(requireRole(["coordenador", "gestor"]));
-router22.get("/", async (req, res) => {
+var router23 = Router23();
+router23.use(authenticateToken);
+router23.use(requireRole(["coordenador", "gestor"]));
+router23.get("/", async (req, res) => {
   try {
     const insights = await generatePredictiveInsights();
     res.json(insights);
@@ -24009,7 +23222,7 @@ router22.get("/", async (req, res) => {
     res.status(500).json({ error: "Erro ao gerar insights preditivos" });
   }
 });
-router22.get("/summary", async (req, res) => {
+router23.get("/summary", async (req, res) => {
   try {
     const insights = await generatePredictiveInsights();
     res.json({
@@ -24022,7 +23235,7 @@ router22.get("/summary", async (req, res) => {
     res.status(500).json({ error: "Erro ao gerar resumo" });
   }
 });
-router22.get("/ministers", async (req, res) => {
+router23.get("/ministers", async (req, res) => {
   try {
     const riskFilter = req.query.risk;
     let profiles = await getMinisterRiskProfiles();
@@ -24038,7 +23251,7 @@ router22.get("/ministers", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter perfis de risco" });
   }
 });
-router22.get("/ministers/:id", async (req, res) => {
+router23.get("/ministers/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const profiles = await getMinisterRiskProfiles();
@@ -24052,7 +23265,7 @@ router22.get("/ministers/:id", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter perfil do ministro" });
   }
 });
-router22.get("/time-slots", async (req, res) => {
+router23.get("/time-slots", async (req, res) => {
   try {
     const insights = await getTimeSlotInsights();
     const grouped = {
@@ -24071,7 +23284,7 @@ router22.get("/time-slots", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter analise de horarios" });
   }
 });
-router22.get("/substitutions", async (req, res) => {
+router23.get("/substitutions", async (req, res) => {
   try {
     const patterns = await getSubstitutionPatterns();
     const avgFrequency = patterns.length > 0 ? patterns.reduce((sum2, p) => sum2 + p.requestFrequency, 0) / patterns.length : 0;
@@ -24091,7 +23304,7 @@ router22.get("/substitutions", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter padroes de substituicao" });
   }
 });
-router22.get("/seasonal", async (req, res) => {
+router23.get("/seasonal", async (req, res) => {
   try {
     const patterns = await getSeasonalPatterns();
     const highRiskMonths = patterns.filter((p) => p.isHighRisk).map((p) => p.monthName);
@@ -24105,7 +23318,7 @@ router22.get("/seasonal", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter padroes sazonais" });
   }
 });
-router22.get("/engagement", async (req, res) => {
+router23.get("/engagement", async (req, res) => {
   try {
     const trends = await getEngagementTrends();
     const latestTrend = trends.length > 0 ? trends[trends.length - 1].trend : "stable";
@@ -24119,7 +23332,7 @@ router22.get("/engagement", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter tendencias de engajamento" });
   }
 });
-router22.get("/schedule-risk/:date", async (req, res) => {
+router23.get("/schedule-risk/:date", async (req, res) => {
   try {
     const { date: date2 } = req.params;
     const dateObj = new Date(date2);
@@ -24133,7 +23346,7 @@ router22.get("/schedule-risk/:date", async (req, res) => {
     res.status(500).json({ error: "Erro ao avaliar risco da escala" });
   }
 });
-router22.get("/recommendations", async (req, res) => {
+router23.get("/recommendations", async (req, res) => {
   try {
     const insights = await generatePredictiveInsights();
     const categorized = {
@@ -24160,15 +23373,15 @@ router22.get("/recommendations", async (req, res) => {
     res.status(500).json({ error: "Erro ao obter recomendacoes" });
   }
 });
-var insights_default = router22;
+var insights_default = router23;
 
 // server/routes/materials.ts
-import { Router as Router23 } from "express";
+import { Router as Router24 } from "express";
 import multer3 from "multer";
 init_roles();
 await init_db();
 init_schema();
-import { eq as eq36, desc as desc12, and as and28, ilike, or as or10, sql as sql20 } from "drizzle-orm";
+import { eq as eq36, desc as desc12, and as and29, ilike, or as or10, sql as sql21 } from "drizzle-orm";
 
 // server/services/aiContentAnalyzer.ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -24387,47 +23600,71 @@ ${content.slice(0, 1e4)}`
   }
 }
 
+// server/utils/materialTypes.ts
+var MATERIAL_MAX_FILE_SIZE = 10 * 1024 * 1024;
+var MATERIAL_ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/wav",
+  "audio/x-wav",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime"
+];
+var MATERIAL_TYPES = ["pdf", "document", "video", "audio", "image", "presentation", "other"];
+function getFileType(mimeType) {
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType.includes("powerpoint") || mimeType.includes("presentation")) return "presentation";
+  if (mimeType.includes("word") || mimeType.includes("document")) return "document";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  return "other";
+}
+function isMaterialType(value) {
+  return typeof value === "string" && MATERIAL_TYPES.includes(value);
+}
+function inferMaterialTypeFromExternalUrl(url, explicitType) {
+  if (isMaterialType(explicitType)) return explicitType;
+  const normalized = url.toLowerCase().split(/[?#]/, 1)[0];
+  if (/\.(pdf)$/.test(normalized)) return "pdf";
+  if (/\.(doc|docx|odt|rtf)$/.test(normalized)) return "document";
+  if (/\.(ppt|pptx|odp)$/.test(normalized)) return "presentation";
+  if (/\.(jpe?g|png|webp)$/.test(normalized)) return "image";
+  if (/\.(mp3|m4a|wav|aac|ogg)$/.test(normalized)) return "audio";
+  if (/\.(mp4|webm|mov|m4v)$/.test(normalized)) return "video";
+  if (/youtube\.com|youtu\.be|vimeo\.com/.test(normalized)) return "video";
+  return "other";
+}
+
 // server/routes/materials.ts
-var router23 = Router23();
+var router24 = Router24();
 var upload3 = multer3({
   storage: multer3.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024
+    fileSize: MATERIAL_MAX_FILE_SIZE
     // 10MB max
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-powerpoint",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "audio/mpeg",
-      "audio/mp3",
-      "video/mp4",
-      "video/webm"
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
+    if (MATERIAL_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error(`Tipo de arquivo n\xE3o permitido: ${file.mimetype}`));
     }
   }
 });
-function getFileType(mimeType) {
-  if (mimeType === "application/pdf") return "pdf";
-  if (mimeType.includes("word") || mimeType.includes("document")) return "document";
-  if (mimeType.includes("powerpoint") || mimeType.includes("presentation")) return "presentation";
-  if (mimeType.startsWith("image/")) return "image";
-  if (mimeType.startsWith("audio/")) return "audio";
-  if (mimeType.startsWith("video/")) return "video";
-  return "other";
-}
-router23.use(authenticateToken);
-router23.get("/", async (req, res) => {
+router24.use(authenticateToken);
+router24.get("/", async (req, res) => {
   try {
     const {
       category,
@@ -24456,7 +23693,7 @@ router23.get("/", async (req, res) => {
     } else if (aiStatus === "pending") {
       conditions.push(or10(
         eq36(formationMaterials.aiAnalyzed, false),
-        sql20`${formationMaterials.aiAnalyzed} IS NULL`
+        sql21`${formationMaterials.aiAnalyzed} IS NULL`
       ));
     }
     if (aiQuality && aiQuality !== "all") {
@@ -24510,8 +23747,8 @@ router23.get("/", async (req, res) => {
       aiContentQuality: formationMaterials.aiContentQuality,
       aiSummary: formationMaterials.aiSummary,
       aiKeyTopics: formationMaterials.aiKeyTopics
-    }).from(formationMaterials).leftJoin(users, eq36(formationMaterials.uploadedBy, users.id)).where(and28(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
-    const [countResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and28(...conditions));
+    }).from(formationMaterials).leftJoin(users, eq36(formationMaterials.uploadedBy, users.id)).where(and29(...conditions)).orderBy(orderByClause).limit(parseInt(limit)).offset(parseInt(offset));
+    const [countResult] = await db.select({ count: sql21`count(*)` }).from(formationMaterials).where(and29(...conditions));
     res.json({
       materials,
       total: countResult?.count || 0,
@@ -24523,7 +23760,7 @@ router23.get("/", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar materiais" });
   }
 });
-router23.get("/categories", async (req, res) => {
+router24.get("/categories", async (req, res) => {
   try {
     const tracks = await db.select({
       id: formationTracks.id,
@@ -24536,7 +23773,7 @@ router23.get("/categories", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar categorias" });
   }
 });
-router23.get("/:id", async (req, res) => {
+router24.get("/:id([0-9a-fA-F-]{36})", async (req, res) => {
   try {
     const { id } = req.params;
     const [material] = await db.select({
@@ -24555,7 +23792,7 @@ router23.get("/:id", async (req, res) => {
       isPublished: formationMaterials.isPublished,
       createdAt: formationMaterials.createdAt,
       uploaderName: users.name
-    }).from(formationMaterials).leftJoin(users, eq36(formationMaterials.uploadedBy, users.id)).where(and28(
+    }).from(formationMaterials).leftJoin(users, eq36(formationMaterials.uploadedBy, users.id)).where(and29(
       eq36(formationMaterials.id, id),
       eq36(formationMaterials.isActive, true)
     ));
@@ -24575,10 +23812,10 @@ router23.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar material" });
   }
 });
-router23.get("/:id/download", async (req, res) => {
+router24.get("/:id([0-9a-fA-F-]{36})/download", async (req, res) => {
   try {
     const { id } = req.params;
-    const [material] = await db.select().from(formationMaterials).where(and28(
+    const [material] = await db.select().from(formationMaterials).where(and29(
       eq36(formationMaterials.id, id),
       eq36(formationMaterials.isActive, true)
     ));
@@ -24619,9 +23856,9 @@ router23.get("/:id/download", async (req, res) => {
     res.status(500).json({ error: "Erro ao baixar material" });
   }
 });
-router23.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, upload3.single("file"), async (req, res) => {
+router24.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, upload3.single("file"), async (req, res) => {
   try {
-    const { title, description, category, trackId, tags, externalUrl, isPublished } = req.body;
+    const { title, description, category, trackId, tags, externalUrl, isPublished, type } = req.body;
     if (!title) {
       return res.status(400).json({ error: "T\xEDtulo \xE9 obrigat\xF3rio" });
     }
@@ -24641,7 +23878,7 @@ router23.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, uploa
       fileType = getFileType(mimeType);
     } else if (externalUrl) {
       fileName = title;
-      fileType = "other";
+      fileType = inferMaterialTypeFromExternalUrl(externalUrl, type);
     }
     const parsedTags = typeof tags === "string" ? JSON.parse(tags) : tags || [];
     const [material] = await db.insert(formationMaterials).values({
@@ -24697,7 +23934,7 @@ router23.post("/", requireRole(["coordenador", "gestor"]), csrfProtection, uploa
     res.status(500).json({ error: "Erro ao enviar material" });
   }
 });
-router23.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router24.put("/:id([0-9a-fA-F-]{36})", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, category, trackId, tags, isPublished } = req.body;
@@ -24720,7 +23957,7 @@ router23.put("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, asy
     res.status(500).json({ error: "Erro ao atualizar material" });
   }
 });
-router23.delete("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router24.delete("/:id([0-9a-fA-F-]{36})", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const [material] = await db.update(formationMaterials).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq36(formationMaterials.id, id)).returning();
@@ -24733,30 +23970,30 @@ router23.delete("/:id", requireRole(["coordenador", "gestor"]), csrfProtection, 
     res.status(500).json({ error: "Erro ao remover material" });
   }
 });
-router23.get("/stats/overview", async (req, res) => {
+router24.get("/stats/overview", async (req, res) => {
   try {
-    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(eq36(formationMaterials.isActive, true));
+    const [totalResult] = await db.select({ count: sql21`count(*)` }).from(formationMaterials).where(eq36(formationMaterials.isActive, true));
     const typeStats = await db.select({
       type: formationMaterials.type,
-      count: sql20`count(*)`
+      count: sql21`count(*)`
     }).from(formationMaterials).where(eq36(formationMaterials.isActive, true)).groupBy(formationMaterials.type);
     const categoryStats = await db.select({
       category: formationMaterials.category,
-      count: sql20`count(*)`
+      count: sql21`count(*)`
     }).from(formationMaterials).where(eq36(formationMaterials.isActive, true)).groupBy(formationMaterials.category);
-    const [aiAnalyzedResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and28(
+    const [aiAnalyzedResult] = await db.select({ count: sql21`count(*)` }).from(formationMaterials).where(and29(
       eq36(formationMaterials.isActive, true),
       eq36(formationMaterials.aiAnalyzed, true)
     ));
     const qualityStats = await db.select({
       quality: formationMaterials.aiContentQuality,
-      count: sql20`count(*)`
-    }).from(formationMaterials).where(and28(
+      count: sql21`count(*)`
+    }).from(formationMaterials).where(and29(
       eq36(formationMaterials.isActive, true),
       eq36(formationMaterials.aiAnalyzed, true)
     )).groupBy(formationMaterials.aiContentQuality);
-    const [downloadResult] = await db.select({ total: sql20`coalesce(sum(download_count), 0)` }).from(formationMaterials).where(eq36(formationMaterials.isActive, true));
-    const [sizeResult] = await db.select({ total: sql20`coalesce(sum(file_size), 0)` }).from(formationMaterials).where(eq36(formationMaterials.isActive, true));
+    const [downloadResult] = await db.select({ total: sql21`coalesce(sum(download_count), 0)` }).from(formationMaterials).where(eq36(formationMaterials.isActive, true));
+    const [sizeResult] = await db.select({ total: sql21`coalesce(sum(file_size), 0)` }).from(formationMaterials).where(eq36(formationMaterials.isActive, true));
     const topMaterials = await db.select({
       id: formationMaterials.id,
       title: formationMaterials.title,
@@ -24789,7 +24026,7 @@ router23.get("/stats/overview", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar estat\xEDsticas" });
   }
 });
-router23.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router24.post("/:id([0-9a-fA-F-]{36})/analyze", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -24841,7 +24078,7 @@ router23.post("/:id/analyze", requireRole(["coordenador", "gestor"]), csrfProtec
     res.status(500).json({ error: "Erro ao analisar material" });
   }
 });
-router23.get("/:id/analysis", async (req, res) => {
+router24.get("/:id([0-9a-fA-F-]{36})/analysis", async (req, res) => {
   try {
     const { id } = req.params;
     const [material] = await db.select({
@@ -24882,7 +24119,7 @@ router23.get("/:id/analysis", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar analise" });
   }
 });
-router23.post("/:id/apply-suggestions", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router24.post("/:id([0-9a-fA-F-]{36})/apply-suggestions", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const { applyCategory, applyTags, applyDescription } = req.body;
@@ -24910,7 +24147,7 @@ router23.post("/:id/apply-suggestions", requireRole(["coordenador", "gestor"]), 
     res.status(500).json({ error: "Erro ao aplicar sugestoes" });
   }
 });
-router23.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
+router24.post("/:id([0-9a-fA-F-]{36})/generate-quiz", requireRole(["coordenador", "gestor"]), csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const { numQuestions = 5 } = req.body;
@@ -24947,7 +24184,7 @@ router23.post("/:id/generate-quiz", requireRole(["coordenador", "gestor"]), csrf
     res.status(500).json({ error: "Erro ao gerar quiz" });
   }
 });
-router23.get("/my-progress", async (req, res) => {
+router24.get("/my-progress", async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -24963,12 +24200,12 @@ router23.get("/my-progress", async (req, res) => {
       if (!materialAccess.has(log2.materialId)) {
         materialAccess.set(log2.materialId, { views: 0, downloads: 0, completed: false, lastAccess: log2.accessedAt });
       }
-      const access = materialAccess.get(log2.materialId);
-      if (log2.action === "view") access.views++;
-      if (log2.action === "download") access.downloads++;
-      if (log2.action === "completed") access.completed = true;
+      const access2 = materialAccess.get(log2.materialId);
+      if (log2.action === "view") access2.views++;
+      if (log2.action === "download") access2.downloads++;
+      if (log2.action === "completed") access2.completed = true;
     }
-    const [totalResult] = await db.select({ count: sql20`count(*)` }).from(formationMaterials).where(and28(
+    const [totalResult] = await db.select({ count: sql21`count(*)` }).from(formationMaterials).where(and29(
       eq36(formationMaterials.isActive, true),
       eq36(formationMaterials.isPublished, true)
     ));
@@ -24987,7 +24224,7 @@ router23.get("/my-progress", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar progresso" });
   }
 });
-router23.post("/:id/mark-completed", csrfProtection, async (req, res) => {
+router24.post("/:id([0-9a-fA-F-]{36})/mark-completed", csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -25009,14 +24246,14 @@ router23.post("/:id/mark-completed", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao marcar como concluido" });
   }
 });
-router23.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
+router24.delete("/:id([0-9a-fA-F-]{36})/mark-completed", csrfProtection, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Usuario nao autenticado" });
     }
-    await db.delete(materialAccessLogs).where(and28(
+    await db.delete(materialAccessLogs).where(and29(
       eq36(materialAccessLogs.materialId, id),
       eq36(materialAccessLogs.userId, userId),
       eq36(materialAccessLogs.action, "completed")
@@ -25027,20 +24264,20 @@ router23.delete("/:id/mark-completed", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao remover marcacao" });
   }
 });
-var materials_default = router23;
+var materials_default = router24;
 
 // server/routes/whatsapp-api.ts
 await init_db();
 init_schema();
-import { Router as Router24 } from "express";
-import { eq as eq38, and as and30, gte as gte18, desc as desc13, asc as asc4 } from "drizzle-orm";
-import { sql as sql21 } from "drizzle-orm";
+import { Router as Router25 } from "express";
+import { eq as eq38, and as and31, gte as gte18, desc as desc13, asc as asc4 } from "drizzle-orm";
+import { sql as sql22 } from "drizzle-orm";
 function getErrorMessage9(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Unknown error";
 }
-var router24 = Router24();
+var router25 = Router25();
 var authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
   const validApiKey = process.env.WHATSAPP_API_KEY;
@@ -25056,7 +24293,7 @@ var authenticateAPIKey = (req, res, next) => {
   }
   next();
 };
-router24.get("/health", (req, res) => {
+router25.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "MESC WhatsApp API",
@@ -25065,7 +24302,7 @@ router24.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router24.get("/webhook", (req, res) => {
+router25.get("/webhook", (req, res) => {
   res.json({
     status: "ok",
     message: "Webhook WhatsApp MESC est\xE1 ativo",
@@ -25076,7 +24313,7 @@ router24.get("/webhook", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router24.post("/webhook", async (req, res) => {
+router25.post("/webhook", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_WEBHOOK] Mensagem recebida:", JSON.stringify(req.body, null, 2));
   try {
     const message = req.body;
@@ -25090,7 +24327,7 @@ router24.post("/webhook", async (req, res) => {
     res.sendStatus(200);
   }
 });
-router24.use(authenticateAPIKey);
+router25.use(authenticateAPIKey);
 function normalizePhone(phone) {
   return phone.replace(/[\s\-\(\)]/g, "");
 }
@@ -25123,7 +24360,7 @@ function getDayOfWeek(dateStr) {
   const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
   return days[date2.getDay()];
 }
-router24.post("/escala", async (req, res) => {
+router25.post("/escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, data } = req.body;
@@ -25137,7 +24374,7 @@ router24.post("/escala", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /escala] Telefone normalizado:", normalizedPhone, "| Data:", data);
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql21`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql22`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -25150,7 +24387,7 @@ router24.post("/escala", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala] Buscando escala para ministro ID:", minister[0].id, "na data:", data);
     const schedule = await db.select().from(schedules).where(
-      and30(
+      and31(
         eq38(schedules.ministerId, minister[0].id),
         eq38(schedules.date, data)
       )
@@ -25182,7 +24419,7 @@ router24.post("/escala", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.post("/proximas", async (req, res) => {
+router25.post("/proximas", async (req, res) => {
   try {
     const { telefone } = req.body;
     if (!telefone) {
@@ -25192,7 +24429,7 @@ router24.post("/proximas", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const minister = await db.select().from(users).where(
-      sql21`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql22`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -25203,7 +24440,7 @@ router24.post("/proximas", async (req, res) => {
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const upcomingSchedules = await db.select().from(schedules).where(
-      and30(
+      and31(
         eq38(schedules.ministerId, minister[0].id),
         gte18(schedules.date, today)
       )
@@ -25236,7 +24473,7 @@ router24.post("/proximas", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.post("/colegas", async (req, res) => {
+router25.post("/colegas", async (req, res) => {
   try {
     const { data, horario } = req.body;
     if (!data || !horario) {
@@ -25255,7 +24492,7 @@ router24.post("/colegas", async (req, res) => {
       ministerPhone: users.phone,
       ministerWhatsapp: users.whatsapp
     }).from(schedules).innerJoin(users, eq38(schedules.ministerId, users.id)).where(
-      and30(
+      and31(
         eq38(schedules.date, data),
         eq38(schedules.time, normalizedTime)
       )
@@ -25285,7 +24522,7 @@ router24.post("/colegas", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.get("/substituicoes-abertas", async (req, res) => {
+router25.get("/substituicoes-abertas", async (req, res) => {
   try {
     const limite = Math.min(parseInt(req.query.limite) || 5, 20);
     const openSubstitutions = await db.select({
@@ -25332,7 +24569,7 @@ router24.get("/substituicoes-abertas", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.post("/aceitar-substituicao", async (req, res) => {
+router25.post("/aceitar-substituicao", async (req, res) => {
   try {
     const { telefone, id_substituicao, mensagem } = req.body;
     if (!telefone || !id_substituicao) {
@@ -25342,7 +24579,7 @@ router24.post("/aceitar-substituicao", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const substitute = await db.select().from(users).where(
-      sql21`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql22`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!substitute || substitute.length === 0) {
@@ -25401,7 +24638,7 @@ router24.post("/aceitar-substituicao", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.post("/minhas-substituicoes", async (req, res) => {
+router25.post("/minhas-substituicoes", async (req, res) => {
   try {
     const { telefone, tipo = "todas" } = req.body;
     if (!telefone) {
@@ -25411,7 +24648,7 @@ router24.post("/minhas-substituicoes", async (req, res) => {
     }
     const normalizedPhone = normalizePhone(telefone);
     const minister = await db.select().from(users).where(
-      sql21`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql22`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     if (!minister || minister.length === 0) {
@@ -25426,7 +24663,7 @@ router24.post("/minhas-substituicoes", async (req, res) => {
     } else if (tipo === "aceitas") {
       whereCondition = eq38(substitutionRequests.substituteId, minister[0].id);
     } else {
-      whereCondition = sql21`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
+      whereCondition = sql22`${substitutionRequests.requesterId} = ${minister[0].id} OR ${substitutionRequests.substituteId} = ${minister[0].id}`;
     }
     const mySubstitutions = await db.select({
       substitutionId: substitutionRequests.id,
@@ -25472,7 +24709,7 @@ router24.post("/minhas-substituicoes", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.post("/proxima-escala", async (req, res) => {
+router25.post("/proxima-escala", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /proxima-escala] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone } = req.body;
@@ -25486,7 +24723,7 @@ router24.post("/proxima-escala", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /proxima-escala] Telefone normalizado:", normalizedPhone);
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql21`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql22`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /proxima-escala] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -25502,7 +24739,7 @@ router24.post("/proxima-escala", async (req, res) => {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     console.log("\u{1F50E} [WHATSAPP_API /proxima-escala] Buscando pr\xF3xima escala para ministro ID:", minister[0].id, "a partir de:", today);
     const nextSchedule = await db.select().from(schedules).where(
-      and30(
+      and31(
         eq38(schedules.ministerId, minister[0].id),
         gte18(schedules.date, today)
       )
@@ -25541,7 +24778,7 @@ router24.post("/proxima-escala", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-router24.post("/escala-mes", async (req, res) => {
+router25.post("/escala-mes", async (req, res) => {
   console.log("\u{1F4E9} [WHATSAPP_API /escala-mes] Requisi\xE7\xE3o recebida:", req.body);
   try {
     const { telefone, mes, ano } = req.body;
@@ -25561,7 +24798,7 @@ router24.post("/escala-mes", async (req, res) => {
     console.log("\u{1F50D} [WHATSAPP_API /escala-mes] Telefone normalizado:", normalizedPhone, "| M\xEAs:", mes, "| Ano:", ano);
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando ministro no banco de dados...");
     const minister = await db.select().from(users).where(
-      sql21`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
+      sql22`REPLACE(REPLACE(REPLACE(REPLACE(${users.phone}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}
          OR REPLACE(REPLACE(REPLACE(REPLACE(${users.whatsapp}, ' ', ''), '-', ''), '(', ''), ')', '') = ${normalizedPhone}`
     ).limit(1);
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca do ministro:", minister.length > 0 ? `Encontrado: ${minister[0].name} (ID: ${minister[0].id})` : "N\xE3o encontrado");
@@ -25576,10 +24813,10 @@ router24.post("/escala-mes", async (req, res) => {
     }
     console.log("\u{1F50E} [WHATSAPP_API /escala-mes] Buscando escalas para ministro ID:", minister[0].id, "no m\xEAs", mes, "de", ano);
     const monthSchedules = await db.select().from(schedules).where(
-      and30(
+      and31(
         eq38(schedules.ministerId, minister[0].id),
-        sql21`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
-        sql21`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
+        sql22`EXTRACT(MONTH FROM ${schedules.date}) = ${mes}`,
+        sql22`EXTRACT(YEAR FROM ${schedules.date}) = ${ano}`
       )
     ).orderBy(asc4(schedules.date), asc4(schedules.time));
     console.log("\u{1F4CA} [WHATSAPP_API /escala-mes] Resultado da busca:", monthSchedules.length, "escalas encontradas");
@@ -25625,15 +24862,15 @@ router24.post("/escala-mes", async (req, res) => {
     return res.status(500).json({ erro: getErrorMessage9(err) });
   }
 });
-var whatsapp_api_default = router24;
+var whatsapp_api_default = router25;
 
 // server/routes/metrics.ts
-import { Router as Router25 } from "express";
+import { Router as Router26 } from "express";
 await init_db();
 init_schema();
 import { eq as eq39, count as count10, gte as gte19 } from "drizzle-orm";
 import os from "os";
-var router25 = Router25();
+var router26 = Router26();
 var metrics = {
   total: 0,
   success: 0,
@@ -25690,7 +24927,7 @@ function updateMetrics(statusCode, responseTime, route, method, errorMessage) {
     metrics.avgResponseTime = metrics.responseTimes.reduce((a, b) => a + b, 0) / metrics.responseTimes.length;
   }
 }
-router25.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router26.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
@@ -25779,7 +25016,7 @@ router25.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch metrics" });
   }
 });
-router25.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router26.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const errors = [...metrics.errorLogs].reverse().map((error) => ({
       ...error,
@@ -25794,7 +25031,7 @@ router25.get("/errors", authenticateToken, requireRole(["gestor", "coordenador"]
     res.status(500).json({ error: "Failed to fetch error logs" });
   }
 });
-router25.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router26.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const routes = Array.from(metrics.routeStats.entries()).map(([route, stats]) => ({
       route,
@@ -25813,7 +25050,7 @@ router25.get("/slow-routes", authenticateToken, requireRole(["gestor", "coordena
     res.status(500).json({ error: "Failed to fetch slow routes" });
   }
 });
-router25.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router26.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   metrics.total = 0;
   metrics.success = 0;
   metrics.errors = 0;
@@ -25824,7 +25061,7 @@ router25.post("/reset", authenticateToken, requireRole(["gestor"]), async (req, 
   metrics.lastReset = /* @__PURE__ */ new Date();
   res.json({ message: "M\xE9tricas resetadas com sucesso", lastReset: metrics.lastReset });
 });
-router25.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router26.post("/clear-cache", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   try {
     const cacheStats = scheduleCache.getStats();
     scheduleCache.clear();
@@ -25854,15 +25091,15 @@ function formatUptime(seconds) {
   parts.push(`${secs}s`);
   return parts.join(" ");
 }
-var metrics_default = router25;
+var metrics_default = router26;
 
 // server/routes/reliabilityMetrics.ts
-import { Router as Router26 } from "express";
+import { Router as Router27 } from "express";
 await init_db();
 init_schema();
 import { eq as eq40 } from "drizzle-orm";
-var router26 = Router26();
-router26.get(
+var router27 = Router27();
+router27.get(
   "/metrics",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -25890,7 +25127,7 @@ router26.get(
     }
   }
 );
-router26.get(
+router27.get(
   "/low",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -25919,7 +25156,7 @@ router26.get(
     }
   }
 );
-router26.get(
+router27.get(
   "/minister/:ministerId",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -25952,7 +25189,7 @@ router26.get(
     }
   }
 );
-router26.post(
+router27.post(
   "/minister/:ministerId/recalculate",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -25980,7 +25217,7 @@ router26.post(
     }
   }
 );
-router26.post(
+router27.post(
   "/minister/:ministerId/reset",
   authenticateToken,
   requireRole(["gestor"]),
@@ -26028,7 +25265,7 @@ router26.post(
     }
   }
 );
-router26.post(
+router27.post(
   "/minister/:ministerId/note",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -26076,7 +25313,7 @@ ${newNote}` : newNote;
     }
   }
 );
-router26.get(
+router27.get(
   "/stats",
   authenticateToken,
   requireRole(["gestor", "coordenador"]),
@@ -26142,12 +25379,12 @@ router26.get(
     }
   }
 );
-var reliabilityMetrics_default = router26;
+var reliabilityMetrics_default = router27;
 
 // server/routes/cron.ts
-import { Router as Router27 } from "express";
+import { Router as Router28 } from "express";
 init_logger();
-var router27 = Router27();
+var router28 = Router28();
 function verifyCronKey(req, res, next) {
   const cronKey = req.headers["x-cron-key"] || req.query.key;
   const expectedKey = process.env.CRON_API_KEY || "development-cron-key";
@@ -26163,7 +25400,7 @@ function verifyCronKey(req, res, next) {
   }
   next();
 }
-router27.post("/reliability-check", verifyCronKey, async (req, res) => {
+router28.post("/reliability-check", verifyCronKey, async (req, res) => {
   try {
     logger.info("[CRON] \u{1F550} Starting scheduled reliability check...");
     const result = await checkAndAlertLowReliability();
@@ -26184,17 +25421,17 @@ router27.post("/reliability-check", verifyCronKey, async (req, res) => {
     });
   }
 });
-router27.get("/health", (req, res) => {
+router28.get("/health", (req, res) => {
   res.json({
     success: true,
     message: "Cron endpoints are healthy",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-var cron_default = router27;
+var cron_default = router28;
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-import { Router as Router28 } from "express";
+import { Router as Router29 } from "express";
 
 // server/escala-alternativa/services/pythonScheduleService.ts
 init_logger();
@@ -26283,7 +25520,7 @@ var pythonScheduleService = new PythonScheduleService();
 await init_db();
 init_schema();
 init_logger();
-import { eq as eq41, and as and31 } from "drizzle-orm";
+import { eq as eq41, and as and32 } from "drizzle-orm";
 function getErrorMessage11(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -26298,7 +25535,7 @@ async function gerarEscalaAlternativa(req, res) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(eq41(questionnaires.id, questionnaireId)).limit(1);
     } else if (year && month) {
       [targetQuestionnaire] = await db.select().from(questionnaires).where(
-        and31(
+        and32(
           eq41(questionnaires.year, year),
           eq41(questionnaires.month, month)
         )
@@ -26412,32 +25649,32 @@ async function verificarPython(req, res) {
 }
 
 // server/escala-alternativa/routes/escalaRoutes.ts
-var router28 = Router28();
-router28.get("/check-python", authenticateToken, verificarPython);
-router28.post(
+var router29 = Router29();
+router29.get("/check-python", authenticateToken, verificarPython);
+router29.post(
   "/gerar",
   authenticateToken,
   requireRole(["coordenador", "gestor"]),
   gerarEscalaAlternativa
 );
-router28.post(
+router29.post(
   "/comparar",
   authenticateToken,
   requireRole(["gestor"]),
   compararAlgoritmos
 );
-var escalaRoutes_default = router28;
+var escalaRoutes_default = router29;
 
 // server/routes/adoration.ts
-import { Router as Router29 } from "express";
-import { z as z9 } from "zod";
+import { Router as Router30 } from "express";
+import { z as z10 } from "zod";
 await init_storage();
 init_logger();
 await init_db();
 init_schema();
 init_roles();
-import { eq as eq42, and as and32, inArray as inArray18 } from "drizzle-orm";
-var router29 = Router29();
+import { eq as eq42, and as and33, inArray as inArray19 } from "drizzle-orm";
+var router30 = Router30();
 function getErrorMessage12(error) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -26460,13 +25697,13 @@ function parseYearMonthParams3(req, res) {
   }
   return { year, month };
 }
-var createDrawSchema = z9.object({
-  month: z9.number().min(1).max(12),
-  year: z9.number().min(2024).max(2030),
-  totalMinistersToDraw: z9.number().min(1).max(100).optional()
+var createDrawSchema = z10.object({
+  month: z10.number().min(1).max(12),
+  year: z10.number().min(2024).max(2030),
+  totalMinistersToDraw: z10.number().min(1).max(100).optional()
   // Opcional, será calculado automaticamente
 });
-router29.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router30.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { month, year, totalMinistersToDraw } = createDrawSchema.parse(req.body);
     if (!req.user?.id) {
@@ -26482,9 +25719,9 @@ router29.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
       });
     }
     const allMinisters = await db.select().from(users).where(
-      and32(
+      and33(
         eq42(users.status, "active"),
-        inArray18(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
+        inArray19(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       )
     );
     if (allMinisters.length === 0) {
@@ -26612,7 +25849,7 @@ router29.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
     });
   } catch (error) {
     logger.error("Erro ao executar sorteio de adora\xE7\xE3o:", error);
-    if (error instanceof z9.ZodError) {
+    if (error instanceof z10.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Dados inv\xE1lidos",
@@ -26625,7 +25862,7 @@ router29.post("/draw", authenticateToken, requireRole(["gestor", "coordenador"])
     });
   }
 });
-router29.get("/results/:year/:month", authenticateToken, async (req, res) => {
+router30.get("/results/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -26641,7 +25878,7 @@ router29.get("/results/:year/:month", authenticateToken, async (req, res) => {
     const draw = draws[0];
     const results = await storage.getAdorationDrawResults(draw.id);
     const ministerIds = [...new Set(results.map((r) => r.ministerId))];
-    const ministers = await db.select().from(users).where(inArray18(users.id, ministerIds));
+    const ministers = await db.select().from(users).where(inArray19(users.id, ministerIds));
     const ministerMap = new Map(ministers.map((m) => [m.id, m]));
     const enrichedResults = results.map((result) => {
       const minister = ministerMap.get(result.ministerId);
@@ -26672,7 +25909,7 @@ router29.get("/results/:year/:month", authenticateToken, async (req, res) => {
     });
   }
 });
-router29.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router30.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { drawId } = req.params;
     await storage.deleteAdorationDraw(drawId);
@@ -26689,10 +25926,10 @@ router29.delete("/draw/:drawId", authenticateToken, requireRole(["gestor", "coor
     });
   }
 });
-var swapDaySchema = z9.object({
-  newMondayOfWeek: z9.number().int().min(1).max(5)
+var swapDaySchema = z10.object({
+  newMondayOfWeek: z10.number().int().min(1).max(5)
 });
-router29.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
+router30.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
     const { newMondayOfWeek } = swapDaySchema.parse(req.body);
@@ -26742,7 +25979,7 @@ router29.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     logger.error("Erro ao trocar dia de adora\xE7\xE3o:", error);
-    if (error instanceof z9.ZodError) {
+    if (error instanceof z10.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Dados inv\xE1lidos",
@@ -26755,7 +25992,7 @@ router29.post("/swap-day/:drawId", authenticateToken, async (req, res) => {
     });
   }
 });
-router29.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
+router30.get("/my-schedule/:year/:month", authenticateToken, async (req, res) => {
   try {
     const params = parseYearMonthParams3(req, res);
     if (!params) return;
@@ -26837,7 +26074,7 @@ function getMondaysInMonth(year, month) {
 async function getVoluntaryMinistersForAdoration(year, month) {
   try {
     const [questionnaire] = await db.select().from(questionnaires).where(
-      and32(
+      and33(
         eq42(questionnaires.year, year),
         eq42(questionnaires.month, month)
       )
@@ -26854,8 +26091,8 @@ async function getVoluntaryMinistersForAdoration(year, month) {
       return [];
     }
     const voluntaryMinisters = await db.select().from(users).where(
-      and32(
-        inArray18(users.id, voluntaryMinisterIds),
+      and33(
+        inArray19(users.id, voluntaryMinisterIds),
         eq42(users.status, "active")
       )
     );
@@ -26865,15 +26102,15 @@ async function getVoluntaryMinistersForAdoration(year, month) {
     return [];
   }
 }
-var adoration_default = router29;
+var adoration_default = router30;
 
 // server/routes/activity.ts
 await init_db();
 init_schema();
-import { Router as Router30 } from "express";
-import { eq as eq43, sql as sql23, and as and33, gte as gte20, lte as lte15, desc as desc14, count as count11, like, or as or12 } from "drizzle-orm";
+import { Router as Router31 } from "express";
+import { eq as eq43, sql as sql24, and as and34, gte as gte20, lte as lte15, desc as desc14, count as count11, like, or as or12 } from "drizzle-orm";
 init_roles();
-var router30 = Router30();
+var router31 = Router31();
 function formatDateBR3(date2) {
   return date2.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -26942,7 +26179,7 @@ var actionCategories = {
   "notifications": ["send_notification", "view_notifications"],
   "dashboard": ["view_dashboard"]
 };
-router30.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router31.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const pageStr = typeof req.query.page === "string" ? req.query.page : "1";
     const limitStr = typeof req.query.limit === "string" ? req.query.limit : "50";
@@ -26985,11 +26222,11 @@ router30.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
       conditions.push(
         or12(
           like(activityLogs.action, `%${search}%`),
-          sql23`${activityLogs.details}::text ILIKE ${"%" + search + "%"}`
+          sql24`${activityLogs.details}::text ILIKE ${"%" + search + "%"}`
         )
       );
     }
-    const whereClause = conditions.length > 0 ? and33(...conditions) : void 0;
+    const whereClause = conditions.length > 0 ? and34(...conditions) : void 0;
     const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(whereClause);
     const totalCount = countResult?.count || 0;
     const logs = await db.select({
@@ -27022,7 +26259,7 @@ router30.get("/", authenticateToken, requireRole(["gestor", "coordenador"]), asy
     res.status(500).json({ error: "Failed to fetch activity logs" });
   }
 });
-router30.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router31.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const daysStr = typeof req.query.days === "string" ? req.query.days : "7";
     const numDays = Math.min(90, Math.max(1, parseInt(daysStr) || 7));
@@ -27033,9 +26270,9 @@ router30.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
       count: count11()
     }).from(activityLogs).where(gte20(activityLogs.createdAt, startDate)).groupBy(activityLogs.action).orderBy(desc14(count11()));
     const byDay = await db.select({
-      date: sql23`DATE(${activityLogs.createdAt})`.as("date"),
+      date: sql24`DATE(${activityLogs.createdAt})`.as("date"),
       count: count11()
-    }).from(activityLogs).where(gte20(activityLogs.createdAt, startDate)).groupBy(sql23`DATE(${activityLogs.createdAt})`).orderBy(sql23`DATE(${activityLogs.createdAt})`);
+    }).from(activityLogs).where(gte20(activityLogs.createdAt, startDate)).groupBy(sql24`DATE(${activityLogs.createdAt})`).orderBy(sql24`DATE(${activityLogs.createdAt})`);
     const topUsers = await db.select({
       userId: activityLogs.userId,
       userName: users.name,
@@ -27045,7 +26282,7 @@ router30.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
       action: activityLogs.action,
       count: count11()
     }).from(activityLogs).where(
-      and33(
+      and34(
         gte20(activityLogs.createdAt, startDate),
         or12(
           eq43(activityLogs.action, "login"),
@@ -27079,7 +26316,7 @@ router30.get("/summary", authenticateToken, requireRole(["gestor", "coordenador"
     res.status(500).json({ error: "Failed to fetch activity summary" });
   }
 });
-router30.get("/recent", authenticateToken, async (req, res) => {
+router31.get("/recent", authenticateToken, async (req, res) => {
   try {
     const limitStr = typeof req.query.limit === "string" ? req.query.limit : "10";
     const limitNum = Math.min(50, Math.max(1, parseInt(limitStr) || 10));
@@ -27108,7 +26345,7 @@ router30.get("/recent", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch recent activities" });
   }
 });
-router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router31.get("/user/:userId", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const { userId } = req.params;
     const pageStr = typeof req.query.page === "string" ? req.query.page : "1";
@@ -27136,7 +26373,7 @@ router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(and33(...conditions));
+    const [countResult] = await db.select({ count: count11() }).from(activityLogs).where(and34(...conditions));
     const totalCount = countResult?.count || 0;
     const logs = await db.select({
       id: activityLogs.id,
@@ -27144,7 +26381,7 @@ router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
       details: activityLogs.details,
       ipAddress: activityLogs.ipAddress,
       createdAt: activityLogs.createdAt
-    }).from(activityLogs).where(and33(...conditions)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
+    }).from(activityLogs).where(and34(...conditions)).orderBy(desc14(activityLogs.createdAt)).limit(limitNum).offset(offset);
     const logsWithDescriptions = logs.map((log2) => ({
       ...log2,
       description: getActionDescription(log2.action, log2.details)
@@ -27164,7 +26401,7 @@ router30.get("/user/:userId", authenticateToken, requireRole(["gestor", "coorden
     res.status(500).json({ error: "Failed to fetch user activity" });
   }
 });
-router30.get("/export", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router31.get("/export", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   const logActivity3 = createActivityLogger(req);
   await logActivity3("export_report", { type: "activity_logs" });
   try {
@@ -27204,7 +26441,7 @@ router30.get("/export", authenticateToken, requireRole(["gestor"]), async (req, 
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       conditions.push(gte20(activityLogs.createdAt, thirtyDaysAgo));
     }
-    const whereClause = conditions.length > 0 ? and33(...conditions) : void 0;
+    const whereClause = conditions.length > 0 ? and34(...conditions) : void 0;
     const logs = await db.select({
       id: activityLogs.id,
       userId: activityLogs.userId,
@@ -27251,18 +26488,18 @@ router30.get("/export", authenticateToken, requireRole(["gestor"]), async (req, 
     res.status(500).json({ error: "Failed to export activity logs" });
   }
 });
-var activity_default = router30;
+var activity_default = router31;
 
 // server/routes/gamification.ts
-import { Router as Router31 } from "express";
+import { Router as Router32 } from "express";
 await init_db();
 init_schema();
-import { eq as eq45, desc as desc16, and as and35, sql as sql25 } from "drizzle-orm";
+import { eq as eq45, desc as desc16, and as and36, sql as sql26 } from "drizzle-orm";
 
 // server/services/gamificationService.ts
 await init_db();
 init_schema();
-import { eq as eq44, desc as desc15, and as and34, sql as sql24 } from "drizzle-orm";
+import { eq as eq44, desc as desc15, and as and35, sql as sql25 } from "drizzle-orm";
 var POINT_VALUES = {
   mass_served: 50,
   substitution_offered: 20,
@@ -27569,7 +26806,7 @@ async function awardBadge(userId, badgeCode) {
     console.warn(`Badge ${badgeCode} not found`);
     return false;
   }
-  const [existing] = await db.select().from(userBadges).where(and34(
+  const [existing] = await db.select().from(userBadges).where(and35(
     eq44(userBadges.userId, userId),
     eq44(userBadges.badgeId, badge.id)
   ));
@@ -27610,7 +26847,7 @@ async function getLeaderboard(period = "alltime", limit = 10) {
   }));
 }
 async function getUserRank(userId) {
-  const result = await db.execute(sql24`
+  const result = await db.execute(sql25`
     SELECT COUNT(*) + 1 as rank
     FROM user_points up
     JOIN users u ON up.user_id = u.id
@@ -27647,9 +26884,9 @@ async function seedLevelDefinitions() {
 }
 
 // server/routes/gamification.ts
-var router31 = Router31();
-router31.use(authenticateToken);
-router31.get("/profile", async (req, res) => {
+var router32 = Router32();
+router32.use(authenticateToken);
+router32.get("/profile", async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -27666,7 +26903,7 @@ router31.get("/profile", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar perfil de gamificacao" });
   }
 });
-router31.get("/profile/:userId", async (req, res) => {
+router32.get("/profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     const profile = await getUserGamificationProfile(userId);
@@ -27686,7 +26923,7 @@ router31.get("/profile/:userId", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar perfil" });
   }
 });
-router31.get("/leaderboard", async (req, res) => {
+router32.get("/leaderboard", async (req, res) => {
   try {
     const { period = "alltime", limit = "10" } = req.query;
     const userId = req.user?.id;
@@ -27722,7 +26959,7 @@ router31.get("/leaderboard", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar ranking" });
   }
 });
-router31.get("/badges", async (req, res) => {
+router32.get("/badges", async (req, res) => {
   try {
     const userId = req.user?.id;
     const allBadges = await db.select().from(badges).where(eq45(badges.isActive, true)).orderBy(badges.category, badges.rarity);
@@ -27741,7 +26978,7 @@ router31.get("/badges", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar badges" });
   }
 });
-router31.get("/levels", async (req, res) => {
+router32.get("/levels", async (req, res) => {
   try {
     res.json({ levels: LEVEL_THRESHOLDS });
   } catch (error) {
@@ -27749,7 +26986,7 @@ router31.get("/levels", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar niveis" });
   }
 });
-router31.get("/points-config", async (req, res) => {
+router32.get("/points-config", async (req, res) => {
   try {
     res.json({ pointValues: POINT_VALUES });
   } catch (error) {
@@ -27757,7 +26994,7 @@ router31.get("/points-config", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar configuracao de pontos" });
   }
 });
-router31.get("/history", async (req, res) => {
+router32.get("/history", async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -27765,7 +27002,7 @@ router31.get("/history", async (req, res) => {
     }
     const { limit = "50", offset = "0" } = req.query;
     const transactions = await db.select().from(pointTransactions).where(eq45(pointTransactions.userId, userId)).orderBy(desc16(pointTransactions.createdAt)).limit(parseInt(limit)).offset(parseInt(offset));
-    const [countResult] = await db.select({ count: sql25`count(*)` }).from(pointTransactions).where(eq45(pointTransactions.userId, userId));
+    const [countResult] = await db.select({ count: sql26`count(*)` }).from(pointTransactions).where(eq45(pointTransactions.userId, userId));
     res.json({
       transactions,
       total: countResult?.count || 0,
@@ -27777,7 +27014,7 @@ router31.get("/history", async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar historico" });
   }
 });
-router31.post("/feature-badge", csrfProtection, async (req, res) => {
+router32.post("/feature-badge", csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -27787,7 +27024,7 @@ router31.post("/feature-badge", csrfProtection, async (req, res) => {
     if (!badgeId) {
       return res.status(400).json({ error: "Badge ID obrigatorio" });
     }
-    const [userBadge] = await db.select().from(userBadges).where(and35(
+    const [userBadge] = await db.select().from(userBadges).where(and36(
       eq45(userBadges.userId, userId),
       eq45(userBadges.badgeId, badgeId)
     ));
@@ -27795,7 +27032,7 @@ router31.post("/feature-badge", csrfProtection, async (req, res) => {
       return res.status(404).json({ error: "Badge nao encontrado" });
     }
     if (featured) {
-      const featuredCount = await db.select({ count: sql25`count(*)` }).from(userBadges).where(and35(
+      const featuredCount = await db.select({ count: sql26`count(*)` }).from(userBadges).where(and36(
         eq45(userBadges.userId, userId),
         eq45(userBadges.isFeatured, true)
       ));
@@ -27810,7 +27047,7 @@ router31.post("/feature-badge", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao destacar badge" });
   }
 });
-router31.post("/claim-daily", csrfProtection, async (req, res) => {
+router32.post("/claim-daily", csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -27818,10 +27055,10 @@ router31.post("/claim-daily", csrfProtection, async (req, res) => {
     }
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const [existingClaim] = await db.select().from(pointTransactions).where(and35(
+    const [existingClaim] = await db.select().from(pointTransactions).where(and36(
       eq45(pointTransactions.userId, userId),
       eq45(pointTransactions.action, "login_bonus"),
-      sql25`${pointTransactions.createdAt} >= ${today}`
+      sql26`${pointTransactions.createdAt} >= ${today}`
     ));
     if (existingClaim) {
       return res.status(400).json({ error: "Bonus diario ja coletado hoje", alreadyClaimed: true });
@@ -27844,7 +27081,7 @@ router31.post("/claim-daily", csrfProtection, async (req, res) => {
     res.status(500).json({ error: "Erro ao coletar bonus" });
   }
 });
-router31.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router32.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const { userId, points, reason } = req.body;
     if (!userId || !points) {
@@ -27865,7 +27102,7 @@ router31.post("/admin/award-points", requireRole(["gestor", "coordenador"]), csr
     res.status(500).json({ error: "Erro ao conceder pontos" });
   }
 });
-router31.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router32.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const { userId, badgeCode } = req.body;
     if (!userId || !badgeCode) {
@@ -27881,7 +27118,7 @@ router31.post("/admin/award-badge", requireRole(["gestor", "coordenador"]), csrf
     res.status(500).json({ error: "Erro ao conceder badge" });
   }
 });
-router31.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req, res) => {
+router32.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req, res) => {
   try {
     await seedDefaultBadges();
     await seedLevelDefinitions();
@@ -27891,19 +27128,19 @@ router31.post("/admin/seed", requireRole(["gestor"]), csrfProtection, async (req
     res.status(500).json({ error: "Erro ao criar dados de gamificacao" });
   }
 });
-router31.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) => {
+router32.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
-    const [totalPointsResult] = await db.select({ total: sql25`COALESCE(SUM(total_points), 0)` }).from(userPoints);
-    const [totalBadgesResult] = await db.select({ count: sql25`count(*)` }).from(userBadges);
-    const [activeUsersResult] = await db.select({ count: sql25`count(*)` }).from(userPoints).where(sql25`total_points > 0`);
+    const [totalPointsResult] = await db.select({ total: sql26`COALESCE(SUM(total_points), 0)` }).from(userPoints);
+    const [totalBadgesResult] = await db.select({ count: sql26`count(*)` }).from(userBadges);
+    const [activeUsersResult] = await db.select({ count: sql26`count(*)` }).from(userPoints).where(sql26`total_points > 0`);
     const badgeDistribution = await db.select({
       badgeId: userBadges.badgeId,
       badgeName: badges.name,
-      count: sql25`count(*)`
-    }).from(userBadges).innerJoin(badges, eq45(userBadges.badgeId, badges.id)).groupBy(userBadges.badgeId, badges.name).orderBy(desc16(sql25`count(*)`)).limit(10);
+      count: sql26`count(*)`
+    }).from(userBadges).innerJoin(badges, eq45(userBadges.badgeId, badges.id)).groupBy(userBadges.badgeId, badges.name).orderBy(desc16(sql26`count(*)`)).limit(10);
     const levelDistribution = await db.select({
       level: userPoints.level,
-      count: sql25`count(*)`
+      count: sql26`count(*)`
     }).from(userPoints).groupBy(userPoints.level).orderBy(userPoints.level);
     res.json({
       totalPointsDistributed: totalPointsResult?.total || 0,
@@ -27917,16 +27154,16 @@ router31.get("/stats", requireRole(["gestor", "coordenador"]), async (req, res) 
     res.status(500).json({ error: "Erro ao buscar estatisticas" });
   }
 });
-var gamification_default = router31;
+var gamification_default = router32;
 
 // server/routes/massConfig.ts
 await init_db();
 init_schema();
-import { Router as Router32 } from "express";
+import { Router as Router33 } from "express";
 import { eq as eq46 } from "drizzle-orm";
-import { z as z10 } from "zod";
-var router32 = Router32();
-router32.get("/", async (req, res) => {
+import { z as z11 } from "zod";
+var router33 = Router33();
+router33.get("/", async (req, res) => {
   try {
     const { active } = req.query;
     let query = db.select().from(massConfigurations);
@@ -27942,7 +27179,7 @@ router32.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to list mass configurations" });
   }
 });
-router32.get("/:id", async (req, res) => {
+router33.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [config] = await db.select().from(massConfigurations).where(eq46(massConfigurations.id, id)).limit(1);
@@ -27955,7 +27192,7 @@ router32.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch mass configuration" });
   }
 });
-router32.post("/", async (req, res) => {
+router33.post("/", async (req, res) => {
   try {
     const validatedData = insertMassConfigurationSchema.parse(req.body);
     const insertData = {
@@ -27968,14 +27205,14 @@ router32.post("/", async (req, res) => {
     console.log(`[MassConfig] Created new configuration: ${newConfig.name} (${newConfig.id})`);
     res.status(201).json(newConfig);
   } catch (error) {
-    if (error instanceof z10.ZodError) {
+    if (error instanceof z11.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[MassConfig] Error creating configuration:", error);
     res.status(500).json({ error: "Failed to create mass configuration" });
   }
 });
-router32.put("/:id", async (req, res) => {
+router33.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(massConfigurations).where(eq46(massConfigurations.id, id)).limit(1);
@@ -27995,14 +27232,14 @@ router32.put("/:id", async (req, res) => {
     console.log(`[MassConfig] Updated configuration: ${updated.name} (${updated.id})`);
     res.json(updated);
   } catch (error) {
-    if (error instanceof z10.ZodError) {
+    if (error instanceof z11.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[MassConfig] Error updating configuration:", error);
     res.status(500).json({ error: "Failed to update mass configuration" });
   }
 });
-router32.delete("/:id", async (req, res) => {
+router33.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
@@ -28023,7 +27260,7 @@ router32.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete mass configuration" });
   }
 });
-router32.post("/:id/toggle", async (req, res) => {
+router33.post("/:id/toggle", async (req, res) => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(massConfigurations).where(eq46(massConfigurations.id, id)).limit(1);
@@ -28041,7 +27278,7 @@ router32.post("/:id/toggle", async (req, res) => {
     res.status(500).json({ error: "Failed to toggle mass configuration" });
   }
 });
-router32.post("/:id/exclude-date", async (req, res) => {
+router33.post("/:id/exclude-date", async (req, res) => {
   try {
     const { id } = req.params;
     const { date: date2 } = req.body;
@@ -28067,7 +27304,7 @@ router32.post("/:id/exclude-date", async (req, res) => {
     res.status(500).json({ error: "Failed to add excluded date" });
   }
 });
-router32.delete("/:id/exclude-date/:date", async (req, res) => {
+router33.delete("/:id/exclude-date/:date", async (req, res) => {
   try {
     const { id, date: date2 } = req.params;
     const [existing] = await db.select().from(massConfigurations).where(eq46(massConfigurations.id, id)).limit(1);
@@ -28087,17 +27324,59 @@ router32.delete("/:id/exclude-date/:date", async (req, res) => {
     res.status(500).json({ error: "Failed to remove excluded date" });
   }
 });
-var massConfig_default = router32;
+var massConfig_default = router33;
 
 // server/routes/specialEvents.ts
 await init_db();
 init_schema();
-import { Router as Router33 } from "express";
-import { eq as eq47, and as and37, gte as gte22, lte as lte17 } from "drizzle-orm";
-import { z as z11 } from "zod";
+import { Router as Router34 } from "express";
+import { eq as eq47, and as and38, gte as gte22, lte as lte17 } from "drizzle-orm";
+import { z as z12 } from "zod";
 import { format as format12, startOfMonth as startOfMonth5, endOfMonth as endOfMonth5 } from "date-fns";
-var router33 = Router33();
-router33.get("/", async (req, res) => {
+await init_pushNotifications();
+var router34 = Router34();
+function formatEventDate(eventDate) {
+  return (/* @__PURE__ */ new Date(`${eventDate}T12:00:00`)).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit"
+  });
+}
+async function notifySanctuaryEventPublished(event) {
+  const recipients = await db.select({ id: users.id }).from(users).where(and38(
+    eq47(users.role, "ministro"),
+    eq47(users.status, "active"),
+    eq47(users.homeCommunityId, event.communityId)
+  ));
+  const recipientIds = recipients.map((recipient) => recipient.id);
+  if (recipientIds.length === 0) {
+    return;
+  }
+  const title = "\u{1F4C5} Evento do Santu\xE1rio";
+  const message = `${event.name} foi publicado para ${formatEventDate(event.eventDate)} \xE0s ${event.eventTime}.`;
+  const data = mobileNotificationData("sanctuary_event_published", {
+    eventId: event.id,
+    eventDate: event.eventDate,
+    eventTime: event.eventTime,
+    communityId: event.communityId
+  });
+  await db.insert(notifications).values(recipientIds.map((userId) => ({
+    userId,
+    type: "announcement",
+    title,
+    message,
+    read: false,
+    actionUrl: "/schedules",
+    data
+  })));
+  await sendPushNotificationToUsers(recipientIds, {
+    title,
+    body: message,
+    url: "/schedules",
+    tag: `sanctuary-event-${event.id}`,
+    data
+  });
+}
+router34.get("/", async (req, res) => {
   try {
     const { active } = req.query;
     if (active !== void 0) {
@@ -28112,7 +27391,7 @@ router33.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to list special events" });
   }
 });
-router33.get("/month/:year/:month", async (req, res) => {
+router34.get("/month/:year/:month", async (req, res) => {
   try {
     const year = parseInt(req.params.year, 10);
     const month = parseInt(req.params.month, 10);
@@ -28122,7 +27401,7 @@ router33.get("/month/:year/:month", async (req, res) => {
     const startDate = format12(startOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
     const endDate = format12(endOfMonth5(new Date(year, month - 1)), "yyyy-MM-dd");
     const events = await db.select().from(specialEvents).where(
-      and37(
+      and38(
         eq47(specialEvents.isActive, true),
         gte22(specialEvents.eventDate, startDate),
         lte17(specialEvents.eventDate, endDate)
@@ -28134,7 +27413,7 @@ router33.get("/month/:year/:month", async (req, res) => {
     res.status(500).json({ error: "Failed to list special events for month" });
   }
 });
-router33.get("/:id", async (req, res) => {
+router34.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [event] = await db.select().from(specialEvents).where(eq47(specialEvents.id, id)).limit(1);
@@ -28147,7 +27426,7 @@ router33.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch special event" });
   }
 });
-router33.post("/", async (req, res) => {
+router34.post("/", async (req, res) => {
   try {
     const userId = req.user?.id;
     const validatedData = insertSpecialEventSchema.parse({
@@ -28161,17 +27440,22 @@ router33.post("/", async (req, res) => {
       // comunidade do coordenador
     };
     const [newEvent] = await db.insert(specialEvents).values(insertData).returning();
+    try {
+      await notifySanctuaryEventPublished(newEvent);
+    } catch (notificationError) {
+      console.error("[SpecialEvents] Error notifying published event:", notificationError);
+    }
     console.log(`[SpecialEvents] Created new event: ${newEvent.name} on ${newEvent.eventDate}`);
     res.status(201).json(newEvent);
   } catch (error) {
-    if (error instanceof z11.ZodError) {
+    if (error instanceof z12.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[SpecialEvents] Error creating event:", error);
     res.status(500).json({ error: "Failed to create special event" });
   }
 });
-router33.put("/:id", async (req, res) => {
+router34.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(specialEvents).where(eq47(specialEvents.id, id)).limit(1);
@@ -28191,14 +27475,14 @@ router33.put("/:id", async (req, res) => {
     console.log(`[SpecialEvents] Updated event: ${updated.name} (${updated.id})`);
     res.json(updated);
   } catch (error) {
-    if (error instanceof z11.ZodError) {
+    if (error instanceof z12.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[SpecialEvents] Error updating event:", error);
     res.status(500).json({ error: "Failed to update special event" });
   }
 });
-router33.delete("/:id", async (req, res) => {
+router34.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
@@ -28219,7 +27503,7 @@ router33.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete special event" });
   }
 });
-router33.post("/batch", async (req, res) => {
+router34.post("/batch", async (req, res) => {
   try {
     const { events } = req.body;
     if (!Array.isArray(events) || events.length === 0) {
@@ -28240,26 +27524,33 @@ router33.post("/batch", async (req, res) => {
       });
     }
     const newEvents = await db.insert(specialEvents).values(validatedEvents).returning();
+    await Promise.all(newEvents.map(async (event) => {
+      try {
+        await notifySanctuaryEventPublished(event);
+      } catch (notificationError) {
+        console.error(`[SpecialEvents] Error notifying published event ${event.id}:`, notificationError);
+      }
+    }));
     console.log(`[SpecialEvents] Created ${newEvents.length} events in batch`);
     res.status(201).json(newEvents);
   } catch (error) {
-    if (error instanceof z11.ZodError) {
+    if (error instanceof z12.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[SpecialEvents] Error creating batch events:", error);
     res.status(500).json({ error: "Failed to create batch events" });
   }
 });
-var specialEvents_default = router33;
+var specialEvents_default = router34;
 
 // server/routes/questionMappings.ts
 await init_db();
 init_schema();
-import { Router as Router34 } from "express";
-import { eq as eq48, and as and38 } from "drizzle-orm";
-import { z as z12 } from "zod";
-var router34 = Router34();
-router34.get("/questionnaire/:id", async (req, res) => {
+import { Router as Router35 } from "express";
+import { eq as eq48, and as and39 } from "drizzle-orm";
+import { z as z13 } from "zod";
+var router35 = Router35();
+router35.get("/questionnaire/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [questionnaire] = await db.select().from(questionnaires).where(eq48(questionnaires.id, id)).limit(1);
@@ -28290,7 +27581,7 @@ router34.get("/questionnaire/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to list question mappings" });
   }
 });
-router34.get("/:id", async (req, res) => {
+router35.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [mapping] = await db.select().from(questionMassMappings).where(eq48(questionMassMappings.id, id)).limit(1);
@@ -28303,7 +27594,7 @@ router34.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch question mapping" });
   }
 });
-router34.post("/", async (req, res) => {
+router35.post("/", async (req, res) => {
   try {
     const validatedData = insertQuestionMassMappingSchema.parse(req.body);
     if (!validatedData.massConfigurationId && !validatedData.specialEventId && (!validatedData.targetDate || !validatedData.targetTime)) {
@@ -28312,7 +27603,7 @@ router34.post("/", async (req, res) => {
       });
     }
     const existing = await db.select().from(questionMassMappings).where(
-      and38(
+      and39(
         eq48(questionMassMappings.questionnaireId, validatedData.questionnaireId),
         eq48(questionMassMappings.questionId, validatedData.questionId)
       )
@@ -28327,14 +27618,14 @@ router34.post("/", async (req, res) => {
     console.log(`[QuestionMappings] Created mapping for question ${validatedData.questionId}`);
     res.status(201).json(newMapping);
   } catch (error) {
-    if (error instanceof z12.ZodError) {
+    if (error instanceof z13.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[QuestionMappings] Error creating mapping:", error);
     res.status(500).json({ error: "Failed to create question mapping" });
   }
 });
-router34.put("/:id", async (req, res) => {
+router35.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(questionMassMappings).where(eq48(questionMassMappings.id, id)).limit(1);
@@ -28350,14 +27641,14 @@ router34.put("/:id", async (req, res) => {
     console.log(`[QuestionMappings] Updated mapping ${id}`);
     res.json(updated);
   } catch (error) {
-    if (error instanceof z12.ZodError) {
+    if (error instanceof z13.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[QuestionMappings] Error updating mapping:", error);
     res.status(500).json({ error: "Failed to update question mapping" });
   }
 });
-router34.delete("/:id", async (req, res) => {
+router35.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(questionMassMappings).where(eq48(questionMassMappings.id, id)).limit(1);
@@ -28372,7 +27663,7 @@ router34.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete question mapping" });
   }
 });
-router34.post("/batch", async (req, res) => {
+router35.post("/batch", async (req, res) => {
   try {
     const { mappings } = req.body;
     if (!Array.isArray(mappings) || mappings.length === 0) {
@@ -28392,14 +27683,14 @@ router34.post("/batch", async (req, res) => {
     console.log(`[QuestionMappings] Created ${newMappings.length} mappings in batch`);
     res.status(201).json(newMappings);
   } catch (error) {
-    if (error instanceof z12.ZodError) {
+    if (error instanceof z13.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[QuestionMappings] Error creating batch mappings:", error);
     res.status(500).json({ error: "Failed to create batch mappings" });
   }
 });
-router34.post("/infer", async (req, res) => {
+router35.post("/infer", async (req, res) => {
   try {
     const { questionText } = req.body;
     if (!questionText) {
@@ -28472,16 +27763,16 @@ router34.post("/infer", async (req, res) => {
     res.status(500).json({ error: "Failed to infer mapping from question text" });
   }
 });
-var questionMappings_default = router34;
+var questionMappings_default = router35;
 
 // server/routes/learningPatterns.ts
 await init_db();
 init_schema();
-import { Router as Router35 } from "express";
-import { eq as eq49, and as and39, desc as desc17, sql as sql26 } from "drizzle-orm";
-import { z as z13 } from "zod";
-var router35 = Router35();
-router35.get("/patterns", async (req, res) => {
+import { Router as Router36 } from "express";
+import { eq as eq49, and as and40, desc as desc17, sql as sql27 } from "drizzle-orm";
+import { z as z14 } from "zod";
+var router36 = Router36();
+router36.get("/patterns", async (req, res) => {
   try {
     const { active, type, ministerId, limit: limitParam } = req.query;
     let conditions = [];
@@ -28510,14 +27801,14 @@ router35.get("/patterns", async (req, res) => {
       isActive: learnedPatterns.isActive,
       createdAt: learnedPatterns.createdAt,
       ministerName: users.name
-    }).from(learnedPatterns).leftJoin(users, eq49(learnedPatterns.ministerId, users.id)).where(conditions.length > 0 ? and39(...conditions) : void 0).orderBy(desc17(learnedPatterns.lastOccurrence)).limit(limit);
+    }).from(learnedPatterns).leftJoin(users, eq49(learnedPatterns.ministerId, users.id)).where(conditions.length > 0 ? and40(...conditions) : void 0).orderBy(desc17(learnedPatterns.lastOccurrence)).limit(limit);
     res.json(patterns);
   } catch (error) {
     console.error("[LearningPatterns] Error listing patterns:", error);
     res.status(500).json({ error: "Failed to list learned patterns" });
   }
 });
-router35.get("/patterns/:id", async (req, res) => {
+router36.get("/patterns/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [pattern] = await db.select({
@@ -28545,7 +27836,7 @@ router35.get("/patterns/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch pattern" });
   }
 });
-router35.get("/report/:year/:month", async (req, res) => {
+router36.get("/report/:year/:month", async (req, res) => {
   try {
     const year = parseInt(req.params.year, 10);
     const month = parseInt(req.params.month, 10);
@@ -28559,7 +27850,7 @@ router35.get("/report/:year/:month", async (req, res) => {
     });
     const ministerNames = /* @__PURE__ */ new Map();
     if (ministerIds.size > 0) {
-      const ministers = await db.select({ id: users.id, name: users.name }).from(users).where(sql26`${users.id} = ANY(${Array.from(ministerIds)})`);
+      const ministers = await db.select({ id: users.id, name: users.name }).from(users).where(sql27`${users.id} = ANY(${Array.from(ministerIds)})`);
       ministers.forEach((m) => ministerNames.set(m.id, m.name));
     }
     res.json({
@@ -28582,11 +27873,11 @@ router35.get("/report/:year/:month", async (req, res) => {
     res.status(500).json({ error: "Failed to generate learning report" });
   }
 });
-router35.get("/minister/:id", async (req, res) => {
+router36.get("/minister/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const patterns = await db.select().from(learnedPatterns).where(
-      and39(
+      and40(
         eq49(learnedPatterns.ministerId, id),
         eq49(learnedPatterns.isActive, true)
       )
@@ -28608,21 +27899,21 @@ router35.get("/minister/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch minister patterns" });
   }
 });
-router35.post("/patterns", async (req, res) => {
+router36.post("/patterns", async (req, res) => {
   try {
     const validatedData = insertLearnedPatternSchema.parse(req.body);
     const [newPattern] = await db.insert(learnedPatterns).values(validatedData).returning();
     console.log(`[LearningPatterns] Created pattern: ${newPattern.patternType} for minister ${newPattern.ministerId}`);
     res.status(201).json(newPattern);
   } catch (error) {
-    if (error instanceof z13.ZodError) {
+    if (error instanceof z14.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[LearningPatterns] Error creating pattern:", error);
     res.status(500).json({ error: "Failed to create pattern" });
   }
 });
-router35.put("/patterns/:id", async (req, res) => {
+router36.put("/patterns/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(learnedPatterns).where(eq49(learnedPatterns.id, id)).limit(1);
@@ -28638,14 +27929,14 @@ router35.put("/patterns/:id", async (req, res) => {
     console.log(`[LearningPatterns] Updated pattern ${id}`);
     res.json(updated);
   } catch (error) {
-    if (error instanceof z13.ZodError) {
+    if (error instanceof z14.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
     console.error("[LearningPatterns] Error updating pattern:", error);
     res.status(500).json({ error: "Failed to update pattern" });
   }
 });
-router35.delete("/patterns/:id", async (req, res) => {
+router36.delete("/patterns/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
@@ -28666,7 +27957,7 @@ router35.delete("/patterns/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete pattern" });
   }
 });
-router35.post("/reset-minister/:id", async (req, res) => {
+router36.post("/reset-minister/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
@@ -28683,7 +27974,7 @@ router35.post("/reset-minister/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to reset minister patterns" });
   }
 });
-router35.get("/stats", async (req, res) => {
+router36.get("/stats", async (req, res) => {
   try {
     const allPatterns = await db.select().from(learnedPatterns).where(eq49(learnedPatterns.isActive, true));
     const byType = {};
@@ -28713,18 +28004,18 @@ router35.get("/stats", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch learning stats" });
   }
 });
-var learningPatterns_default = router35;
+var learningPatterns_default = router36;
 
 // server/routes/users.ts
 await init_storage();
-import { Router as Router36 } from "express";
+import { Router as Router37 } from "express";
 import crypto2 from "crypto";
 init_roles();
 
 // server/utils/routeHelpers.ts
 init_logger();
 init_roles();
-import { z as z14 } from "zod";
+import { z as z15 } from "zod";
 function stripHeavyFields(user) {
   const { imageData, imageContentType, passwordHash, ...rest } = user;
   return rest;
@@ -28747,7 +28038,7 @@ function sanitizeUserData(user, requestingUserRole) {
   return sanitizedUser;
 }
 function handleApiError(error, operation) {
-  if (error instanceof z14.ZodError) {
+  if (error instanceof z15.ZodError) {
     return {
       status: 400,
       message: `Dados inv\xE1lidos para ${operation}`,
@@ -28789,10 +28080,10 @@ function handleApiError(error, operation) {
 // server/routes/users.ts
 init_schema();
 await init_db();
-import { z as z15 } from "zod";
+import { z as z16 } from "zod";
 import { eq as eq50, count as count12, or as or13 } from "drizzle-orm";
-var router36 = Router36();
-router36.get("/api/users/active", authenticateToken, async (req, res) => {
+var router37 = Router37();
+router37.get("/api/users/active", authenticateToken, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
@@ -28806,7 +28097,7 @@ router36.get("/api/users/active", authenticateToken, async (req, res) => {
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.get("/api/users/pending", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router37.get("/api/users/pending", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
@@ -28820,7 +28111,7 @@ router36.get("/api/users/pending", authenticateToken, requireRole(["gestor", "co
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.get("/api/users", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router37.get("/api/users", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     res.set({
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -28841,7 +28132,7 @@ router36.get("/api/users", authenticateToken, requireRole(["gestor", "coordenado
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.get("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router37.get("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const user = await storage.getUser(req.params.id);
     if (!user) {
@@ -28853,7 +28144,7 @@ router36.get("/api/users/:id", authenticateToken, requireRole(["gestor", "coorde
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.get("/api/users/:id/photo", authenticateToken, async (req, res) => {
+router37.get("/api/users/:id/photo", authenticateToken, async (req, res) => {
   try {
     const userId = req.params.id;
     const [user] = await db.select({
@@ -28881,7 +28172,7 @@ router36.get("/api/users/:id/photo", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to load photo" });
   }
 });
-router36.post("/api/users", authenticateToken, requireRole(["gestor"]), csrfProtection, async (req, res) => {
+router37.post("/api/users", authenticateToken, requireRole(["gestor"]), csrfProtection, async (req, res) => {
   try {
     const userData = insertUserSchema.parse(req.body);
     const safeUserData = {
@@ -28898,7 +28189,7 @@ router36.post("/api/users", authenticateToken, requireRole(["gestor"]), csrfProt
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router37.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const userData = insertUserSchema.partial().parse(req.body);
     const { role, status, ...safeUserData } = userData;
@@ -28909,10 +28200,10 @@ router36.put("/api/users/:id", authenticateToken, requireRole(["gestor", "coorde
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router37.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
-    const statusUpdateSchema = z15.object({
-      status: z15.enum(["active", "inactive", "pending"], {
+    const statusUpdateSchema = z16.object({
+      status: z16.enum(["active", "inactive", "pending"], {
         errorMap: () => ({ message: "Status deve ser: active, inactive ou pending" })
       })
     });
@@ -28936,7 +28227,7 @@ router36.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor"
     }
     res.json(user);
   } catch (error) {
-    if (error instanceof z15.ZodError) {
+    if (error instanceof z16.ZodError) {
       return res.status(400).json({
         message: "Dados inv\xE1lidos",
         errors: error.errors
@@ -28946,10 +28237,10 @@ router36.patch("/api/users/:id/status", authenticateToken, requireRole(["gestor"
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router37.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
-    const roleUpdateSchema = z15.object({
-      role: z15.enum(["gestor", "reitor", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "ministro"], {
+    const roleUpdateSchema = z16.object({
+      role: z16.enum(["gestor", "reitor", "coordenador", "coordenador_comunidade", "coordenador_paroquial", "ministro"], {
         errorMap: () => ({ message: "Papel deve ser: gestor, reitor, coordenador (comunidade/paroquial) ou ministro" })
       })
     });
@@ -28982,7 +28273,7 @@ router36.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", 
     }
     res.json(user);
   } catch (error) {
-    if (error instanceof z15.ZodError) {
+    if (error instanceof z16.ZodError) {
       return res.status(400).json({
         message: "Dados inv\xE1lidos",
         errors: error.errors
@@ -28992,7 +28283,7 @@ router36.patch("/api/users/:id/role", authenticateToken, requireRole(["gestor", 
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router37.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     if (req.user?.id === req.params.id) {
       return res.status(400).json({ message: "N\xE3o \xE9 poss\xEDvel bloquear sua pr\xF3pria conta" });
@@ -29015,7 +28306,7 @@ router36.patch("/api/users/:id/block", authenticateToken, requireRole(["gestor",
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router36.get("/api/users/:id/check-usage", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
+router37.get("/api/users/:id/check-usage", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
   try {
     const userId = req.params.id;
     const user = await storage.getUser(userId);
@@ -29032,7 +28323,7 @@ router36.get("/api/users/:id/check-usage", authenticateToken, requireRole(["gest
     res.status(500).json({ message: "Erro ao verificar uso do usu\xE1rio" });
   }
 });
-router36.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router37.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const userId = req.params.id;
     const currentUser = req.user;
@@ -29158,23 +28449,23 @@ router36.delete("/api/users/:id", authenticateToken, requireRole(["gestor", "coo
     });
   }
 });
-var users_default = router36;
+var users_default = router37;
 
 // server/routes/health.ts
 await init_storage();
-import { Router as Router37 } from "express";
+import { Router as Router38 } from "express";
 init_schema();
 await init_db();
 import { eq as eq51, count as count13, or as or14 } from "drizzle-orm";
 
 // server/services/healthService.ts
 await init_db();
-import { sql as sql27 } from "drizzle-orm";
+import { sql as sql28 } from "drizzle-orm";
 function getErrorMessage13(error) {
   return error instanceof Error ? error.message : "Unknown error";
 }
 async function checkDatabaseConnection() {
-  const healthQuery = sql27`SELECT 1 AS ready`;
+  const healthQuery = sql28`SELECT 1 AS ready`;
   const database = db;
   if (typeof database.execute === "function") {
     await database.execute(healthQuery);
@@ -29234,22 +28525,22 @@ async function getHealthStatus(options = {}) {
 }
 
 // server/routes/health.ts
-var router37 = Router37();
-router37.get("/api/health", async (_req, res) => {
+var router38 = Router38();
+router38.get("/api/health", async (_req, res) => {
   res.status(200).json(await getHealthStatus());
 });
-router37.head("/api/health", (_req, res) => {
+router38.head("/api/health", (_req, res) => {
   res.status(200).end();
 });
-router37.get("/api/health/ready", async (_req, res) => {
+router38.get("/api/health/ready", async (_req, res) => {
   const health = await getHealthStatus({ includeDatabase: true });
   res.status(health.status === "ok" ? 200 : 503).json(health);
 });
-router37.head("/api/health/ready", async (_req, res) => {
+router38.head("/api/health/ready", async (_req, res) => {
   const health = await getHealthStatus({ includeDatabase: true });
   res.status(health.status === "ok" ? 200 : 503).end();
 });
-router37.get("/api/diagnostic/:userId", authenticateToken, requireRole(["gestor"]), async (req, res) => {
+router38.get("/api/diagnostic/:userId", authenticateToken, requireRole(["gestor"]), async (req, res) => {
   try {
     const userId = req.params.userId;
     const diagnostics = {
@@ -29313,15 +28604,15 @@ router37.get("/api/diagnostic/:userId", authenticateToken, requireRole(["gestor"
     res.status(500).json({ error: `Diagnostic failed: ${error}` });
   }
 });
-var health_default = router37;
+var health_default = router38;
 
 // server/routes/mass-times.ts
 await init_storage();
-import { Router as Router38 } from "express";
+import { Router as Router39 } from "express";
 init_schema();
-import { z as z16 } from "zod";
-var router38 = Router38();
-router38.get("/api/mass-times", authenticateToken, async (req, res) => {
+import { z as z17 } from "zod";
+var router39 = Router39();
+router39.get("/api/mass-times", authenticateToken, async (req, res) => {
   try {
     const massTimes = await storage.getMassTimes();
     res.json(massTimes);
@@ -29330,33 +28621,33 @@ router38.get("/api/mass-times", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch mass times" });
   }
 });
-router38.post("/api/mass-times", authenticateToken, csrfProtection, async (req, res) => {
+router39.post("/api/mass-times", authenticateToken, csrfProtection, async (req, res) => {
   try {
     const massTimeData = insertMassTimeSchema.parse(req.body);
     const massTime = await storage.createMassTime(massTimeData);
     res.status(201).json(massTime);
   } catch (error) {
     console.error("Error creating mass time:", error);
-    if (error instanceof z16.ZodError) {
+    if (error instanceof z17.ZodError) {
       return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
     }
     res.status(500).json({ message: "Failed to create mass time" });
   }
 });
-router38.put("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
+router39.put("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
   try {
     const massTimeData = insertMassTimeSchema.partial().parse(req.body);
     const massTime = await storage.updateMassTime(req.params.id, massTimeData);
     res.json(massTime);
   } catch (error) {
     console.error("Error updating mass time:", error);
-    if (error instanceof z16.ZodError) {
+    if (error instanceof z17.ZodError) {
       return res.status(400).json({ message: "Invalid mass time data", errors: error.errors });
     }
     res.status(500).json({ message: "Failed to update mass time" });
   }
 });
-router38.delete("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
+router39.delete("/api/mass-times/:id", authenticateToken, csrfProtection, async (req, res) => {
   try {
     await storage.deleteMassTime(req.params.id);
     res.status(204).send();
@@ -29365,18 +28656,19 @@ router38.delete("/api/mass-times/:id", authenticateToken, csrfProtection, async 
     res.status(500).json({ message: "Failed to delete mass time" });
   }
 });
-var mass_times_default = router38;
+var mass_times_default = router39;
 
 // server/routes/formation.ts
 await init_storage();
-import { Router as Router39 } from "express";
+import { Router as Router40 } from "express";
 init_schema();
-import { z as z17 } from "zod";
+init_mescFormationContent();
+import { z as z18 } from "zod";
 
 // server/services/formationService.ts
 await init_db();
 import { randomUUID as randomUUID4 } from "node:crypto";
-import { sql as sql28 } from "drizzle-orm";
+import { sql as sql29 } from "drizzle-orm";
 var parseRows = (result) => {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -29385,12 +28677,35 @@ var parseRows = (result) => {
   }
   return [];
 };
-var parseProgressNotes = (notes) => {
-  if (!notes) {
+var parseCompletedSections = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter((section) => typeof section === "string");
+  }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      return parseCompletedSections(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+var parseProgressMeta = (progressRow) => {
+  if (!progressRow) {
+    return { completedSections: [], progressPercentage: 0 };
+  }
+  const completedSections = parseCompletedSections(progressRow.completedSections);
+  if (completedSections.length > 0 || typeof progressRow.progressPercentage === "number") {
+    return {
+      completedSections,
+      progressPercentage: progressRow.progressPercentage ?? 0
+    };
+  }
+  if (!progressRow.notes) {
     return { completedSections: [], progressPercentage: 0 };
   }
   try {
-    const parsed = JSON.parse(notes);
+    const parsed = JSON.parse(progressRow.notes);
     return {
       completedSections: Array.isArray(parsed?.completedSections) ? parsed.completedSections : [],
       progressPercentage: typeof parsed?.progressPercentage === "number" ? parsed.progressPercentage : 0
@@ -29399,10 +28714,6 @@ var parseProgressNotes = (notes) => {
     return { completedSections: [], progressPercentage: 0 };
   }
 };
-var serializeProgressNotes = (data) => JSON.stringify({
-  completedSections: data.completedSections,
-  progressPercentage: data.progressPercentage
-});
 var buildLessonProgressView = (lesson, progressRow, totalSections) => {
   if (!progressRow) {
     return {
@@ -29412,7 +28723,7 @@ var buildLessonProgressView = (lesson, progressRow, totalSections) => {
       completedSections: []
     };
   }
-  const meta = parseProgressNotes(progressRow.notes);
+  const meta = parseProgressMeta(progressRow);
   const isCompleted = Boolean(progressRow.isCompleted);
   const timeSpent = progressRow.timeSpent ?? 0;
   let progressPercentage = meta.progressPercentage ?? 0;
@@ -29453,7 +28764,7 @@ var groupBy = (items, extractKey) => {
 };
 async function getFormationOverview(userId) {
   const [tracksResult, modulesResult, lessonsResult, progressResult] = await Promise.all([
-    db.execute(sql28`
+    db.execute(sql29`
       SELECT
         id,
         title,
@@ -29467,9 +28778,10 @@ async function getFormationOverview(userId) {
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM formation_tracks
+      WHERE COALESCE(is_active, true) = true
       ORDER BY COALESCE(order_index, 0), title
     `),
-    db.execute(sql28`
+    db.execute(sql29`
       SELECT
         id,
         track_id AS "trackId",
@@ -29484,7 +28796,7 @@ async function getFormationOverview(userId) {
       FROM formation_modules
       ORDER BY track_id, COALESCE(order_index, 0), title
     `),
-    db.execute(sql28`
+    db.execute(sql29`
       SELECT
         id,
         module_id AS "moduleId",
@@ -29499,16 +28811,20 @@ async function getFormationOverview(userId) {
         '' AS "videoUrl",
         '' AS "documentUrl"
       FROM formation_lessons
+      WHERE COALESCE(is_active, true) = true
       ORDER BY module_id, lesson_number
     `),
-    userId ? db.execute(sql28`
+    userId ? db.execute(sql29`
           SELECT
             id,
             user_id AS "userId",
             lesson_id AS "lessonId",
+            status,
             CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
             completed_at AS "completedAt",
             time_spent_minutes AS "timeSpent",
+            progress_percentage AS "progressPercentage",
+            completed_sections AS "completedSections",
             0 AS "quizScore",
             '' AS notes
           FROM formation_lesson_progress
@@ -29603,7 +28919,7 @@ async function getFormationOverview(userId) {
 }
 async function getLessonDetail(params) {
   const { userId, trackId, moduleId, lessonNumber } = params;
-  const lessonResult = await db.execute(sql28`
+  const lessonResult = await db.execute(sql29`
     SELECT
       id,
       module_id AS "moduleId",
@@ -29618,14 +28934,16 @@ async function getLessonDetail(params) {
       '' AS "videoUrl",
       '' AS "documentUrl"
     FROM formation_lessons
-    WHERE module_id = ${moduleId} AND lesson_number = ${lessonNumber}
+    WHERE module_id = ${moduleId}
+      AND lesson_number = ${lessonNumber}
+      AND COALESCE(is_active, true) = true
     LIMIT 1
   `);
   const lessonRow = parseRows(lessonResult)[0];
   if (!lessonRow) {
     return null;
   }
-  const sectionsResult = await db.execute(sql28`
+  const sectionsResult = await db.execute(sql29`
     SELECT
       id,
       lesson_id AS "lessonId",
@@ -29664,14 +28982,17 @@ async function getLessonDetail(params) {
     completedSections: []
   };
   if (userId) {
-    const progressResult = await db.execute(sql28`
+    const progressResult = await db.execute(sql29`
       SELECT
         id,
         user_id AS "userId",
         lesson_id AS "lessonId",
+        status,
         CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
         completed_at AS "completedAt",
         time_spent_minutes AS "timeSpent",
+        progress_percentage AS "progressPercentage",
+        completed_sections AS "completedSections",
         0 AS "quizScore",
         '' AS notes
       FROM formation_lesson_progress
@@ -29700,24 +29021,27 @@ async function getLessonDetail(params) {
   };
 }
 async function ensureLessonProgressRecord(userId, lessonId) {
-  const result = await db.execute(sql28`
+  const result = await db.execute(sql29`
     SELECT
-      id,
-      user_id AS "userId",
-      lesson_id AS "lessonId",
-      CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
-      completed_at AS "completedAt",
-      time_spent_minutes AS "timeSpent",
-      0 AS "quizScore",
-      '' AS notes
-    FROM formation_lesson_progress
-    WHERE user_id = ${userId} AND lesson_id = ${lessonId}
-    LIMIT 1
+    id,
+    user_id AS "userId",
+    lesson_id AS "lessonId",
+    status,
+    CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+    completed_at AS "completedAt",
+    time_spent_minutes AS "timeSpent",
+    progress_percentage AS "progressPercentage",
+    completed_sections AS "completedSections",
+    0 AS "quizScore",
+    '' AS notes
+  FROM formation_lesson_progress
+  WHERE user_id = ${userId} AND lesson_id = ${lessonId}
+  LIMIT 1
   `);
   return parseRows(result)[0] ?? null;
 }
 async function countLessonSections(lessonId) {
-  const result = await db.execute(sql28`
+  const result = await db.execute(sql29`
     SELECT COUNT(*)::integer AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
@@ -29728,49 +29052,54 @@ async function countLessonSections(lessonId) {
 async function markLessonSectionCompleted(params) {
   const { userId, lessonId, sectionId } = params;
   const existing = await ensureLessonProgressRecord(userId, lessonId);
-  const meta = parseProgressNotes(existing?.notes);
+  const meta = parseProgressMeta(existing);
   if (!meta.completedSections.includes(sectionId)) {
     meta.completedSections.push(sectionId);
   }
   const totalSections = await countLessonSections(lessonId);
   if (totalSections > 0) {
-    meta.progressPercentage = Math.min(99, Math.round(meta.completedSections.length / totalSections * 100));
+    meta.progressPercentage = Math.min(100, Math.round(meta.completedSections.length / totalSections * 100));
   }
-  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const now = /* @__PURE__ */ new Date();
+  const status = meta.progressPercentage >= 100 ? "completed" : "in_progress";
+  const completedAt = status === "completed" ? now : existing?.completedAt ?? null;
   if (existing) {
-    await db.execute(sql28`
+    await db.execute(sql29`
       UPDATE formation_lesson_progress
       SET
-        "isCompleted" = ${existing.isCompleted},
-        "completedAt" = ${existing.completedAt},
-        "timeSpent" = COALESCE("timeSpent", 0) + 1,
-        "quizScore" = "quizScore",
-        notes = ${serializeProgressNotes(meta)},
-        "updatedAt" = ${now}
+        status = ${status},
+        progress_percentage = ${meta.progressPercentage},
+        completed_sections = ${JSON.stringify(meta.completedSections)}::jsonb,
+        time_spent_minutes = COALESCE(time_spent_minutes, 0) + 1,
+        last_accessed_at = ${now},
+        completed_at = ${completedAt},
+        updated_at = ${now}
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql28`
+    await db.execute(sql29`
       INSERT INTO formation_lesson_progress (
         id,
-        "userId",
-        "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes,
-        "createdAt",
-        "updatedAt"
+        user_id,
+        lesson_id,
+        status,
+        progress_percentage,
+        time_spent_minutes,
+        completed_sections,
+        last_accessed_at,
+        completed_at,
+        created_at,
+        updated_at
       ) VALUES (
         ${randomUUID4()},
         ${userId},
         ${lessonId},
-        ${false},
-        ${null},
+        ${status},
+        ${meta.progressPercentage},
         ${1},
-        ${null},
-        ${serializeProgressNotes(meta)},
+        ${JSON.stringify(meta.completedSections)}::jsonb,
+        ${now},
+        ${completedAt},
         ${now},
         ${now}
       )
@@ -29798,11 +29127,14 @@ async function markLessonSectionCompleted(params) {
       id: existing?.id ?? "",
       userId,
       lessonId,
-      isCompleted: false,
-      completedAt: null,
+      status,
+      isCompleted: status === "completed",
+      completedAt: completedAt ? String(completedAt) : null,
       timeSpent: (existing?.timeSpent ?? 0) + 1,
+      progressPercentage: meta.progressPercentage,
+      completedSections: meta.completedSections,
       quizScore: existing?.quizScore ?? null,
-      notes: serializeProgressNotes(meta)
+      notes: null
     },
     totalSections
   );
@@ -29811,52 +29143,57 @@ async function markLessonCompleted(params) {
   const { userId, lessonId } = params;
   const existing = await ensureLessonProgressRecord(userId, lessonId);
   const totalSections = await countLessonSections(lessonId);
+  const sectionRows = totalSections > 0 ? parseRows(
+    await db.execute(sql29`
+          SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
+        `)
+  ) : [];
   const meta = {
     completedSections: Array.from(
       /* @__PURE__ */ new Set([
-        ...existing ? parseProgressNotes(existing.notes).completedSections : [],
-        ...totalSections > 0 ? (await db.execute(sql28`
-                SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
-              `)).rows.map((row) => row.id).filter((id) => typeof id === "string") : []
+        ...parseProgressMeta(existing).completedSections,
+        ...sectionRows.map((row) => row.id).filter((id) => typeof id === "string")
       ])
     ),
     progressPercentage: 100
   };
-  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const now = /* @__PURE__ */ new Date();
   if (existing) {
-    await db.execute(sql28`
+    await db.execute(sql29`
       UPDATE formation_lesson_progress
       SET
-        "isCompleted" = ${true},
-        "completedAt" = ${now},
-        "timeSpent" = COALESCE("timeSpent", 0),
-        "quizScore" = "quizScore",
-        notes = ${serializeProgressNotes(meta)},
-        "updatedAt" = ${now}
+        status = 'completed',
+        progress_percentage = 100,
+        completed_sections = ${JSON.stringify(meta.completedSections)}::jsonb,
+        last_accessed_at = ${now},
+        completed_at = COALESCE(completed_at, ${now}),
+        updated_at = ${now}
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql28`
+    await db.execute(sql29`
       INSERT INTO formation_lesson_progress (
         id,
-        "userId",
-        "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes,
-        "createdAt",
-        "updatedAt"
+        user_id,
+        lesson_id,
+        status,
+        progress_percentage,
+        time_spent_minutes,
+        completed_sections,
+        last_accessed_at,
+        completed_at,
+        created_at,
+        updated_at
       ) VALUES (
         ${randomUUID4()},
         ${userId},
         ${lessonId},
-        ${true},
-        ${now},
+        'completed',
+        ${100},
         ${0},
-        ${null},
-        ${serializeProgressNotes(meta)},
+        ${JSON.stringify(meta.completedSections)}::jsonb,
+        ${now},
+        ${now},
         ${now},
         ${now}
       )
@@ -29872,7 +29209,7 @@ async function markLessonCompleted(params) {
 async function upsertLessonProgressEntry(params) {
   const { userId, lessonId, isCompleted, timeSpent, progressPercentage, completedSections, quizScore, notes } = params;
   const existing = await ensureLessonProgressRecord(userId, lessonId);
-  const meta = parseProgressNotes(existing?.notes);
+  const meta = parseProgressMeta(existing);
   if (Array.isArray(completedSections)) {
     meta.completedSections = Array.from(new Set(completedSections));
   }
@@ -29891,53 +29228,58 @@ async function upsertLessonProgressEntry(params) {
     } catch {
     }
   }
-  const finalIsCompleted = isCompleted ?? existing?.isCompleted ?? false;
+  const finalIsCompleted = Boolean(isCompleted ?? existing?.isCompleted ?? false);
   if (finalIsCompleted) {
     meta.progressPercentage = 100;
   }
-  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const now = /* @__PURE__ */ new Date();
+  const status = finalIsCompleted ? "completed" : meta.progressPercentage > 0 ? "in_progress" : "not_started";
   const payload = {
-    isCompleted: finalIsCompleted,
+    status,
     completedAt: finalIsCompleted ? now : existing?.completedAt ?? null,
     timeSpent: timeSpent ?? existing?.timeSpent ?? 0,
     quizScore: quizScore ?? existing?.quizScore ?? null,
-    notes: serializeProgressNotes(meta),
+    progressPercentage: meta.progressPercentage,
+    completedSections: meta.completedSections,
     updatedAt: now
   };
   if (existing) {
-    await db.execute(sql28`
+    await db.execute(sql29`
       UPDATE formation_lesson_progress
       SET
-        "isCompleted" = ${payload.isCompleted},
-        "completedAt" = ${payload.completedAt},
-        "timeSpent" = ${payload.timeSpent},
-        "quizScore" = ${payload.quizScore},
-        notes = ${payload.notes},
-        "updatedAt" = ${payload.updatedAt}
+        status = ${payload.status},
+        progress_percentage = ${payload.progressPercentage},
+        time_spent_minutes = ${payload.timeSpent},
+        completed_sections = ${JSON.stringify(payload.completedSections)}::jsonb,
+        last_accessed_at = ${now},
+        completed_at = ${payload.completedAt},
+        updated_at = ${payload.updatedAt}
       WHERE id = ${existing.id}
     `);
   } else {
-    await db.execute(sql28`
+    await db.execute(sql29`
       INSERT INTO formation_lesson_progress (
         id,
-        "userId",
-        "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes,
-        "createdAt",
-        "updatedAt"
+        user_id,
+        lesson_id,
+        status,
+        progress_percentage,
+        time_spent_minutes,
+        completed_sections,
+        last_accessed_at,
+        completed_at,
+        created_at,
+        updated_at
       ) VALUES (
         ${randomUUID4()},
         ${userId},
         ${lessonId},
-        ${payload.isCompleted},
-        ${payload.completedAt},
+        ${payload.status},
+        ${payload.progressPercentage},
         ${payload.timeSpent},
-        ${payload.quizScore},
-        ${payload.notes},
+        ${JSON.stringify(payload.completedSections)}::jsonb,
+        ${now},
+        ${payload.completedAt},
         ${now},
         ${now}
       )
@@ -29962,24 +29304,30 @@ async function upsertLessonProgressEntry(params) {
       id: existing?.id ?? "",
       userId,
       lessonId,
-      isCompleted: payload.isCompleted ? 1 : 0,
-      completedAt: payload.completedAt,
+      status: payload.status,
+      isCompleted: payload.status === "completed" ? 1 : 0,
+      completedAt: payload.completedAt ? String(payload.completedAt) : null,
       timeSpent: payload.timeSpent,
+      progressPercentage: payload.progressPercentage,
+      completedSections: payload.completedSections,
       quizScore: payload.quizScore,
-      notes: payload.notes
+      notes: null
     }
   );
 }
 async function listLessonProgressEntries(params) {
   const { userId, trackId } = params;
-  const query = trackId ? sql28`
+  const query = trackId ? sql29`
         SELECT
           p.id,
           p.user_id AS "userId",
           p.lesson_id AS "lessonId",
+          p.status,
           CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
           p.completed_at AS "completedAt",
           p.time_spent_minutes AS "timeSpent",
+          p.progress_percentage AS "progressPercentage",
+          p.completed_sections AS "completedSections",
           0 AS "quizScore",
           '' AS notes,
           l.duration_minutes AS "lessonEstimatedDuration",
@@ -29990,14 +29338,17 @@ async function listLessonProgressEntries(params) {
         INNER JOIN formation_lessons l ON l.id = p.lesson_id
         WHERE p.user_id = ${userId} AND l.track_id = ${trackId}
         ORDER BY p.updated_at DESC
-      ` : sql28`
+      ` : sql29`
         SELECT
           p.id,
           p.user_id AS "userId",
           p.lesson_id AS "lessonId",
+          p.status,
           CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
           p.completed_at AS "completedAt",
           p.time_spent_minutes AS "timeSpent",
+          p.progress_percentage AS "progressPercentage",
+          p.completed_sections AS "completedSections",
           0 AS "quizScore",
           '' AS notes,
           l.duration_minutes AS "lessonEstimatedDuration",
@@ -30034,17 +29385,17 @@ async function listLessonProgressEntries(params) {
 }
 
 // server/routes/formation.ts
-var formationProgressUpdateSchema = z17.object({
-  lessonId: z17.string(),
-  isCompleted: z17.boolean().optional(),
-  timeSpent: z17.number().int().min(0).optional(),
-  progressPercentage: z17.number().min(0).max(100).optional(),
-  completedSections: z17.array(z17.string()).optional(),
-  quizScore: z17.number().optional(),
-  notes: z17.string().optional()
+var formationProgressUpdateSchema = z18.object({
+  lessonId: z18.string(),
+  isCompleted: z18.boolean().optional(),
+  timeSpent: z18.number().int().min(0).optional(),
+  progressPercentage: z18.number().min(0).max(100).optional(),
+  completedSections: z18.array(z18.string()).optional(),
+  quizScore: z18.number().optional(),
+  notes: z18.string().optional()
 });
-var router39 = Router39();
-router39.get("/api/formation/overview", authenticateToken, async (req, res) => {
+var router40 = Router40();
+router40.get("/api/formation/overview", authenticateToken, async (req, res) => {
   try {
     const overview = await getFormationOverview(req.user?.id);
     res.json(overview);
@@ -30053,7 +29404,16 @@ router39.get("/api/formation/overview", authenticateToken, async (req, res) => {
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/tracks", authenticateToken, async (req, res) => {
+router40.get("/api/formation/material", authenticateToken, async (_req, res) => {
+  try {
+    const content = await loadMescFormationContent();
+    res.json(buildMescFormationMaterialResponse(content));
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar material oficial de forma\xE7\xE3o");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+router40.get("/api/formation/tracks", authenticateToken, async (req, res) => {
   try {
     const tracks = await storage.getFormationTracks();
     res.json(tracks);
@@ -30062,7 +29422,7 @@ router39.get("/api/formation/tracks", authenticateToken, async (req, res) => {
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/tracks/:id", authenticateToken, async (req, res) => {
+router40.get("/api/formation/tracks/:id", authenticateToken, async (req, res) => {
   try {
     const track = await storage.getFormationTrackById(req.params.id);
     if (!track) {
@@ -30074,7 +29434,7 @@ router39.get("/api/formation/tracks/:id", authenticateToken, async (req, res) =>
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/modules/:trackId", authenticateToken, async (req, res) => {
+router40.get("/api/formation/modules/:trackId", authenticateToken, async (req, res) => {
   try {
     const { trackId } = req.params;
     const trackIdMap = {
@@ -30093,7 +29453,7 @@ router39.get("/api/formation/modules/:trackId", authenticateToken, async (req, r
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/lessons", authenticateToken, async (req, res) => {
+router40.get("/api/formation/lessons", authenticateToken, async (req, res) => {
   try {
     const { trackId, moduleId } = req.query;
     const lessons = await storage.getFormationLessons(trackId, moduleId);
@@ -30103,7 +29463,7 @@ router39.get("/api/formation/lessons", authenticateToken, async (req, res) => {
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, async (req, res) => {
+router40.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, async (req, res) => {
   try {
     const { trackId, moduleId } = req.params;
     const lessons = await storage.getFormationLessonsByTrackAndModule(trackId, moduleId);
@@ -30116,7 +29476,7 @@ router39.get("/api/formation/lessons/:trackId/:moduleId", authenticateToken, asy
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/lessons/:id", authenticateToken, async (req, res) => {
+router40.get("/api/formation/lessons/:id", authenticateToken, async (req, res) => {
   try {
     const lesson = await storage.getFormationLessonById(req.params.id);
     if (!lesson) {
@@ -30128,7 +29488,7 @@ router39.get("/api/formation/lessons/:id", authenticateToken, async (req, res) =
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/:trackId/:moduleId/:lessonNumber", authenticateToken, async (req, res) => {
+router40.get("/api/formation/:trackId/:moduleId/:lessonNumber", authenticateToken, async (req, res) => {
   try {
     const { trackId, moduleId, lessonNumber } = req.params;
     const detail = await getLessonDetail({
@@ -30146,7 +29506,7 @@ router39.get("/api/formation/:trackId/:moduleId/:lessonNumber", authenticateToke
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/lessons/:id/sections", authenticateToken, async (req, res) => {
+router40.get("/api/formation/lessons/:id/sections", authenticateToken, async (req, res) => {
   try {
     const sections = await storage.getFormationLessonSections(req.params.id);
     res.json(sections);
@@ -30155,7 +29515,7 @@ router39.get("/api/formation/lessons/:id/sections", authenticateToken, async (re
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.get("/api/formation/progress", authenticateToken, async (req, res) => {
+router40.get("/api/formation/progress", authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -30172,7 +29532,7 @@ router39.get("/api/formation/progress", authenticateToken, async (req, res) => {
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.post("/api/formation/progress", authenticateToken, csrfProtection, async (req, res) => {
+router40.post("/api/formation/progress", authenticateToken, csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -30195,7 +29555,7 @@ router39.post("/api/formation/progress", authenticateToken, csrfProtection, asyn
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, csrfProtection, async (req, res) => {
+router40.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -30213,7 +29573,7 @@ router39.post("/api/formation/lessons/:lessonId/sections/:sectionId/complete", a
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.post("/api/formation/lessons/:lessonId/complete", authenticateToken, csrfProtection, async (req, res) => {
+router40.post("/api/formation/lessons/:lessonId/complete", authenticateToken, csrfProtection, async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -30230,7 +29590,7 @@ router39.post("/api/formation/lessons/:lessonId/complete", authenticateToken, cs
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.post("/api/formation/tracks", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router40.post("/api/formation/tracks", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const trackData = insertFormationTrackSchema.parse(req.body);
     const track = await storage.createFormationTrack(trackData);
@@ -30240,7 +29600,7 @@ router39.post("/api/formation/tracks", authenticateToken, requireRole(["gestor",
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.post("/api/formation/lessons", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router40.post("/api/formation/lessons", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const lessonData = insertFormationLessonSchema.parse(req.body);
     const lesson = await storage.createFormationLesson(lessonData);
@@ -30250,7 +29610,7 @@ router39.post("/api/formation/lessons", authenticateToken, requireRole(["gestor"
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-router39.post("/api/formation/lessons/:id/sections", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
+router40.post("/api/formation/lessons/:id/sections", authenticateToken, requireRole(["gestor", "coordenador"]), csrfProtection, async (req, res) => {
   try {
     const sectionData = insertFormationLessonSectionSchema.parse({
       ...req.body,
@@ -30263,14 +29623,14 @@ router39.post("/api/formation/lessons/:id/sections", authenticateToken, requireR
     res.status(errorResponse.status).json(errorResponse);
   }
 });
-var formation_default = router39;
+var formation_default = router40;
 
 // server/routes/account.ts
 await init_db();
-import { Router as Router40 } from "express";
-import { and as and40, eq as eq52, or as or15 } from "drizzle-orm";
+import { Router as Router41 } from "express";
+import { and as and41, eq as eq52, or as or15 } from "drizzle-orm";
 init_schema();
-var router40 = Router40();
+var router41 = Router41();
 var CONFIRMATION_TEXT = "EXCLUIR MINHA CONTA";
 function clearAuthCookies(res) {
   const cookieOptions = {
@@ -30282,7 +29642,7 @@ function clearAuthCookies(res) {
   res.clearCookie("token", cookieOptions);
   res.clearCookie("session_token", cookieOptions);
 }
-router40.get("/deletion-info", authenticateToken, async (_req, res) => {
+router41.get("/deletion-info", authenticateToken, async (_req, res) => {
   res.json({
     confirmationText: CONFIRMATION_TEXT,
     retainedOperationalData: "Escalas e registros operacionais podem ser preservados sem dados pessoais identific\xE1veis para continuidade pastoral, auditoria e seguran\xE7a.",
@@ -30379,7 +29739,7 @@ async function deleteAccountHandler(req, res) {
       await tx.delete(pointTransactions).where(eq52(pointTransactions.userId, userId));
       await tx.delete(leaderboardCache).where(eq52(leaderboardCache.userId, userId));
       await tx.update(activeSessions).set({ isActive: false }).where(
-        and40(
+        and41(
           eq52(activeSessions.userId, userId),
           eq52(activeSessions.isActive, true)
         )
@@ -30467,16 +29827,16 @@ async function deleteAccountHandler(req, res) {
     });
   }
 }
-router40.delete("/", authenticateToken, deleteAccountHandler);
-var account_default = router40;
+router41.delete("/", authenticateToken, deleteAccountHandler);
+var account_default = router41;
 
 // server/routes/mobile.ts
 init_schema();
 init_roles();
-import { Router as Router41 } from "express";
+import { Router as Router42 } from "express";
 import { randomUUID as randomUUID7 } from "crypto";
-import { z as z18 } from "zod";
-import { and as and43, asc as asc5, count as count14, desc as desc19, eq as eq55, gte as gte23, inArray as inArray20, lte as lte19, ne as ne5, or as or16, sql as sql29 } from "drizzle-orm";
+import { z as z19 } from "zod";
+import { and as and44, asc as asc5, count as count14, desc as desc19, eq as eq55, gte as gte23, inArray as inArray21, lte as lte19, ne as ne5, or as or16, sql as sql30 } from "drizzle-orm";
 
 // shared/mobileDataReadiness.ts
 function hasText(value) {
@@ -30641,7 +30001,7 @@ await init_pushNotifications();
 init_schema();
 await init_db();
 import { createHash, randomUUID as randomUUID5 } from "crypto";
-import { and as and41, eq as eq53, lte as lte18 } from "drizzle-orm";
+import { and as and42, eq as eq53, lte as lte18 } from "drizzle-orm";
 var IDEMPOTENCY_TTL_HOURS = 24;
 var localTablesEnsured = false;
 var MobileIdempotencyError = class extends Error {
@@ -30731,7 +30091,7 @@ async function beginMobileIdempotency(input) {
   await ensureLocalMobileIdempotencyTable();
   const now = /* @__PURE__ */ new Date();
   await db.delete(mobileIdempotencyKeys).where(
-    and41(
+    and42(
       eq53(mobileIdempotencyKeys.userId, input.userId),
       eq53(mobileIdempotencyKeys.idempotencyKey, input.idempotencyKey),
       lte18(mobileIdempotencyKeys.expiresAt, now)
@@ -30760,7 +30120,7 @@ async function beginMobileIdempotency(input) {
     };
   }
   const [existing] = await db.select().from(mobileIdempotencyKeys).where(
-    and41(
+    and42(
       eq53(mobileIdempotencyKeys.userId, input.userId),
       eq53(mobileIdempotencyKeys.idempotencyKey, input.idempotencyKey)
     )
@@ -30807,7 +30167,7 @@ async function releaseMobileIdempotency(recordId) {
 init_schema();
 await init_db();
 import { createHash as createHash2, randomBytes, randomUUID as randomUUID6 } from "crypto";
-import { and as and42, desc as desc18, eq as eq54, isNull as isNull5 } from "drizzle-orm";
+import { and as and43, desc as desc18, eq as eq54, isNull as isNull5 } from "drizzle-orm";
 var REFRESH_TOKEN_PREFIX = "mesc_rt_";
 var REFRESH_TOKEN_BYTES = 48;
 var REFRESH_TOKEN_TTL_DAYS = 30;
@@ -30948,7 +30308,7 @@ async function createOrUpdateMobileDevice(input) {
   const now = /* @__PURE__ */ new Date();
   const deviceId = input.deviceId || createServerDeviceId();
   const platform = normalizeMobilePlatform(input.platform);
-  const [existing] = await db.select().from(mobileDevices).where(and42(eq54(mobileDevices.userId, input.userId), eq54(mobileDevices.deviceId, deviceId))).limit(1);
+  const [existing] = await db.select().from(mobileDevices).where(and43(eq54(mobileDevices.userId, input.userId), eq54(mobileDevices.deviceId, deviceId))).limit(1);
   const devicePatch = {
     platform,
     appVersion: input.appVersion ?? null,
@@ -31035,7 +30395,7 @@ async function createMobileSession(input) {
 async function revokeTokenFamily(tokenFamilyId, userId) {
   const now = /* @__PURE__ */ new Date();
   await db.update(mobileRefreshTokens).set({ revokedAt: now }).where(
-    and42(
+    and43(
       eq54(mobileRefreshTokens.tokenFamilyId, tokenFamilyId),
       userId ? eq54(mobileRefreshTokens.userId, userId) : void 0
     )
@@ -31075,7 +30435,7 @@ async function consumeMobileRefreshToken(input) {
   const now = /* @__PURE__ */ new Date();
   const [claimedToken] = await db.update(mobileRefreshTokens).set({
     rotatedAt: now
-  }).where(and42(
+  }).where(and43(
     eq54(mobileRefreshTokens.id, record.token.id),
     isNull5(mobileRefreshTokens.rotatedAt),
     isNull5(mobileRefreshTokens.revokedAt)
@@ -31112,7 +30472,7 @@ async function revokeMobileDeviceForUser(input) {
     input.deviceDbId ? eq54(mobileDevices.id, input.deviceDbId) : void 0,
     input.deviceId ? eq54(mobileDevices.deviceId, input.deviceId) : void 0
   ];
-  const [device] = await db.select().from(mobileDevices).where(and42(...conditions)).limit(1);
+  const [device] = await db.select().from(mobileDevices).where(and43(...conditions)).limit(1);
   if (!device) return false;
   const now = /* @__PURE__ */ new Date();
   await db.update(mobileDevices).set({ revokedAt: now, updatedAt: now }).where(eq54(mobileDevices.id, device.id));
@@ -31306,97 +30666,117 @@ function buildMissionPendingActions(input) {
 }
 
 // server/routes/mobile.ts
-var router41 = Router41();
-var loginSchema2 = z18.object({
-  email: z18.string().email("Email invalido"),
-  password: z18.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  keepSignedIn: z18.boolean().optional().default(false),
-  deviceId: z18.string().min(8).max(128).optional(),
-  platform: z18.enum(["ios", "android"]).optional(),
-  appVersion: z18.string().max(64).optional()
+var router42 = Router42();
+var loginSchema2 = z19.object({
+  email: z19.string().email("Email invalido"),
+  password: z19.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  keepSignedIn: z19.boolean().optional().default(false),
+  deviceId: z19.string().min(8).max(128).optional(),
+  platform: z19.enum(["ios", "android"]).optional(),
+  appVersion: z19.string().max(64).optional()
 });
-var refreshSchema = z18.object({
-  refreshToken: z18.string().min(32),
-  deviceId: z18.string().min(8).max(128).optional()
+var refreshSchema = z19.object({
+  refreshToken: z19.string().min(32),
+  deviceId: z19.string().min(8).max(128).optional()
 });
-var logoutSchema = z18.object({
-  deviceId: z18.string().min(8).max(128).optional(),
-  deviceDbId: z18.string().uuid().optional()
+var logoutSchema = z19.object({
+  deviceId: z19.string().min(8).max(128).optional(),
+  deviceDbId: z19.string().uuid().optional()
 });
-var deviceSchema = z18.object({
-  deviceId: z18.string().min(8).max(128).optional(),
-  platform: z18.enum(["ios", "android"]).optional(),
-  appVersion: z18.string().max(64).optional(),
-  pushToken: z18.string().nullable().optional(),
-  pushProvider: z18.enum(["apns", "fcm"]).nullable().optional(),
-  pushEnabled: z18.boolean().optional(),
-  biometricCapable: z18.boolean().optional(),
-  biometricEnabled: z18.boolean().optional(),
-  notificationPreferences: z18.record(z18.unknown()).optional()
+var deviceSchema = z19.object({
+  deviceId: z19.string().min(8).max(128).optional(),
+  platform: z19.enum(["ios", "android"]).optional(),
+  appVersion: z19.string().max(64).optional(),
+  pushToken: z19.string().nullable().optional(),
+  pushProvider: z19.enum(["apns", "fcm"]).nullable().optional(),
+  pushEnabled: z19.boolean().optional(),
+  biometricCapable: z19.boolean().optional(),
+  biometricEnabled: z19.boolean().optional(),
+  notificationPreferences: z19.record(z19.unknown()).optional()
 });
-var questionnaireResponseSchema = z18.object({
-  responses: z18.array(z18.object({
-    questionId: z18.string(),
-    answer: z18.union([
-      z18.string(),
-      z18.array(z18.string()),
-      z18.boolean(),
-      z18.object({
-        answer: z18.string(),
-        selectedOptions: z18.array(z18.string()).optional()
+var questionnaireResponseSchema = z19.object({
+  responses: z19.array(z19.object({
+    questionId: z19.string(),
+    answer: z19.union([
+      z19.string(),
+      z19.array(z19.string()),
+      z19.boolean(),
+      z19.object({
+        answer: z19.string(),
+        selectedOptions: z19.array(z19.string()).optional()
       })
     ]),
-    metadata: z18.any().optional()
+    metadata: z19.any().optional()
   })),
-  sharedWithFamilyIds: z18.array(z18.string()).optional()
+  sharedWithFamilyIds: z19.array(z19.string()).optional()
 });
-var substitutionCreateSchema = z18.object({
-  scheduleId: z18.string().uuid(),
-  substituteId: z18.string().optional().nullable(),
-  reason: z18.string().max(1e3).optional().nullable()
+var substitutionCreateSchema = z19.object({
+  scheduleId: z19.string().uuid(),
+  substituteId: z19.string().optional().nullable(),
+  reason: z19.string().max(1e3).optional().nullable()
 });
-var substitutionClaimSchema = z18.object({
-  message: z18.string().max(1e3).optional().nullable()
+var substitutionClaimSchema = z19.object({
+  message: z19.string().max(1e3).optional().nullable()
 });
-var confirmationSchema = z18.object({
-  status: z18.enum(["confirmed", "declined"]).default("confirmed"),
-  declineReason: z18.string().max(1e3).optional().nullable(),
-  notes: z18.string().max(1e3).optional().nullable()
+var confirmationSchema = z19.object({
+  status: z19.enum(["confirmed", "declined"]).default("confirmed"),
+  declineReason: z19.string().max(1e3).optional().nullable(),
+  notes: z19.string().max(1e3).optional().nullable()
 });
-var adminQuestionnaireReminderSchema = z18.object({
-  target: z18.enum(["pending_questionnaire", "data_quality", "pending_or_data_quality"]).optional().default("pending_questionnaire"),
-  dataQualityStatuses: z18.array(z18.enum(["blocked", "needs_attention"])).optional(),
-  ministerIds: z18.array(z18.string()).optional(),
-  message: z18.string().trim().max(1e3).nullable().optional(),
-  dryRun: z18.boolean().optional().default(false)
+function normalizeMobileScheduleTime(time2) {
+  if (!time2) return "";
+  if (/^\d{2}:\d{2}:\d{2}$/.test(time2)) return time2;
+  if (/^\d{2}:\d{2}$/.test(time2)) return `${time2}:00`;
+  if (time2.includes("h")) {
+    const [hours, minutes = "00"] = time2.split("h");
+    return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
+  }
+  return time2;
+}
+function getMondayDateForWeekOfMonth(year, month, mondayOfWeek) {
+  if (mondayOfWeek < 1) return null;
+  const date2 = new Date(Date.UTC(year, month - 1, 1));
+  while (date2.getUTCDay() !== 1) {
+    date2.setUTCDate(date2.getUTCDate() + 1);
+  }
+  date2.setUTCDate(date2.getUTCDate() + (mondayOfWeek - 1) * 7);
+  if (date2.getUTCMonth() !== month - 1) return null;
+  return date2.toISOString().slice(0, 10);
+}
+var adminQuestionnaireReminderSchema = z19.object({
+  target: z19.enum(["pending_questionnaire", "data_quality", "pending_or_data_quality"]).optional().default("pending_questionnaire"),
+  dataQualityStatuses: z19.array(z19.enum(["blocked", "needs_attention"])).optional(),
+  ministerIds: z19.array(z19.string()).optional(),
+  message: z19.string().trim().max(1e3).nullable().optional(),
+  dryRun: z19.boolean().optional().default(false)
 });
-var adminSchedulePreviewSchema = z18.object({
-  month: z18.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional()
+var adminSchedulePreviewSchema = z19.object({
+  month: z19.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional()
 });
-var adminSchedulePublishSchema = z18.object({
-  month: z18.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional(),
-  replaceExisting: z18.boolean().optional().default(false)
+var adminSchedulePublishSchema = z19.object({
+  month: z19.string().regex(/^\d{4}-\d{2}$/, "Use month no formato YYYY-MM").optional(),
+  replaceExisting: z19.boolean().optional().default(false)
 });
-var profileUpdateSchema = z18.object({
-  name: z18.string().min(3).max(255).optional(),
-  phone: z18.string().max(20).nullable().optional(),
-  whatsapp: z18.string().max(20).nullable().optional(),
-  scheduleDisplayName: z18.string().max(100).nullable().optional(),
-  ministryStartDate: z18.string().nullable().optional(),
-  maritalStatus: z18.string().max(20).nullable().optional(),
-  preferredPosition: z18.number().int().min(1).max(30).nullable().optional(),
-  preferredPositions: z18.array(z18.number().int().min(1).max(30)).optional(),
-  avoidPositions: z18.array(z18.number().int().min(1).max(30)).optional(),
-  preferredTimes: z18.array(z18.string()).optional(),
-  availableForSpecialEvents: z18.boolean().optional(),
-  extraActivities: z18.object({
-    sickCommunion: z18.boolean().optional(),
-    mondayAdoration: z18.boolean().optional(),
-    helpOtherPastorals: z18.boolean().optional(),
-    festiveEvents: z18.boolean().optional()
+var profileUpdateSchema = z19.object({
+  name: z19.string().min(3).max(255).optional(),
+  phone: z19.string().max(20).nullable().optional(),
+  whatsapp: z19.string().max(20).nullable().optional(),
+  scheduleDisplayName: z19.string().max(100).nullable().optional(),
+  ministryStartDate: z19.string().nullable().optional(),
+  maritalStatus: z19.string().max(20).nullable().optional(),
+  preferredPosition: z19.number().int().min(1).max(30).nullable().optional(),
+  preferredPositions: z19.array(z19.number().int().min(1).max(30)).optional(),
+  avoidPositions: z19.array(z19.number().int().min(1).max(30)).optional(),
+  preferredTimes: z19.array(z19.string()).optional(),
+  availableForSpecialEvents: z19.boolean().optional(),
+  extraActivities: z19.object({
+    sickCommunion: z19.boolean().optional(),
+    mondayAdoration: z19.boolean().optional(),
+    helpOtherPastorals: z19.boolean().optional(),
+    festiveEvents: z19.boolean().optional()
   }).optional()
 });
-var mobilePlatformSchema = z18.enum(["ios", "android"]).optional();
+var mobilePlatformSchema = z19.enum(["ios", "android"]).optional();
 var MobileHttpError = class extends Error {
   constructor(status, message) {
     super(message);
@@ -31415,7 +30795,7 @@ function dbBoolean2(value) {
   return process.env.DATABASE_URL ? value : value ? 1 : 0;
 }
 function dbCurrentTimestamp() {
-  return sql29`CURRENT_TIMESTAMP`;
+  return sql30`CURRENT_TIMESTAMP`;
 }
 function toValidDate(value) {
   if (!value) return null;
@@ -31443,10 +30823,10 @@ function requireIdempotencyKey(req) {
 }
 async function startMobileMutationIdempotency(input) {
   const idempotencyKey = requireIdempotencyKey(input.req);
-  const path3 = (input.req.originalUrl || `${input.req.baseUrl}${input.req.path}`).split("?")[0];
+  const path4 = (input.req.originalUrl || `${input.req.baseUrl}${input.req.path}`).split("?")[0];
   const requestHash = buildMobileRequestFingerprint({
     method: input.req.method,
-    path: path3,
+    path: path4,
     communityId: input.communityId,
     body: input.body ?? input.req.body ?? null
   });
@@ -31454,7 +30834,7 @@ async function startMobileMutationIdempotency(input) {
     userId: input.userId,
     idempotencyKey,
     method: input.req.method,
-    path: path3,
+    path: path4,
     requestHash
   });
 }
@@ -31487,7 +30867,7 @@ function toIsoMonthFromParts(year, month) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 function questionnaireMonthOrderSql() {
-  return sql29`(${questionnaires.year} * 100 + ${questionnaires.month})`;
+  return sql30`(${questionnaires.year} * 100 + ${questionnaires.month})`;
 }
 async function loadRelevantPublishedQuestionnaires(input) {
   const monthOrder = questionnaireMonthOrderSql();
@@ -31503,7 +30883,7 @@ async function loadRelevantPublishedQuestionnaires(input) {
     targetUserIds: questionnaires.targetUserIds,
     updatedAt: questionnaires.updatedAt
   }).from(questionnaires).where(
-    and43(
+    and44(
       eq55(questionnaires.communityId, input.communityId),
       eq55(questionnaires.status, "published"),
       gte23(monthOrder, questionnaireMonthKey(input.monthRange.year, input.monthRange.month))
@@ -31616,11 +30996,11 @@ async function loadMobileQuestionnaireTargetMinisters(input) {
     canServeAsCouple: users.canServeAsCouple,
     spouseMinisterId: users.spouseMinisterId
   }).from(users).where(
-    and43(
+    and44(
       eq55(users.homeCommunityId, input.communityId),
       eq55(users.status, "active"),
-      inArray20(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
-      targetUserIds.length > 0 ? inArray20(users.id, targetUserIds) : void 0
+      inArray21(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
+      targetUserIds.length > 0 ? inArray21(users.id, targetUserIds) : void 0
     )
   ).orderBy(asc5(users.name));
   return rows.map((minister) => ({
@@ -31645,7 +31025,7 @@ async function loadMobileSubstitutionUsers(rows) {
     name: users.name,
     email: users.email,
     photoUrl: users.photoUrl
-  }).from(users).where(inArray20(users.id, userIds));
+  }).from(users).where(inArray21(users.id, userIds));
   return new Map(people.map((person) => [
     person.id,
     {
@@ -31793,7 +31173,7 @@ async function getAccessibleCommunities(user) {
     parishName: communities.parishName,
     isMatriz: communities.isMatriz
   }).from(communities).where(
-    and43(
+    and44(
       eq55(communities.active, dbBoolean2(true)),
       isParishWide(user.role) ? void 0 : eq55(communities.id, user.homeCommunityId)
     )
@@ -31818,7 +31198,7 @@ async function resolveActiveCommunity(req) {
     parishName: communities.parishName,
     isMatriz: communities.isMatriz
   }).from(communities).where(
-    and43(
+    and44(
       eq55(communities.id, communityScope.activeCommunityId),
       eq55(communities.active, dbBoolean2(true))
     )
@@ -31838,7 +31218,7 @@ function handleMobileError(res, error, fallbackMessage) {
   if (error instanceof MobileIdempotencyError) {
     return res.status(error.status).json({ success: false, message: error.message });
   }
-  if (error instanceof z18.ZodError) {
+  if (error instanceof z19.ZodError) {
     return res.status(400).json({
       success: false,
       message: "Dados invalidos",
@@ -31851,7 +31231,7 @@ function handleMobileError(res, error, fallbackMessage) {
     message: fallbackMessage
   });
 }
-router41.get("/app/config", (req, res) => {
+router42.get("/app/config", (req, res) => {
   const platform = mobilePlatformSchema.safeParse(
     req.query.platform ?? req.headers["x-platform"]
   );
@@ -31877,7 +31257,7 @@ router41.get("/app/config", (req, res) => {
     }
   });
 });
-router41.post("/auth/login", authRateLimiter, async (req, res) => {
+router42.post("/auth/login", authRateLimiter, async (req, res) => {
   let parsed;
   try {
     parsed = loginSchema2.parse(req.body);
@@ -31933,7 +31313,7 @@ router41.post("/auth/login", authRateLimiter, async (req, res) => {
       const message2 = error instanceof Error ? error.message : "Credenciais invalidas";
       await auditLoginAttempt(parsed.email, false, req, message2);
     }
-    if (error instanceof z18.ZodError) {
+    if (error instanceof z19.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Dados invalidos",
@@ -31947,7 +31327,7 @@ router41.post("/auth/login", authRateLimiter, async (req, res) => {
     });
   }
 });
-router41.post("/auth/refresh", authRateLimiter, async (req, res) => {
+router42.post("/auth/refresh", authRateLimiter, async (req, res) => {
   try {
     const parsed = refreshSchema.parse(req.body);
     const refreshed = await consumeMobileRefreshToken({
@@ -31987,7 +31367,7 @@ router41.post("/auth/refresh", authRateLimiter, async (req, res) => {
     return handleMobileError(res, error, "Erro ao renovar sessao mobile");
   }
 });
-router41.post("/auth/biometric-session", authenticateToken, async (req, res) => {
+router42.post("/auth/biometric-session", authenticateToken, async (req, res) => {
   try {
     const parsed = deviceSchema.pick({
       deviceId: true,
@@ -32047,7 +31427,7 @@ router41.post("/auth/biometric-session", authenticateToken, async (req, res) => 
     return handleMobileError(res, error, "Erro ao preparar sessao biometrica");
   }
 });
-router41.post("/auth/logout", authenticateToken, async (req, res) => {
+router42.post("/auth/logout", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32071,7 +31451,7 @@ router41.post("/auth/logout", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao encerrar sessao mobile");
   }
 });
-router41.get("/auth/me", authenticateToken, async (req, res) => {
+router42.get("/auth/me", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32092,7 +31472,7 @@ router41.get("/auth/me", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao buscar usuario mobile");
   }
 });
-router41.get("/devices", authenticateToken, async (req, res) => {
+router42.get("/devices", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32107,7 +31487,7 @@ router41.get("/devices", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao listar dispositivos");
   }
 });
-router41.get("/devices/current", authenticateToken, async (req, res) => {
+router42.get("/devices/current", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32130,7 +31510,7 @@ router41.get("/devices/current", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao consultar dispositivo atual");
   }
 });
-router41.put("/devices/current", authenticateToken, async (req, res) => {
+router42.put("/devices/current", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32161,7 +31541,7 @@ router41.put("/devices/current", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao registrar dispositivo");
   }
 });
-router41.delete("/devices/:id", authenticateToken, async (req, res) => {
+router42.delete("/devices/:id", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32182,7 +31562,7 @@ router41.delete("/devices/:id", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao revogar dispositivo");
   }
 });
-router41.get("/profile", authenticateToken, async (req, res) => {
+router42.get("/profile", authenticateToken, async (req, res) => {
   try {
     const authUser = req.user;
     if (!authUser) {
@@ -32223,7 +31603,7 @@ router41.get("/profile", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar perfil");
   }
 });
-router41.patch("/profile", authenticateToken, async (req, res) => {
+router42.patch("/profile", authenticateToken, async (req, res) => {
   try {
     const authUser = req.user;
     if (!authUser) {
@@ -32298,7 +31678,7 @@ router41.patch("/profile", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao atualizar perfil");
   }
 });
-router41.get("/notifications", authenticateToken, async (req, res) => {
+router42.get("/notifications", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32317,7 +31697,7 @@ router41.get("/notifications", authenticateToken, async (req, res) => {
       actionUrl: notifications.actionUrl,
       createdAt: notifications.createdAt
     }).from(notifications).where(eq55(notifications.userId, user.id)).orderBy(desc19(notifications.createdAt)).limit(limit);
-    const [unread] = await db.select({ total: count14() }).from(notifications).where(and43(eq55(notifications.userId, user.id), eq55(notifications.read, dbBoolean2(false))));
+    const [unread] = await db.select({ total: count14() }).from(notifications).where(and44(eq55(notifications.userId, user.id), eq55(notifications.read, dbBoolean2(false))));
     res.json({
       success: true,
       notifications: rows.map((notification) => ({
@@ -32338,25 +31718,25 @@ router41.get("/notifications", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar notificacoes");
   }
 });
-router41.patch("/notifications/read-all", authenticateToken, async (req, res) => {
+router42.patch("/notifications/read-all", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and43(eq55(notifications.userId, user.id), eq55(notifications.read, dbBoolean2(false))));
+    await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and44(eq55(notifications.userId, user.id), eq55(notifications.read, dbBoolean2(false))));
     res.json({ success: true });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao marcar notificacoes como lidas");
   }
 });
-router41.patch("/notifications/:id/read", authenticateToken, async (req, res) => {
+router42.patch("/notifications/:id/read", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
       throw new MobileHttpError(401, "Usuario nao autenticado");
     }
-    const [notification] = await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and43(eq55(notifications.id, req.params.id), eq55(notifications.userId, user.id))).returning({
+    const [notification] = await db.update(notifications).set({ read: dbBoolean2(true), readAt: dbCurrentTimestamp() }).where(and44(eq55(notifications.id, req.params.id), eq55(notifications.userId, user.id))).returning({
       id: notifications.id,
       read: notifications.read,
       readAt: notifications.readAt
@@ -32376,7 +31756,7 @@ router41.patch("/notifications/:id/read", authenticateToken, async (req, res) =>
     return handleMobileError(res, error, "Erro ao marcar notificacao como lida");
   }
 });
-router41.get("/privacy/account-deletion-info", authenticateToken, (_req, res) => {
+router42.get("/privacy/account-deletion-info", authenticateToken, (_req, res) => {
   res.json({
     success: true,
     confirmationText: "EXCLUIR MINHA CONTA",
@@ -32391,8 +31771,8 @@ router41.get("/privacy/account-deletion-info", authenticateToken, (_req, res) =>
     ]
   });
 });
-router41.delete("/account", authenticateToken, deleteAccountHandler);
-router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
+router42.delete("/account", authenticateToken, deleteAccountHandler);
+router42.get("/questionnaires/current", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32419,7 +31799,7 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
       submittedAt: questionnaireResponses.submittedAt,
       updatedAt: questionnaireResponses.updatedAt
     }).from(questionnaireResponses).where(
-      and43(
+      and44(
         eq55(questionnaireResponses.questionnaireId, questionnaire.id),
         eq55(questionnaireResponses.userId, user.id),
         eq55(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -32451,7 +31831,7 @@ router41.get("/questionnaires/current", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar questionario atual");
   }
 });
-router41.post("/questionnaires/:id/response", authenticateToken, async (req, res) => {
+router42.post("/questionnaires/:id/response", authenticateToken, async (req, res) => {
   let idempotencyRecordId = null;
   try {
     const user = req.user;
@@ -32471,7 +31851,7 @@ router41.post("/questionnaires/:id/response", authenticateToken, async (req, res
     }
     idempotencyRecordId = idempotency.recordId;
     const idempotencyKey = idempotency.idempotencyKey;
-    const [questionnaire] = await db.select().from(questionnaires).where(and43(eq55(questionnaires.id, req.params.id), eq55(questionnaires.communityId, activeCommunity.id))).limit(1);
+    const [questionnaire] = await db.select().from(questionnaires).where(and44(eq55(questionnaires.id, req.params.id), eq55(questionnaires.communityId, activeCommunity.id))).limit(1);
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
@@ -32564,7 +31944,7 @@ router41.post("/questionnaires/:id/response", authenticateToken, async (req, res
     return handleMobileError(res, error, "Erro ao salvar resposta do questionario");
   }
 });
-router41.get("/substitutions", authenticateToken, async (req, res) => {
+router42.get("/substitutions", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32588,7 +31968,7 @@ router41.get("/substitutions", authenticateToken, async (req, res) => {
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
     }).from(substitutionRequests).innerJoin(schedules, eq55(substitutionRequests.scheduleId, schedules.id)).where(
-      and43(
+      and44(
         eq55(substitutionRequests.communityId, activeCommunity.id),
         admin ? void 0 : or16(
           eq55(substitutionRequests.requesterId, user.id),
@@ -32611,7 +31991,7 @@ router41.get("/substitutions", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar substituicoes");
   }
 });
-router41.post("/substitutions", authenticateToken, async (req, res) => {
+router42.post("/substitutions", authenticateToken, async (req, res) => {
   let idempotencyRecordId = null;
   try {
     const user = req.user;
@@ -32631,7 +32011,7 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
     }
     idempotencyRecordId = idempotency.recordId;
     const idempotencyKey = idempotency.idempotencyKey;
-    const [schedule] = await db.select().from(schedules).where(and43(eq55(schedules.id, parsed.scheduleId), eq55(schedules.communityId, activeCommunity.id))).limit(1);
+    const [schedule] = await db.select().from(schedules).where(and44(eq55(schedules.id, parsed.scheduleId), eq55(schedules.communityId, activeCommunity.id))).limit(1);
     if (!schedule) {
       throw new MobileHttpError(404, "Escala nao encontrada");
     }
@@ -32642,10 +32022,10 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
       throw new MobileHttpError(400, "Nao e possivel solicitar substituicao para missa que ja passou");
     }
     const [existingRequest] = await db.select().from(substitutionRequests).where(
-      and43(
+      and44(
         eq55(substitutionRequests.scheduleId, schedule.id),
         eq55(substitutionRequests.requesterId, user.id),
-        inArray20(substitutionRequests.status, ["available", "pending"])
+        inArray21(substitutionRequests.status, ["available", "pending"])
       )
     ).limit(1);
     if (existingRequest) {
@@ -32698,7 +32078,7 @@ router41.post("/substitutions", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao pedir substituicao");
   }
 });
-router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
+router42.get("/substitutions/:id", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32720,7 +32100,7 @@ router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
       scheduleTime: schedules.time,
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
-    }).from(substitutionRequests).innerJoin(schedules, eq55(substitutionRequests.scheduleId, schedules.id)).where(and43(eq55(substitutionRequests.id, req.params.id), eq55(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq55(substitutionRequests.scheduleId, schedules.id)).where(and44(eq55(substitutionRequests.id, req.params.id), eq55(substitutionRequests.communityId, activeCommunity.id))).limit(1);
     if (!row) {
       throw new MobileHttpError(404, "Substituicao nao encontrada");
     }
@@ -32740,7 +32120,7 @@ router41.get("/substitutions/:id", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar substituicao");
   }
 });
-router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) => {
+router42.post("/substitutions/:id/claim", authenticateToken, async (req, res) => {
   let idempotencyRecordId = null;
   try {
     const user = req.user;
@@ -32775,7 +32155,7 @@ router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) =>
       scheduleTime: schedules.time,
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
-    }).from(substitutionRequests).innerJoin(schedules, eq55(substitutionRequests.scheduleId, schedules.id)).where(and43(eq55(substitutionRequests.id, req.params.id), eq55(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+    }).from(substitutionRequests).innerJoin(schedules, eq55(substitutionRequests.scheduleId, schedules.id)).where(and44(eq55(substitutionRequests.id, req.params.id), eq55(substitutionRequests.communityId, activeCommunity.id))).limit(1);
     if (!row) {
       throw new MobileHttpError(404, "Substituicao nao encontrada");
     }
@@ -32790,12 +32170,12 @@ router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) =>
       throw new MobileHttpError(400, "Nao e possivel aceitar substituicao para missa que ja passou");
     }
     const conflictingSchedule = await db.select({ id: schedules.id }).from(schedules).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         eq55(schedules.ministerId, user.id),
         eq55(schedules.date, row.scheduleDate),
         eq55(schedules.time, row.scheduleTime),
-        inArray20(schedules.status, ["scheduled", "published"]),
+        inArray21(schedules.status, ["scheduled", "published"]),
         ne5(schedules.id, row.scheduleId)
       )
     ).limit(1);
@@ -32804,7 +32184,7 @@ router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) =>
     }
     let claimed = row;
     const claimWithClient = async (tx) => {
-      const [currentRequest] = await tx.select().from(substitutionRequests).where(and43(eq55(substitutionRequests.id, row.id), eq55(substitutionRequests.communityId, activeCommunity.id))).limit(1);
+      const [currentRequest] = await tx.select().from(substitutionRequests).where(and44(eq55(substitutionRequests.id, row.id), eq55(substitutionRequests.communityId, activeCommunity.id))).limit(1);
       const stillAvailable = currentRequest && (currentRequest.status === "available" || currentRequest.status === "pending" && !currentRequest.substituteId);
       if (!stillAvailable) {
         throw new MobileHttpError(409, "Esta substituicao ja foi aceita por outro ministro");
@@ -32816,11 +32196,11 @@ router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) =>
         approvedAt: /* @__PURE__ */ new Date(),
         responseMessage: parsed.message || null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(and43(eq55(substitutionRequests.id, row.id), eq55(substitutionRequests.communityId, activeCommunity.id))).returning();
+      }).where(and44(eq55(substitutionRequests.id, row.id), eq55(substitutionRequests.communityId, activeCommunity.id))).returning();
       await tx.update(schedules).set({
         ministerId: user.id,
         substituteId: row.requesterId
-      }).where(and43(eq55(schedules.id, row.scheduleId), eq55(schedules.communityId, activeCommunity.id)));
+      }).where(and44(eq55(schedules.id, row.scheduleId), eq55(schedules.communityId, activeCommunity.id)));
       claimed = {
         ...row,
         substituteId: updated.substituteId,
@@ -32894,7 +32274,7 @@ router41.post("/substitutions/:id/claim", authenticateToken, async (req, res) =>
     return handleMobileError(res, error, "Erro ao aceitar substituicao");
   }
 });
-router41.get("/admin/community/home", authenticateToken, async (req, res) => {
+router42.get("/admin/community/home", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -32919,7 +32299,7 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status
     }).from(schedules).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         eq55(schedules.status, "published"),
         gte23(schedules.date, monthRange.startDate),
@@ -32941,10 +32321,10 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       });
       const targetIds = targetMinisters.map((minister) => minister.id);
       const hasExplicitTarget = targetUserIds.length > 0;
-      const targetFilter = targetIds.length > 0 ? inArray20(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql29`1 = 0` : void 0;
+      const targetFilter = targetIds.length > 0 ? inArray21(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql30`1 = 0` : void 0;
       questionnaireTargetCount = targetMinisters.length;
       const responseRows = await db.select({ userId: questionnaireResponses.userId }).from(questionnaireResponses).where(
-        and43(
+        and44(
           eq55(questionnaireResponses.questionnaireId, currentQuestionnaire.id),
           eq55(questionnaireResponses.communityId, activeCommunity.id),
           eq55(questionnaireResponses.isDeleted, dbBoolean2(false)),
@@ -32969,9 +32349,9 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
       scheduleType: schedules.type,
       scheduleLocation: schedules.location
     }).from(substitutionRequests).innerJoin(schedules, eq55(substitutionRequests.scheduleId, schedules.id)).where(
-      and43(
+      and44(
         eq55(substitutionRequests.communityId, activeCommunity.id),
-        inArray20(substitutionRequests.status, ["available", "pending"])
+        inArray21(substitutionRequests.status, ["available", "pending"])
       )
     ).orderBy(desc19(substitutionRequests.createdAt)).limit(10);
     const coverageMap = /* @__PURE__ */ new Map();
@@ -33027,7 +32407,7 @@ router41.get("/admin/community/home", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar painel da comunidade");
   }
 });
-router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) => {
+router42.get("/admin/schedules/readiness", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -33052,7 +32432,7 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
       targetUserIds: questionnaires.targetUserIds,
       updatedAt: questionnaires.updatedAt
     }).from(questionnaires).where(
-      and43(
+      and44(
         eq55(questionnaires.communityId, activeCommunity.id),
         eq55(questionnaires.month, monthRange.month),
         eq55(questionnaires.year, monthRange.year)
@@ -33069,10 +32449,10 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
       });
       const targetIds = targetMinisters.map((minister) => minister.id);
       const hasExplicitTarget = targetUserIds.length > 0;
-      const targetFilter = targetIds.length > 0 ? inArray20(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql29`1 = 0` : void 0;
+      const targetFilter = targetIds.length > 0 ? inArray21(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql30`1 = 0` : void 0;
       targetCount = targetMinisters.length;
       const responseRows = await db.select({ userId: questionnaireResponses.userId }).from(questionnaireResponses).where(
-        and43(
+        and44(
           eq55(questionnaireResponses.questionnaireId, questionnaire.id),
           eq55(questionnaireResponses.communityId, activeCommunity.id),
           eq55(questionnaireResponses.isDeleted, dbBoolean2(false)),
@@ -33086,7 +32466,7 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
     let massConfigSummary;
     try {
       [massConfigSummary] = await db.select({ configuredSlots: count14() }).from(massTimesConfig).where(
-        and43(
+        and44(
           eq55(massTimesConfig.communityId, activeCommunity.id),
           eq55(massTimesConfig.isActive, dbBoolean2(true))
         )
@@ -33098,7 +32478,7 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
       massConfigSchemaMissing = true;
     }
     const existingScheduleRows = await db.select({ status: schedules.status }).from(schedules).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         gte23(schedules.date, monthRange.startDate),
         lte19(schedules.date, monthRange.endDate)
@@ -33181,7 +32561,7 @@ router41.get("/admin/schedules/readiness", authenticateToken, async (req, res) =
     return handleMobileError(res, error, "Erro ao carregar prontidao da escala");
   }
 });
-router41.post("/admin/schedules/generate-preview", authenticateToken, async (req, res) => {
+router42.post("/admin/schedules/generate-preview", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -33200,7 +32580,7 @@ router41.post("/admin/schedules/generate-preview", authenticateToken, async (req
       year: questionnaires.year,
       status: questionnaires.status
     }).from(questionnaires).where(
-      and43(
+      and44(
         eq55(questionnaires.communityId, activeCommunity.id),
         eq55(questionnaires.month, monthRange.month),
         eq55(questionnaires.year, monthRange.year)
@@ -33210,7 +32590,7 @@ router41.post("/admin/schedules/generate-preview", authenticateToken, async (req
       throw new MobileHttpError(400, "Nenhum questionario encontrado para o mes");
     }
     const [responseSummary] = await db.select({ responses: count14() }).from(questionnaireResponses).where(
-      and43(
+      and44(
         eq55(questionnaireResponses.questionnaireId, questionnaire.id),
         eq55(questionnaireResponses.communityId, activeCommunity.id),
         eq55(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -33220,7 +32600,7 @@ router41.post("/admin/schedules/generate-preview", authenticateToken, async (req
       throw new MobileHttpError(400, "Nenhuma resposta de questionario para o mes");
     }
     const [massConfigSummary] = await db.select({ configuredSlots: count14() }).from(massTimesConfig).where(
-      and43(
+      and44(
         eq55(massTimesConfig.communityId, activeCommunity.id),
         eq55(massTimesConfig.isActive, dbBoolean2(true))
       )
@@ -33259,7 +32639,7 @@ router41.post("/admin/schedules/generate-preview", authenticateToken, async (req
     return handleMobileError(res, error, "Erro ao gerar preview de escala");
   }
 });
-router41.post("/admin/schedules/publish", authenticateToken, async (req, res) => {
+router42.post("/admin/schedules/publish", authenticateToken, async (req, res) => {
   let idempotencyRecordId = null;
   try {
     const user = req.user;
@@ -33294,7 +32674,7 @@ router41.post("/admin/schedules/publish", authenticateToken, async (req, res) =>
       year: questionnaires.year,
       status: questionnaires.status
     }).from(questionnaires).where(
-      and43(
+      and44(
         eq55(questionnaires.communityId, activeCommunity.id),
         eq55(questionnaires.month, monthRange.month),
         eq55(questionnaires.year, monthRange.year)
@@ -33307,7 +32687,7 @@ router41.post("/admin/schedules/publish", authenticateToken, async (req, res) =>
       throw new MobileHttpError(400, "Questionario precisa estar encerrado para publicacao definitiva");
     }
     const [responseSummary] = await db.select({ responses: count14() }).from(questionnaireResponses).where(
-      and43(
+      and44(
         eq55(questionnaireResponses.questionnaireId, questionnaire.id),
         eq55(questionnaireResponses.communityId, activeCommunity.id),
         eq55(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -33317,7 +32697,7 @@ router41.post("/admin/schedules/publish", authenticateToken, async (req, res) =>
       throw new MobileHttpError(400, "Nenhuma resposta de questionario para o mes");
     }
     const [massConfigSummary] = await db.select({ configuredSlots: count14() }).from(massTimesConfig).where(
-      and43(
+      and44(
         eq55(massTimesConfig.communityId, activeCommunity.id),
         eq55(massTimesConfig.isActive, dbBoolean2(true))
       )
@@ -33326,7 +32706,7 @@ router41.post("/admin/schedules/publish", authenticateToken, async (req, res) =>
       throw new MobileHttpError(400, "Nenhuma configuracao de missa ativa para a comunidade");
     }
     const existingScheduleRows = await db.select({ id: schedules.id, status: schedules.status }).from(schedules).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         gte23(schedules.date, monthRange.startDate),
         lte19(schedules.date, monthRange.endDate)
@@ -33369,10 +32749,10 @@ router41.post("/admin/schedules/publish", authenticateToken, async (req, res) =>
     const replaceExistingSchedules = async (executor) => {
       if (!parsed.replaceExisting || existingScheduleRows.length === 0) return;
       const existingScheduleIds = existingScheduleRows.map((row) => row.id);
-      await executor.delete(scheduleConfirmations).where(inArray20(scheduleConfirmations.scheduleId, existingScheduleIds));
-      await executor.delete(substitutionRequests).where(inArray20(substitutionRequests.scheduleId, existingScheduleIds));
+      await executor.delete(scheduleConfirmations).where(inArray21(scheduleConfirmations.scheduleId, existingScheduleIds));
+      await executor.delete(substitutionRequests).where(inArray21(substitutionRequests.scheduleId, existingScheduleIds));
       await executor.delete(schedules).where(
-        and43(
+        and44(
           eq55(schedules.communityId, activeCommunity.id),
           gte23(schedules.date, monthRange.startDate),
           lte19(schedules.date, monthRange.endDate)
@@ -33472,7 +32852,7 @@ router41.post("/admin/schedules/publish", authenticateToken, async (req, res) =>
     return handleMobileError(res, error, "Erro ao publicar escala");
   }
 });
-router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (req, res) => {
+router42.get("/admin/questionnaires/:id/responses", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -33491,7 +32871,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       deadline: questionnaires.deadline,
       questions: questionnaires.questions,
       targetUserIds: questionnaires.targetUserIds
-    }).from(questionnaires).where(and43(eq55(questionnaires.id, req.params.id), eq55(questionnaires.communityId, activeCommunity.id))).limit(1);
+    }).from(questionnaires).where(and44(eq55(questionnaires.id, req.params.id), eq55(questionnaires.communityId, activeCommunity.id))).limit(1);
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
@@ -33502,7 +32882,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
     });
     const targetIds = targetMinisters.map((minister) => minister.id);
     const hasExplicitTarget = targetUserIds.length > 0;
-    const targetFilter = targetIds.length > 0 ? inArray20(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql29`1 = 0` : void 0;
+    const targetFilter = targetIds.length > 0 ? inArray21(questionnaireResponses.userId, targetIds) : hasExplicitTarget ? sql30`1 = 0` : void 0;
     const rows = await db.select({
       responseId: questionnaireResponses.id,
       userId: questionnaireResponses.userId,
@@ -33519,7 +32899,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
       ministerName: users.name,
       ministerPhotoUrl: users.photoUrl
     }).from(questionnaireResponses).innerJoin(users, eq55(questionnaireResponses.userId, users.id)).where(
-      and43(
+      and44(
         eq55(questionnaireResponses.questionnaireId, questionnaire.id),
         eq55(questionnaireResponses.communityId, activeCommunity.id),
         eq55(questionnaireResponses.isDeleted, dbBoolean2(false)),
@@ -33593,7 +32973,7 @@ router41.get("/admin/questionnaires/:id/responses", authenticateToken, async (re
     return handleMobileError(res, error, "Erro ao carregar respostas do questionario");
   }
 });
-router41.post("/admin/questionnaires/:id/reminders", authenticateToken, async (req, res) => {
+router42.post("/admin/questionnaires/:id/reminders", authenticateToken, async (req, res) => {
   let idempotencyRecordId = null;
   try {
     const user = req.user;
@@ -33624,7 +33004,7 @@ router41.post("/admin/questionnaires/:id/reminders", authenticateToken, async (r
       status: questionnaires.status,
       deadline: questionnaires.deadline,
       targetUserIds: questionnaires.targetUserIds
-    }).from(questionnaires).where(and43(eq55(questionnaires.id, req.params.id), eq55(questionnaires.communityId, activeCommunity.id))).limit(1);
+    }).from(questionnaires).where(and44(eq55(questionnaires.id, req.params.id), eq55(questionnaires.communityId, activeCommunity.id))).limit(1);
     if (!questionnaire) {
       throw new MobileHttpError(404, "Questionario nao encontrado");
     }
@@ -33638,11 +33018,11 @@ router41.post("/admin/questionnaires/:id/reminders", authenticateToken, async (r
     const candidateMinisters = requestedMinisterIdSet.size > 0 ? targetMinisters.filter((minister) => requestedMinisterIdSet.has(minister.id)) : targetMinisters;
     const candidateIds = candidateMinisters.map((minister) => minister.id);
     const responseRows = candidateIds.length > 0 ? await db.select({ userId: questionnaireResponses.userId }).from(questionnaireResponses).where(
-      and43(
+      and44(
         eq55(questionnaireResponses.questionnaireId, questionnaire.id),
         eq55(questionnaireResponses.communityId, activeCommunity.id),
         eq55(questionnaireResponses.isDeleted, dbBoolean2(false)),
-        inArray20(questionnaireResponses.userId, candidateIds)
+        inArray21(questionnaireResponses.userId, candidateIds)
       )
     ) : [];
     const respondedUserIds = new Set(responseRows.map((row) => row.userId));
@@ -33737,7 +33117,7 @@ router41.post("/admin/questionnaires/:id/reminders", authenticateToken, async (r
     return handleMobileError(res, error, "Erro ao enviar lembretes do questionario");
   }
 });
-router41.get("/admin/ministers", authenticateToken, async (req, res) => {
+router42.get("/admin/ministers", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -33776,10 +33156,10 @@ router41.get("/admin/ministers", authenticateToken, async (req, res) => {
       canServeAsCouple: users.canServeAsCouple,
       spouseMinisterId: users.spouseMinisterId
     }).from(users).where(
-      and43(
+      and44(
         eq55(users.homeCommunityId, activeCommunity.id),
-        inArray20(users.status, ["active", "pending"]),
-        inArray20(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
+        inArray21(users.status, ["active", "pending"]),
+        inArray21(users.role, DB_MINISTER_AND_COORDINATOR_ROLES)
       )
     ).orderBy(asc5(users.name)).limit(200);
     const ministers = rows.map((minister) => ({
@@ -33815,7 +33195,7 @@ router41.get("/admin/ministers", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar diretorio de ministros");
   }
 });
-router41.get("/mission/home", authenticateToken, async (req, res) => {
+router42.get("/mission/home", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -33837,12 +33217,12 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       confirmationStatus: scheduleConfirmations.status
     }).from(schedules).leftJoin(
       scheduleConfirmations,
-      and43(
+      and44(
         eq55(scheduleConfirmations.scheduleId, schedules.id),
         eq55(scheduleConfirmations.ministerId, user.id)
       )
     ).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         eq55(schedules.ministerId, user.id),
         eq55(schedules.status, "published"),
@@ -33858,7 +33238,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       position: schedules.position,
       status: schedules.status
     }).from(schedules).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         eq55(schedules.ministerId, user.id),
         eq55(schedules.status, "published"),
@@ -33874,7 +33254,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
     let pendingQuestionnaire = null;
     for (const questionnaire of questionnaireCandidates) {
       const [response] = await db.select({ id: questionnaireResponses.id }).from(questionnaireResponses).where(
-        and43(
+        and44(
           eq55(questionnaireResponses.questionnaireId, questionnaire.id),
           eq55(questionnaireResponses.userId, user.id),
           eq55(questionnaireResponses.isDeleted, dbBoolean2(false))
@@ -33891,10 +33271,10 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
       status: substitutionRequests.status,
       updatedAt: substitutionRequests.updatedAt
     }).from(substitutionRequests).where(
-      and43(
+      and44(
         eq55(substitutionRequests.communityId, activeCommunity.id),
         eq55(substitutionRequests.requesterId, user.id),
-        inArray20(substitutionRequests.status, ["available", "pending", "approved"])
+        inArray21(substitutionRequests.status, ["available", "pending", "approved"])
       )
     ).orderBy(desc19(substitutionRequests.updatedAt)).limit(1);
     const notices = await db.select({
@@ -33958,7 +33338,7 @@ router41.get("/mission/home", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar Minha Missao");
   }
 });
-router41.get("/schedules/month", authenticateToken, async (req, res) => {
+router42.get("/schedules/month", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -33978,12 +33358,12 @@ router41.get("/schedules/month", authenticateToken, async (req, res) => {
       confirmationStatus: scheduleConfirmations.status
     }).from(schedules).leftJoin(
       scheduleConfirmations,
-      and43(
+      and44(
         eq55(scheduleConfirmations.scheduleId, schedules.id),
         eq55(scheduleConfirmations.ministerId, user.id)
       )
     ).where(
-      and43(
+      and44(
         eq55(schedules.communityId, activeCommunity.id),
         eq55(schedules.ministerId, user.id),
         eq55(schedules.status, "published"),
@@ -33991,6 +33371,112 @@ router41.get("/schedules/month", authenticateToken, async (req, res) => {
         lte19(schedules.date, monthRange.endDate)
       )
     ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position));
+    const publicRows = await db.select({
+      id: schedules.id,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      position: schedules.position,
+      status: schedules.status,
+      notes: schedules.notes,
+      ministerId: schedules.ministerId,
+      ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName
+    }).from(schedules).leftJoin(users, eq55(schedules.ministerId, users.id)).where(
+      and44(
+        eq55(schedules.communityId, activeCommunity.id),
+        eq55(schedules.status, "published"),
+        gte23(schedules.date, monthRange.startDate),
+        lte19(schedules.date, monthRange.endDate)
+      )
+    ).orderBy(asc5(schedules.date), asc5(schedules.time), asc5(schedules.position), asc5(schedules.id));
+    const publicAssignments = publicRows.map((schedule) => {
+      const isVacant = !schedule.ministerId || schedule.ministerId === "VACANT";
+      const dateOnly = toDateOnly(schedule.date) ?? monthRange.startDate;
+      return {
+        id: schedule.id,
+        scheduleId: schedule.id,
+        date: dateOnly,
+        time: normalizeMobileScheduleTime(schedule.time),
+        type: schedule.type,
+        location: schedule.location,
+        position: schedule.position ?? 0,
+        status: schedule.status,
+        notes: schedule.notes ?? null,
+        ministerId: isVacant ? null : schedule.ministerId,
+        ministerName: isVacant ? "VACANTE" : schedule.ministerName ?? null,
+        scheduleDisplayName: isVacant ? "VACANTE" : schedule.scheduleDisplayName ?? null,
+        source: "schedule",
+        isCurrentUser: !isVacant && schedule.ministerId === user.id
+      };
+    });
+    try {
+      const existingAdorationKeys = new Set(
+        publicAssignments.filter(
+          (assignment) => assignment.type === "adoracao" || (assignment.location ?? "").toLowerCase().includes("adora")
+        ).map((assignment) => `${assignment.date}-${normalizeMobileScheduleTime(assignment.time)}`)
+      );
+      const [draw] = await db.select({ id: adorationDraws.id }).from(adorationDraws).where(and44(
+        eq55(adorationDraws.year, monthRange.year),
+        eq55(adorationDraws.month, monthRange.month)
+      )).orderBy(desc19(adorationDraws.createdAt)).limit(1);
+      if (draw) {
+        const drawResults = await db.select({
+          id: adorationDrawResults.id,
+          ministerId: adorationDrawResults.ministerId,
+          ministerName: users.name,
+          scheduleDisplayName: users.scheduleDisplayName,
+          mondayOfWeek: adorationDrawResults.mondayOfWeek,
+          isVoluntary: adorationDrawResults.isVoluntary
+        }).from(adorationDrawResults).innerJoin(users, eq55(adorationDrawResults.ministerId, users.id)).where(and44(
+          eq55(adorationDrawResults.drawId, draw.id),
+          eq55(users.homeCommunityId, activeCommunity.id)
+        )).orderBy(asc5(adorationDrawResults.mondayOfWeek), asc5(users.name));
+        const adorationPositionByDate = /* @__PURE__ */ new Map();
+        for (const result of drawResults) {
+          const date2 = getMondayDateForWeekOfMonth(
+            monthRange.year,
+            monthRange.month,
+            result.mondayOfWeek
+          );
+          if (!date2) continue;
+          const key = `${date2}-22:00:00`;
+          if (existingAdorationKeys.has(key)) continue;
+          const nextPosition = (adorationPositionByDate.get(date2) ?? 0) + 1;
+          adorationPositionByDate.set(date2, nextPosition);
+          publicAssignments.push({
+            id: `adoration-${result.id}`,
+            scheduleId: `adoration-${result.id}`,
+            date: date2,
+            time: "22:00:00",
+            type: "adoracao",
+            location: "Adora\xE7\xE3o ao Sant\xEDssimo",
+            position: nextPosition,
+            status: "published",
+            notes: result.isVoluntary ? "Volunt\xE1rio" : "Sorteado",
+            ministerId: result.ministerId,
+            ministerName: result.ministerName ?? null,
+            scheduleDisplayName: result.scheduleDisplayName ?? null,
+            source: "adoration",
+            isCurrentUser: result.ministerId === user.id
+          });
+        }
+        publicAssignments.sort((a, b) => {
+          const dateCompare = a.date.localeCompare(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          const timeCompare = a.time.localeCompare(b.time);
+          if (timeCompare !== 0) return timeCompare;
+          return a.position - b.position;
+        });
+      }
+    } catch (error) {
+      if (isMissingTableError(error, "adoration_draws") || isMissingTableError(error, "adoration_draw_results")) {
+        console.info("[MOBILE_SCHEDULES] Adoration draw tables unavailable; skipping public adoration rows.");
+      } else {
+        throw error;
+      }
+    }
     const scheduleIds = rows.map((schedule) => schedule.id);
     const activeSubstitutions = scheduleIds.length ? await db.select({
       id: substitutionRequests.id,
@@ -33998,11 +33484,11 @@ router41.get("/schedules/month", authenticateToken, async (req, res) => {
       status: substitutionRequests.status,
       updatedAt: substitutionRequests.updatedAt
     }).from(substitutionRequests).where(
-      and43(
+      and44(
         eq55(substitutionRequests.communityId, activeCommunity.id),
         eq55(substitutionRequests.requesterId, user.id),
-        inArray20(substitutionRequests.scheduleId, scheduleIds),
-        inArray20(substitutionRequests.status, ["available", "pending", "approved"])
+        inArray21(substitutionRequests.scheduleId, scheduleIds),
+        inArray21(substitutionRequests.status, ["available", "pending", "approved"])
       )
     ).orderBy(desc19(substitutionRequests.updatedAt)) : [];
     const substitutionByScheduleId = new Map(activeSubstitutions.map((item) => [item.scheduleId, item]));
@@ -34028,13 +33514,17 @@ router41.get("/schedules/month", authenticateToken, async (req, res) => {
           canRequestSubstitution: !isPast && !substitution,
           deepLink: mobileScheduleDeepLink(dateOnly)
         };
-      })
+      }),
+      publicSchedule: {
+        assignments: publicAssignments,
+        exportFormats: ["html", "pdf", "excel"]
+      }
     });
   } catch (error) {
     return handleMobileError(res, error, "Erro ao carregar escalas do mes");
   }
 });
-router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
+router42.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
   let idempotencyRecordId = null;
   try {
     const user = req.user;
@@ -34054,7 +33544,7 @@ router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
     }
     idempotencyRecordId = idempotency.recordId;
     const idempotencyKey = idempotency.idempotencyKey;
-    const [schedule] = await db.select().from(schedules).where(and43(eq55(schedules.id, req.params.id), eq55(schedules.communityId, activeCommunity.id))).limit(1);
+    const [schedule] = await db.select().from(schedules).where(and44(eq55(schedules.id, req.params.id), eq55(schedules.communityId, activeCommunity.id))).limit(1);
     if (!schedule) {
       throw new MobileHttpError(404, "Escala nao encontrada");
     }
@@ -34128,7 +33618,7 @@ router41.post("/schedules/:id/confirm", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao confirmar presenca");
   }
 });
-router41.get("/schedules/:id", authenticateToken, async (req, res) => {
+router42.get("/schedules/:id", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -34149,11 +33639,11 @@ router41.get("/schedules/:id", authenticateToken, async (req, res) => {
       confirmationStatus: scheduleConfirmations.status
     }).from(schedules).leftJoin(
       scheduleConfirmations,
-      and43(
+      and44(
         eq55(scheduleConfirmations.scheduleId, schedules.id),
         eq55(scheduleConfirmations.ministerId, user.id)
       )
-    ).where(and43(eq55(schedules.id, req.params.id), eq55(schedules.communityId, activeCommunity.id))).limit(1);
+    ).where(and44(eq55(schedules.id, req.params.id), eq55(schedules.communityId, activeCommunity.id))).limit(1);
     if (!row) {
       throw new MobileHttpError(404, "Escala nao encontrada");
     }
@@ -34166,10 +33656,10 @@ router41.get("/schedules/:id", authenticateToken, async (req, res) => {
       substituteId: substitutionRequests.substituteId,
       updatedAt: substitutionRequests.updatedAt
     }).from(substitutionRequests).where(
-      and43(
+      and44(
         eq55(substitutionRequests.scheduleId, row.id),
         eq55(substitutionRequests.requesterId, user.id),
-        inArray20(substitutionRequests.status, ["available", "pending", "approved"])
+        inArray21(substitutionRequests.status, ["available", "pending", "approved"])
       )
     ).orderBy(desc19(substitutionRequests.updatedAt)).limit(1);
     res.json({
@@ -34199,13 +33689,13 @@ router41.get("/schedules/:id", authenticateToken, async (req, res) => {
     return handleMobileError(res, error, "Erro ao carregar escala");
   }
 });
-var mobile_default = router41;
+var mobile_default = router42;
 
 // server/routes.ts
 init_schema();
 init_logger();
 await init_db();
-import { z as z19 } from "zod";
+import { z as z20 } from "zod";
 import { eq as eq56 } from "drizzle-orm";
 async function registerRoutes(app2) {
   app2.use(cookieParser());
@@ -34213,6 +33703,7 @@ async function registerRoutes(app2) {
   app2.use(csrfTokenGenerator);
   app2.get("/api/csrf-token", getCsrfToken);
   app2.use(health_default);
+  app2.use("/api/admin/db-backfill", dbBackfill_default);
   app2.use("/api/auth", authRateLimiter, authRoutes_default);
   app2.use("/api/password-reset", passwordResetRateLimiter, router3);
   app2.use("/api/whatsapp", whatsapp_api_default);
@@ -34232,6 +33723,7 @@ async function registerRoutes(app2) {
   app2.use("/api/substitutions", csrfProtection, substitutions_default);
   app2.use("/api/mass-pendencies", mass_pendencies_default);
   app2.use("/api/formation/admin", csrfProtection, formationAdmin_default);
+  app2.use("/api/formation-admin", csrfProtection, formationAdmin_default);
   app2.use("/api/version", version_default);
   app2.use("/api/mobile/v1", mobile_default);
   app2.use("/api/dashboard", authenticateToken, dashboard_default);
@@ -34418,7 +33910,7 @@ async function registerRoutes(app2) {
       res.status(201).json(questionnaire);
     } catch (error) {
       console.error("Error creating questionnaire:", error);
-      if (error instanceof z19.ZodError) {
+      if (error instanceof z20.ZodError) {
         return res.status(400).json({ message: "Invalid questionnaire data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create questionnaire" });
@@ -34516,7 +34008,7 @@ async function registerRoutes(app2) {
   }
   app2.post("/api/admin/migrate-substitution-status", authenticateToken, requireRole(["gestor", "coordenador"]), async (req, res) => {
     try {
-      const { sql: sqlHelper, isNull: isNull6, and: and45 } = await import("drizzle-orm");
+      const { sql: sqlHelper, isNull: isNull6, and: and46 } = await import("drizzle-orm");
       const affectedRequests = await db.select({
         id: substitutionRequests.id,
         requesterId: substitutionRequests.requesterId,
@@ -34524,7 +34016,7 @@ async function registerRoutes(app2) {
         status: substitutionRequests.status,
         createdAt: substitutionRequests.createdAt
       }).from(substitutionRequests).where(
-        and45(
+        and46(
           eq56(substitutionRequests.status, "pending"),
           isNull6(substitutionRequests.substituteId)
         )
@@ -34537,7 +34029,7 @@ async function registerRoutes(app2) {
         });
       }
       await db.update(substitutionRequests).set({ status: "available" }).where(
-        and45(
+        and46(
           eq56(substitutionRequests.status, "pending"),
           isNull6(substitutionRequests.substituteId)
         )
@@ -34701,7 +34193,7 @@ function errorHandler(err, req, res, _next) {
 }
 
 // server/index.ts
-import path2 from "path";
+import path3 from "path";
 process.env.TZ = "America/Sao_Paulo";
 var errorMonitoringEnabled = initErrorMonitoring();
 if (errorMonitoringEnabled) {
@@ -34974,8 +34466,8 @@ app.post("/api/whatsapp/webhook", express2.json(), async (req, res) => {
   }
 });
 console.log("\u2705 Webhook WhatsApp MESC registrado diretamente em /api/whatsapp/webhook");
-app.use(express2.static(path2.join(process.cwd(), "public")));
-app.use("/uploads", express2.static(path2.join(process.cwd(), "uploads")));
+app.use(express2.static(path3.join(process.cwd(), "public")));
+app.use("/uploads", express2.static(path3.join(process.cwd(), "uploads")));
 app.use((req, res, next) => {
   const start = Date.now();
   const originalPath = req.path;
@@ -35032,6 +34524,7 @@ async function bootstrapServer({ listen = true } = {}) {
     });
     await scheduleCache.clear();
     console.log("\u{1F9F9} Schedule cache cleared on startup");
+    void init_formation_seed().then(() => formation_seed_exports).then(({ default: seedFormation2 }) => seedFormation2()).then(() => console.log("\u{1F4DA} Formation content ensured on startup")).catch((error) => console.error("\u26A0\uFE0F Formation auto-seed skipped:", error));
     if (listen) {
       server.listen(port, "0.0.0.0", () => {
         console.log(`\u2705 Server started on port ${port} (${process.env.NODE_ENV})`);

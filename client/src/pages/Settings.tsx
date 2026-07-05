@@ -148,7 +148,8 @@ export default function Settings() {
     error: pushError
   } = usePushNotifications();
   const pushIsNative = pushRuntime === 'native';
-  const pushSurfaceLabel = pushIsNative ? 'aparelho' : 'navegador';
+  const nativeNotificationSurface = useNativeSettings || pushIsNative;
+  const pushSurfaceLabel = nativeNotificationSurface ? 'aparelho' : 'navegador';
 
   // Buscar configurações do usuário
   const { data: settingsData, isLoading } = useQuery({
@@ -310,30 +311,28 @@ export default function Settings() {
     setSuccess(null);
 
     if (!pushSupported) {
-      setError(pushIsNative
+      setError(nativeNotificationSurface
         ? 'Este aparelho não permite ativar notificações pelo app.'
         : 'Seu navegador não suporta notificações push.');
       return;
     }
 
     if (pushStatus === 'missing-key') {
-      setError(pushIsNative
+      setError(nativeNotificationSurface
         ? 'Notificações do aparelho não estão configuradas neste ambiente.'
         : 'Notificações push não estão configuradas neste ambiente.');
       return;
     }
 
-    if (!pushIsNative && pushStatus === 'errored') {
-      setError(pushIsNative
-        ? 'Erro ao inicializar notificações do aparelho. Tente fechar e abrir o app novamente.'
-        : 'Erro ao inicializar notificações push. Tente recarregar a página.');
+    if (!nativeNotificationSurface && pushStatus === 'errored') {
+      setError('Erro ao inicializar notificações push. Tente recarregar a página.');
       return;
     }
 
     if (checked) {
       // Ativando notificações
       if (pushPermission === 'denied') {
-        setError(pushIsNative
+        setError(nativeNotificationSurface
           ? 'As notificações foram bloqueadas. Para reativar, acesse os Ajustes do aparelho.'
           : 'As notificações foram bloqueadas. Para reativar, acesse as configurações do seu navegador.');
         return;
@@ -342,12 +341,12 @@ export default function Settings() {
       try {
         await enablePushNotifications();
         setSettings(prev => ({ ...prev, pushNotifications: true }));
-        setSuccess(pushIsNative
+        setSuccess(nativeNotificationSurface
           ? 'Notificações do aparelho ativadas com sucesso!'
           : 'Notificações push ativadas com sucesso!');
       } catch (err) {
         setSettings(prev => ({ ...prev, pushNotifications: false }));
-        setError(pushError || (pushIsNative
+        setError(pushError || (nativeNotificationSurface
           ? 'Erro ao ativar notificações do aparelho.'
           : 'Erro ao ativar notificações push.'));
       }
@@ -356,9 +355,9 @@ export default function Settings() {
       try {
         await disablePushNotifications();
         setSettings(prev => ({ ...prev, pushNotifications: false }));
-        setSuccess(pushIsNative ? 'Notificações do aparelho desativadas.' : 'Notificações push desativadas.');
+        setSuccess(nativeNotificationSurface ? 'Notificações do aparelho desativadas.' : 'Notificações push desativadas.');
       } catch (err) {
-        setError(pushError || (pushIsNative
+        setError(pushError || (nativeNotificationSurface
           ? 'Erro ao desativar notificações do aparelho.'
           : 'Erro ao desativar notificações push.'));
       }
@@ -614,7 +613,7 @@ export default function Settings() {
                           <Alert>
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription className="text-xs sm:text-sm">
-                              {pushIsNative
+                              {nativeNotificationSurface
                                 ? 'Este aparelho não permite ativar notificações pelo app.'
                                 : 'Este navegador não suporta notificações push.'}
                             </AlertDescription>
@@ -632,14 +631,14 @@ export default function Settings() {
                         <div className="ios-control-row flex items-center justify-between gap-4 rounded-xl p-4">
                           <div className="space-y-0.5">
                             <Label htmlFor="push" className="text-sm sm:text-base font-medium">
-                              {pushIsNative ? 'Notificações do aparelho' : 'Notificações Push'}
+                              {nativeNotificationSurface ? 'Notificações do aparelho' : 'Notificações Push'}
                             </Label>
                             <p className="text-xs sm:text-sm text-gray-500">
-                              {pushIsNative
+                              {nativeNotificationSurface
                                 ? 'Receba avisos do app no aparelho sobre escalas, questionários e substituições'
                                 : 'Receba notificações no navegador sobre suas escalas'}
                             </p>
-                            {pushStatus === 'missing-key' && !pushIsNative && (
+                            {pushStatus === 'missing-key' && !nativeNotificationSurface && (
                               <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
                                 Notificações push indisponíveis neste ambiente
                               </p>
