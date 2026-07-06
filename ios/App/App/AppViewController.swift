@@ -5,6 +5,11 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+extension Notification.Name {
+    static let mescRemoteNotificationDeviceToken = Notification.Name("MESCRemoteNotificationDeviceToken")
+    static let mescRemoteNotificationRegistrationFailed = Notification.Name("MESCRemoteNotificationRegistrationFailed")
+}
+
 final class AppViewController: UIViewController {
     private var hostingController: UIHostingController<MESCNativeRootView>?
 
@@ -76,6 +81,38 @@ final class MESCNativeAppModel: ObservableObject {
 
     private let client = MESCMobileAPIClient()
     private let sessionStore = MESCNativeSessionStore()
+    private var notificationObservers: [NSObjectProtocol] = []
+
+    init() {
+        notificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .mescRemoteNotificationDeviceToken,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let token = notification.object as? String, !token.isEmpty else { return }
+                Task { @MainActor [weak self] in
+                    await self?.handleRemoteNotificationToken(token)
+                }
+            }
+        )
+        notificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .mescRemoteNotificationRegistrationFailed,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                let message = (notification.object as? String) ?? "Falha ao registrar notificações remotas."
+                Task { @MainActor [weak self] in
+                    await self?.handleRemoteNotificationRegistrationFailure(message)
+                }
+            }
+        )
+    }
+
+    deinit {
+        notificationObservers.forEach(NotificationCenter.default.removeObserver)
+    }
 
     var firstName: String {
         guard let name = user?.name, !name.isEmpty else { return "ministro" }
@@ -108,6 +145,9 @@ final class MESCNativeAppModel: ObservableObject {
     var pushStatusText: String {
         switch pushAuthorizationStatus {
         case .authorized:
+            if sessionStore.remotePushToken != nil || currentDevice?.pushProvider == "apns" {
+                return "Ativas e vinculadas"
+            }
             return "Ativas neste iPhone"
         case .provisional:
             return "Ativas silenciosamente"
@@ -282,7 +322,11 @@ final class MESCNativeAppModel: ObservableObject {
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
-                await updateCurrentDevice(pushEnabled: true)
+                await updateCurrentDevice(
+                    pushToken: sessionStore.remotePushToken,
+                    pushProvider: sessionStore.remotePushToken == nil ? nil : "apns",
+                    pushEnabled: true
+                )
             } else {
                 pushPermissionMessage = "Permissão não concedida. Você pode habilitar em Ajustes do iPhone."
                 await updateCurrentDevice(pushEnabled: false)
@@ -666,6 +710,7 @@ final class MESCNativeAppModel: ObservableObject {
 
         do {
             try await loadCurrentDevice(accessToken: accessToken)
+            await syncStoredRemotePushTokenIfNeeded()
         } catch {
             if Self.isAuthenticationFailure(error) {
                 throw error
@@ -698,6 +743,36 @@ final class MESCNativeAppModel: ObservableObject {
             deviceId: sessionStore.deviceId
         )
         applyDevice(response.device)
+    }
+
+    private func handleRemoteNotificationToken(_ token: String) async {
+        sessionStore.remotePushToken = token
+        pushPermissionMessage = "Notificações nativas vinculadas a este iPhone."
+
+        guard sessionState == .authenticated else { return }
+        await updateCurrentDevice(
+            pushToken: token,
+            pushProvider: "apns",
+            pushEnabled: true
+        )
+    }
+
+    private func handleRemoteNotificationRegistrationFailure(_ message: String) async {
+        pushPermissionMessage = "O iOS não concluiu o registro de notificações: \(message)"
+
+        guard sessionState == .authenticated else { return }
+        await updateCurrentDevice(pushEnabled: false)
+    }
+
+    private func syncStoredRemotePushTokenIfNeeded() async {
+        guard pushEnabled, let token = sessionStore.remotePushToken else { return }
+        guard currentDevice?.pushProvider != "apns" || currentDevice?.pushEnabled != true else { return }
+
+        await updateCurrentDevice(
+            pushToken: token,
+            pushProvider: "apns",
+            pushEnabled: true
+        )
     }
 
     private func refreshSession() async -> Bool {
@@ -781,6 +856,8 @@ final class MESCNativeAppModel: ObservableObject {
 
     @discardableResult
     private func updateCurrentDevice(
+        pushToken: String? = nil,
+        pushProvider: String? = nil,
         pushEnabled: Bool? = nil,
         biometricCapable: Bool? = nil,
         biometricEnabled: Bool? = nil,
@@ -797,6 +874,8 @@ final class MESCNativeAppModel: ObservableObject {
                 communityId: sessionStore.activeCommunityId,
                 deviceId: sessionStore.deviceId,
                 appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                pushToken: pushToken,
+                pushProvider: pushProvider,
                 pushEnabled: pushEnabled,
                 biometricCapable: biometricCapable,
                 biometricEnabled: biometricEnabled,
@@ -813,6 +892,8 @@ final class MESCNativeAppModel: ObservableObject {
                         communityId: sessionStore.activeCommunityId,
                         deviceId: sessionStore.deviceId,
                         appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                        pushToken: pushToken,
+                        pushProvider: pushProvider,
                         pushEnabled: pushEnabled,
                         biometricCapable: biometricCapable,
                         biometricEnabled: biometricEnabled,
@@ -4162,6 +4243,8 @@ final class MESCMobileAPIClient {
         communityId: String?,
         deviceId: String,
         appVersion: String?,
+        pushToken: String?,
+        pushProvider: String?,
         pushEnabled: Bool?,
         biometricCapable: Bool?,
         biometricEnabled: Bool?,
@@ -4176,6 +4259,8 @@ final class MESCMobileAPIClient {
                 deviceId: deviceId,
                 platform: "ios",
                 appVersion: appVersion,
+                pushToken: pushToken,
+                pushProvider: pushProvider,
                 pushEnabled: pushEnabled,
                 biometricCapable: biometricCapable,
                 biometricEnabled: biometricEnabled,
@@ -4337,6 +4422,8 @@ private struct DeviceUpdateRequestBody: Encodable {
     let deviceId: String
     let platform: String
     let appVersion: String?
+    let pushToken: String?
+    let pushProvider: String?
     let pushEnabled: Bool?
     let biometricCapable: Bool?
     let biometricEnabled: Bool?
@@ -4349,6 +4436,7 @@ final class MESCNativeSessionStore {
     private enum DefaultsKey {
         static let deviceId = "mesc.native.deviceId"
         static let activeCommunityId = "mesc.native.activeCommunityId"
+        static let remotePushToken = "mesc.native.remotePushToken"
     }
 
     private let defaults = UserDefaults.standard
@@ -4370,6 +4458,17 @@ final class MESCNativeSessionStore {
                 defaults.set(newValue, forKey: DefaultsKey.activeCommunityId)
             } else {
                 defaults.removeObject(forKey: DefaultsKey.activeCommunityId)
+            }
+        }
+    }
+
+    var remotePushToken: String? {
+        get { defaults.string(forKey: DefaultsKey.remotePushToken) }
+        set {
+            if let newValue, !newValue.isEmpty {
+                defaults.set(newValue, forKey: DefaultsKey.remotePushToken)
+            } else {
+                defaults.removeObject(forKey: DefaultsKey.remotePushToken)
             }
         }
     }
