@@ -2,7 +2,7 @@
 // IMPORTANT: Version is automatically injected from package.json during build
 // DO NOT manually edit APP_VERSION - it's synced with package.json
 
-export const APP_VERSION = '5.4.3'; // Auto-synced with package.json by build script
+export const APP_VERSION = '5.4.7'; // Auto-synced with package.json by build script
 export const APP_BUILD_ID = '5.4.3-local'; // Fallback only; production builds use VITE_APP_BUILD
 export const BUILD_DATE = '1970-01-01T00:00:00.000Z'; // Fallback only; see version.json for build timestamp
 

@@ -26,6 +26,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MESCAPIBaseURL</key>
+	<string>https://saojudastadeu.app/api/mobile/v1</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID para entrar no MESC com seguranca neste aparelho.</string>
 	<key>UIRequiresFullScreen</key>

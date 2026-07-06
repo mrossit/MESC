@@ -38,7 +38,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="app-shell flex w-full min-w-0 bg-background dark:bg-dark-8">
+      <div className="app-shell native-app-shell flex w-full min-w-0 bg-background dark:bg-dark-8">
         <AppSidebar />
         <SidebarInset className="h-full min-w-0 overflow-hidden dark:bg-dark-8">
           {/* Header */}
@@ -47,7 +47,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
               {/* MOBILE: Avatar no canto superior esquerdo (atalho do perfil) */}
               {isMobile && user && (
                 <Link href="/profile">
-                  <Avatar className="h-9 w-9 cursor-pointer ring-2 ring-primary/10 hover:ring-primary/30 transition-all">
+                  <Avatar className="native-header-avatar h-9 w-9 cursor-pointer transition-all">
                     <AvatarImage src={user.photoUrl || undefined} />
                     <AvatarFallback className="bg-primary/10 text-primary dark:bg-dark-gold/20 dark:text-dark-gold text-xs font-semibold">
                       {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -103,7 +103,7 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
                 {/* MOBILE: Botão Settings no canto superior direito */}
                 {isMobile && (
                   <Link href="/settings">
-                    <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <Button variant="ghost" size="icon" className="native-header-action h-9 w-9">
                       <Settings className="h-5 w-5" />
                     </Button>
                   </Link>

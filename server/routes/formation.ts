@@ -6,6 +6,10 @@ import { handleApiError } from "../utils/routeHelpers";
 import { insertFormationTrackSchema, insertFormationLessonSchema, insertFormationLessonSectionSchema } from "@shared/schema";
 import { z } from "zod";
 import {
+  buildMescFormationMaterialResponse,
+  loadMescFormationContent,
+} from "../services/mescFormationContent";
+import {
   getFormationOverview as buildFormationOverview,
   getLessonDetail as fetchFormationLessonDetail,
   markLessonCompleted as markFormationLessonCompleted,
@@ -33,6 +37,16 @@ router.get('/api/formation/overview', authenticateToken, async (req: AuthRequest
     res.json(overview);
   } catch (error) {
     const errorResponse = handleApiError(error, "buscar visão geral da formação");
+    res.status(errorResponse.status).json(errorResponse);
+  }
+});
+
+router.get('/api/formation/material', authenticateToken, async (_req, res) => {
+  try {
+    const content = await loadMescFormationContent();
+    res.json(buildMescFormationMaterialResponse(content));
+  } catch (error) {
+    const errorResponse = handleApiError(error, "buscar material oficial de formação");
     res.status(errorResponse.status).json(errorResponse);
   }
 });

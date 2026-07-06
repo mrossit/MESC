@@ -62,9 +62,12 @@ type ProgressRow = {
   id: string;
   userId: string;
   lessonId: string;
+  status?: "not_started" | "in_progress" | "completed" | null;
   isCompleted: number | boolean;
   completedAt: string | null;
   timeSpent: number | null;
+  progressPercentage?: number | null;
+  completedSections?: unknown;
   quizScore: number | null;
   notes: string | null;
 };
@@ -165,12 +168,41 @@ const parseRows = <T>(result: QueryResult): T[] => {
   return [];
 };
 
-const parseProgressNotes = (notes: string | null | undefined): { completedSections: string[]; progressPercentage: number } => {
-  if (!notes) {
+const parseCompletedSections = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.filter((section): section is string => typeof section === "string");
+  }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      return parseCompletedSections(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const parseProgressMeta = (
+  progressRow?: Pick<ProgressRow, "notes" | "completedSections" | "progressPercentage"> | null
+): { completedSections: string[]; progressPercentage: number } => {
+  if (!progressRow) {
     return { completedSections: [], progressPercentage: 0 };
   }
+
+  const completedSections = parseCompletedSections(progressRow.completedSections);
+  if (completedSections.length > 0 || typeof progressRow.progressPercentage === "number") {
+    return {
+      completedSections,
+      progressPercentage: progressRow.progressPercentage ?? 0,
+    };
+  }
+
+  if (!progressRow.notes) {
+    return { completedSections: [], progressPercentage: 0 };
+  }
+
   try {
-    const parsed = JSON.parse(notes);
+    const parsed = JSON.parse(progressRow.notes);
     return {
       completedSections: Array.isArray(parsed?.completedSections) ? parsed.completedSections : [],
       progressPercentage: typeof parsed?.progressPercentage === "number" ? parsed.progressPercentage : 0,
@@ -179,12 +211,6 @@ const parseProgressNotes = (notes: string | null | undefined): { completedSectio
     return { completedSections: [], progressPercentage: 0 };
   }
 };
-
-const serializeProgressNotes = (data: { completedSections: string[]; progressPercentage: number }) =>
-  JSON.stringify({
-    completedSections: data.completedSections,
-    progressPercentage: data.progressPercentage,
-  });
 
 const buildLessonProgressView = (
   lesson: LessonRow,
@@ -200,7 +226,7 @@ const buildLessonProgressView = (
     };
   }
 
-  const meta = parseProgressNotes(progressRow.notes);
+  const meta = parseProgressMeta(progressRow);
   const isCompleted = Boolean(progressRow.isCompleted);
   const timeSpent = progressRow.timeSpent ?? 0;
 
@@ -261,6 +287,7 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM formation_tracks
+      WHERE COALESCE(is_active, true) = true
       ORDER BY COALESCE(order_index, 0), title
     `),
     db.execute(sql`
@@ -293,6 +320,7 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
         '' AS "videoUrl",
         '' AS "documentUrl"
       FROM formation_lessons
+      WHERE COALESCE(is_active, true) = true
       ORDER BY module_id, lesson_number
     `),
     userId
@@ -301,9 +329,12 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
             id,
             user_id AS "userId",
             lesson_id AS "lessonId",
+            status,
             CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
             completed_at AS "completedAt",
             time_spent_minutes AS "timeSpent",
+            progress_percentage AS "progressPercentage",
+            completed_sections AS "completedSections",
             0 AS "quizScore",
             '' AS notes
           FROM formation_lesson_progress
@@ -439,7 +470,9 @@ export async function getLessonDetail(params: {
       '' AS "videoUrl",
       '' AS "documentUrl"
     FROM formation_lessons
-    WHERE module_id = ${moduleId} AND lesson_number = ${lessonNumber}
+    WHERE module_id = ${moduleId}
+      AND lesson_number = ${lessonNumber}
+      AND COALESCE(is_active, true) = true
     LIMIT 1
   `);
 
@@ -498,9 +531,12 @@ export async function getLessonDetail(params: {
         id,
         user_id AS "userId",
         lesson_id AS "lessonId",
+        status,
         CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
         completed_at AS "completedAt",
         time_spent_minutes AS "timeSpent",
+        progress_percentage AS "progressPercentage",
+        completed_sections AS "completedSections",
         0 AS "quizScore",
         '' AS notes
       FROM formation_lesson_progress
@@ -533,17 +569,20 @@ export async function getLessonDetail(params: {
 async function ensureLessonProgressRecord(userId: string, lessonId: string): Promise<ProgressRow | null> {
   const result = await db.execute(sql`
     SELECT
-      id,
-      user_id AS "userId",
-      lesson_id AS "lessonId",
-      CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
-      completed_at AS "completedAt",
-      time_spent_minutes AS "timeSpent",
-      0 AS "quizScore",
-      '' AS notes
-    FROM formation_lesson_progress
-    WHERE user_id = ${userId} AND lesson_id = ${lessonId}
-    LIMIT 1
+    id,
+    user_id AS "userId",
+    lesson_id AS "lessonId",
+    status,
+    CASE WHEN status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
+    completed_at AS "completedAt",
+    time_spent_minutes AS "timeSpent",
+    progress_percentage AS "progressPercentage",
+    completed_sections AS "completedSections",
+    0 AS "quizScore",
+    '' AS notes
+  FROM formation_lesson_progress
+  WHERE user_id = ${userId} AND lesson_id = ${lessonId}
+  LIMIT 1
   `);
   return parseRows<ProgressRow>(result)[0] ?? null;
 }
@@ -565,7 +604,7 @@ export async function markLessonSectionCompleted(params: {
 }): Promise<LessonProgressView> {
   const { userId, lessonId, sectionId } = params;
   const existing = await ensureLessonProgressRecord(userId, lessonId);
-  const meta = parseProgressNotes(existing?.notes);
+  const meta = parseProgressMeta(existing);
 
   if (!meta.completedSections.includes(sectionId)) {
     meta.completedSections.push(sectionId);
@@ -573,45 +612,50 @@ export async function markLessonSectionCompleted(params: {
 
   const totalSections = await countLessonSections(lessonId);
   if (totalSections > 0) {
-    meta.progressPercentage = Math.min(99, Math.round((meta.completedSections.length / totalSections) * 100));
+    meta.progressPercentage = Math.min(100, Math.round((meta.completedSections.length / totalSections) * 100));
   }
 
-  const now = new Date().toISOString();
+  const now = new Date();
+  const status = meta.progressPercentage >= 100 ? "completed" : "in_progress";
+  const completedAt = status === "completed" ? now : existing?.completedAt ?? null;
 
   if (existing) {
     await db.execute(sql`
       UPDATE formation_lesson_progress
       SET
-        "isCompleted" = ${existing.isCompleted},
-        "completedAt" = ${existing.completedAt},
-        "timeSpent" = COALESCE("timeSpent", 0) + 1,
-        "quizScore" = "quizScore",
-        notes = ${serializeProgressNotes(meta)},
-        "updatedAt" = ${now}
+        status = ${status},
+        progress_percentage = ${meta.progressPercentage},
+        completed_sections = ${JSON.stringify(meta.completedSections)}::jsonb,
+        time_spent_minutes = COALESCE(time_spent_minutes, 0) + 1,
+        last_accessed_at = ${now},
+        completed_at = ${completedAt},
+        updated_at = ${now}
       WHERE id = ${existing.id}
     `);
   } else {
     await db.execute(sql`
       INSERT INTO formation_lesson_progress (
         id,
-        "userId",
-        "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes,
-        "createdAt",
-        "updatedAt"
+        user_id,
+        lesson_id,
+        status,
+        progress_percentage,
+        time_spent_minutes,
+        completed_sections,
+        last_accessed_at,
+        completed_at,
+        created_at,
+        updated_at
       ) VALUES (
         ${randomUUID()},
         ${userId},
         ${lessonId},
-        ${false},
-        ${null},
+        ${status},
+        ${meta.progressPercentage},
         ${1},
-        ${null},
-        ${serializeProgressNotes(meta)},
+        ${JSON.stringify(meta.completedSections)}::jsonb,
+        ${now},
+        ${completedAt},
         ${now},
         ${now}
       )
@@ -641,11 +685,14 @@ export async function markLessonSectionCompleted(params: {
       id: existing?.id ?? "",
       userId,
       lessonId,
-      isCompleted: false,
-      completedAt: null,
+      status,
+      isCompleted: status === "completed",
+      completedAt: completedAt ? String(completedAt) : null,
       timeSpent: (existing?.timeSpent ?? 0) + 1,
+      progressPercentage: meta.progressPercentage,
+      completedSections: meta.completedSections,
       quizScore: existing?.quizScore ?? null,
-      notes: serializeProgressNotes(meta),
+      notes: null,
     },
     totalSections
   );
@@ -658,60 +705,61 @@ export async function markLessonCompleted(params: {
   const { userId, lessonId } = params;
   const existing = await ensureLessonProgressRecord(userId, lessonId);
   const totalSections = await countLessonSections(lessonId);
+  const sectionRows = totalSections > 0
+    ? parseRows<{ id: string }>(
+        await db.execute(sql`
+          SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
+        `)
+      )
+    : [];
   const meta = {
     completedSections: Array.from(
       new Set([
-        ...(existing ? parseProgressNotes(existing.notes).completedSections : []),
-        ...(totalSections > 0
-          ? (
-              await db.execute(sql`
-                SELECT id FROM formation_lesson_sections WHERE lesson_id = ${lessonId}
-              `)
-            ).rows
-              .map((row) => row.id)
-              .filter((id): id is string => typeof id === "string")
-          : []),
+        ...parseProgressMeta(existing).completedSections,
+        ...sectionRows.map((row) => row.id).filter((id): id is string => typeof id === "string"),
       ])
     ),
     progressPercentage: 100,
   };
 
-  const now = new Date().toISOString();
+  const now = new Date();
 
   if (existing) {
     await db.execute(sql`
       UPDATE formation_lesson_progress
       SET
-        "isCompleted" = ${true},
-        "completedAt" = ${now},
-        "timeSpent" = COALESCE("timeSpent", 0),
-        "quizScore" = "quizScore",
-        notes = ${serializeProgressNotes(meta)},
-        "updatedAt" = ${now}
+        status = 'completed',
+        progress_percentage = 100,
+        completed_sections = ${JSON.stringify(meta.completedSections)}::jsonb,
+        last_accessed_at = ${now},
+        completed_at = COALESCE(completed_at, ${now}),
+        updated_at = ${now}
       WHERE id = ${existing.id}
     `);
   } else {
     await db.execute(sql`
       INSERT INTO formation_lesson_progress (
         id,
-        "userId",
-        "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes,
-        "createdAt",
-        "updatedAt"
+        user_id,
+        lesson_id,
+        status,
+        progress_percentage,
+        time_spent_minutes,
+        completed_sections,
+        last_accessed_at,
+        completed_at,
+        created_at,
+        updated_at
       ) VALUES (
         ${randomUUID()},
         ${userId},
         ${lessonId},
-        ${true},
-        ${now},
+        'completed',
+        ${100},
         ${0},
-        ${null},
-        ${serializeProgressNotes(meta)},
+        ${JSON.stringify(meta.completedSections)}::jsonb,
+        ${now},
+        ${now},
         ${now},
         ${now}
       )
@@ -738,7 +786,7 @@ export async function upsertLessonProgressEntry(params: {
 }): Promise<LessonProgressView> {
   const { userId, lessonId, isCompleted, timeSpent, progressPercentage, completedSections, quizScore, notes } = params;
   const existing = await ensureLessonProgressRecord(userId, lessonId);
-  const meta = parseProgressNotes(existing?.notes);
+  const meta = parseProgressMeta(existing);
 
   if (Array.isArray(completedSections)) {
     meta.completedSections = Array.from(new Set(completedSections));
@@ -760,18 +808,24 @@ export async function upsertLessonProgressEntry(params: {
     }
   }
 
-  const finalIsCompleted = isCompleted ?? existing?.isCompleted ?? false;
+  const finalIsCompleted = Boolean(isCompleted ?? existing?.isCompleted ?? false);
   if (finalIsCompleted) {
     meta.progressPercentage = 100;
   }
 
-  const now = new Date().toISOString();
+  const now = new Date();
+  const status: NonNullable<ProgressRow["status"]> = finalIsCompleted
+    ? "completed"
+    : meta.progressPercentage > 0
+    ? "in_progress"
+    : "not_started";
   const payload = {
-    isCompleted: finalIsCompleted,
+    status,
     completedAt: finalIsCompleted ? now : existing?.completedAt ?? null,
     timeSpent: timeSpent ?? existing?.timeSpent ?? 0,
     quizScore: quizScore ?? existing?.quizScore ?? null,
-    notes: serializeProgressNotes(meta),
+    progressPercentage: meta.progressPercentage,
+    completedSections: meta.completedSections,
     updatedAt: now,
   };
 
@@ -779,36 +833,39 @@ export async function upsertLessonProgressEntry(params: {
     await db.execute(sql`
       UPDATE formation_lesson_progress
       SET
-        "isCompleted" = ${payload.isCompleted},
-        "completedAt" = ${payload.completedAt},
-        "timeSpent" = ${payload.timeSpent},
-        "quizScore" = ${payload.quizScore},
-        notes = ${payload.notes},
-        "updatedAt" = ${payload.updatedAt}
+        status = ${payload.status},
+        progress_percentage = ${payload.progressPercentage},
+        time_spent_minutes = ${payload.timeSpent},
+        completed_sections = ${JSON.stringify(payload.completedSections)}::jsonb,
+        last_accessed_at = ${now},
+        completed_at = ${payload.completedAt},
+        updated_at = ${payload.updatedAt}
       WHERE id = ${existing.id}
     `);
   } else {
     await db.execute(sql`
       INSERT INTO formation_lesson_progress (
         id,
-        "userId",
-        "lessonId",
-        "isCompleted",
-        "completedAt",
-        "timeSpent",
-        "quizScore",
-        notes,
-        "createdAt",
-        "updatedAt"
+        user_id,
+        lesson_id,
+        status,
+        progress_percentage,
+        time_spent_minutes,
+        completed_sections,
+        last_accessed_at,
+        completed_at,
+        created_at,
+        updated_at
       ) VALUES (
         ${randomUUID()},
         ${userId},
         ${lessonId},
-        ${payload.isCompleted},
-        ${payload.completedAt},
+        ${payload.status},
+        ${payload.progressPercentage},
         ${payload.timeSpent},
-        ${payload.quizScore},
-        ${payload.notes},
+        ${JSON.stringify(payload.completedSections)}::jsonb,
+        ${now},
+        ${payload.completedAt},
         ${now},
         ${now}
       )
@@ -834,11 +891,14 @@ export async function upsertLessonProgressEntry(params: {
       id: existing?.id ?? "",
       userId,
       lessonId,
-      isCompleted: payload.isCompleted ? 1 : 0,
-      completedAt: payload.completedAt,
+      status: payload.status,
+      isCompleted: payload.status === "completed" ? 1 : 0,
+      completedAt: payload.completedAt ? String(payload.completedAt) : null,
       timeSpent: payload.timeSpent,
+      progressPercentage: payload.progressPercentage,
+      completedSections: payload.completedSections,
       quizScore: payload.quizScore,
-      notes: payload.notes,
+      notes: null,
     }
   );
 }
@@ -854,9 +914,12 @@ export async function listLessonProgressEntries(params: {
           p.id,
           p.user_id AS "userId",
           p.lesson_id AS "lessonId",
+          p.status,
           CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
           p.completed_at AS "completedAt",
           p.time_spent_minutes AS "timeSpent",
+          p.progress_percentage AS "progressPercentage",
+          p.completed_sections AS "completedSections",
           0 AS "quizScore",
           '' AS notes,
           l.duration_minutes AS "lessonEstimatedDuration",
@@ -873,9 +936,12 @@ export async function listLessonProgressEntries(params: {
           p.id,
           p.user_id AS "userId",
           p.lesson_id AS "lessonId",
+          p.status,
           CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END AS "isCompleted",
           p.completed_at AS "completedAt",
           p.time_spent_minutes AS "timeSpent",
+          p.progress_percentage AS "progressPercentage",
+          p.completed_sections AS "completedSections",
           0 AS "quizScore",
           '' AS notes,
           l.duration_minutes AS "lessonEstimatedDuration",

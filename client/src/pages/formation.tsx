@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { isAdmin as isAdminRole } from "@shared/roles";
+import { isAdmin as canManageFormationRole } from "@shared/roles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ import { authAPI } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useCsrfToken, addCsrfHeader } from "@/hooks/useCsrfToken";
+import { getVisibleFormationTracks } from "@/lib/formationVisibility";
 import FormationAdmin from "@/pages/FormationAdmin";
 import type {
   FormationTrack
@@ -166,13 +167,89 @@ type CertificateStatus = {
   certificateId?: string;
 };
 
-type Certificate = {
-  id: string;
-  certificateNumber: string;
-  trackTitle: string;
-  trackCategory: string;
-  issuedAt: string;
-  verificationCode: string;
+type FormationMaterialResponse = {
+  title: string;
+  subtitle: string;
+  version: string;
+  description: string;
+  modules: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    icon: string;
+    sections: string[];
+    contentPath: string;
+    dataPaths: string[];
+  }>;
+  assets: {
+    maps: Array<{
+      mass: string;
+      ministers: number;
+      particles: number;
+      observation: string;
+      sourcePath: string;
+      assetUrl: string;
+    }>;
+  };
+  data: {
+    funcoes_escala: {
+      descricao: string;
+      fase_legenda: Record<string, string>;
+      funcoes: Array<{
+        numero: number;
+        papel: string;
+        categoria: string;
+        resumo: string;
+        responsabilidades: string[];
+        fases: string[];
+      }>;
+      observacao_geral: string;
+    };
+    missas_e_particulas: {
+      capacidade_igreja: number;
+      regra_calculo_particulas: string;
+      escala_por_missa: Array<{
+        missa: string;
+        ministros: number;
+        eucaristias: number;
+        mapa: string;
+        observacao: string;
+      }>;
+    };
+    checklists: {
+      checklists: Array<{
+        id: string;
+        titulo: string;
+        descricao: string;
+        itens: string[];
+      }>;
+    };
+    oracoes: {
+      nota: string;
+      oracoes: Array<{
+        id: string;
+        titulo: string;
+        repeticoes: number;
+        texto: string;
+        complemento?: string;
+      }>;
+      oracao_na_roda: string;
+    };
+    cores_e_tempos: {
+      cores_liturgicas: Array<{
+        cor: string;
+        hex: string;
+        simbolismo: string;
+        uso: string;
+      }>;
+    };
+    glossario_liturgico: {
+      espaco_celebrativo: Array<{ termo: string; definicao: string }>;
+      vestes: Array<{ termo: string; definicao: string }>;
+      objetos: Array<{ termo: string; definicao: string }>;
+      montagem_calice: string[];
+    };
+  };
 };
 
 type CategoryMeta = {
@@ -268,8 +345,8 @@ const fetchLessonDetail = (trackId: string, moduleId: string, lessonNumber: stri
 const fetchCertificateStatus = () =>
   fetchJson<CertificateStatus[]>("/api/certificates/status", "Não foi possível carregar status dos certificados.");
 
-const fetchUserCertificates = () =>
-  fetchJson<Certificate[]>("/api/certificates", "Não foi possível carregar certificados.");
+const fetchFormationMaterial = () =>
+  fetchJson<FormationMaterialResponse>("/api/formation/material", "Não foi possível carregar a biblioteca de formação.");
 
 interface ModuleDetailProps {
   track: TrackOverview;
@@ -301,7 +378,7 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
           </Badge>
         </div>
 
-        <Card>
+        <Card className="ios-material-card border-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <category.icon className={`h-5 w-5 ${category.accent}`} />
@@ -341,7 +418,7 @@ function ModuleDetail({ track, module, onBack, onSelectLesson }: ModuleDetailPro
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="ios-material-card border-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold">
               <BookOpen className="h-5 w-5" />
@@ -735,6 +812,7 @@ export default function Formation() {
   const { toast } = useToast();
   const [mapZoom, setMapZoom] = useState(1);
   const [showMapInfo, setShowMapInfo] = useState(false);
+  const [selectedMapIndex, setSelectedMapIndex] = useState(0);
   const [adminMode, setAdminMode] = useState(false);
 
   const { data: authData } = useQuery({
@@ -743,7 +821,7 @@ export default function Formation() {
   });
 
   const user = authData?.user;
-  const isAdmin = isAdminRole(user?.role);
+  const canManageFormation = canManageFormationRole(user?.role);
 
   const {
     data: overview,
@@ -763,18 +841,28 @@ export default function Formation() {
     enabled: !!overview
   });
 
-  // Para ministros, filtrar apenas módulos 100% completos
+  const {
+    data: formationMaterial,
+    isLoading: formationMaterialLoading,
+    error: formationMaterialError
+  } = useQuery<FormationMaterialResponse>({
+    queryKey: ['/api/formation/material'],
+    queryFn: fetchFormationMaterial,
+    retry: 1
+  });
+
   const allTracks = overview?.tracks ?? [];
   const tracks = useMemo(() => {
-    if (isAdmin) return allTracks;
-    return allTracks
-      .map((track) => ({
-        ...track,
-        modules: track.modules.filter((m) => m.stats.progressPercentage === 100),
-      }))
-      .filter((track) => track.modules.length > 0);
-  }, [allTracks, isAdmin]);
+    return getVisibleFormationTracks(allTracks, canManageFormation);
+  }, [allTracks, canManageFormation]);
   const summary = overview?.summary;
+  const selectedFormationMap = formationMaterial?.assets.maps[selectedMapIndex] ?? formationMaterial?.assets.maps[0];
+
+  useEffect(() => {
+    if (formationMaterial && selectedMapIndex >= formationMaterial.assets.maps.length) {
+      setSelectedMapIndex(0);
+    }
+  }, [formationMaterial, selectedMapIndex]);
 
   // Helper to get certificate status for a track
   const getCertificateStatusForTrack = (trackId: string) => {
@@ -926,7 +1014,7 @@ export default function Formation() {
     );
   }
 
-  if (adminMode && isAdmin) {
+  if (adminMode && canManageFormation) {
     return <FormationAdmin onExit={() => setAdminMode(false)} />;
   }
 
@@ -936,11 +1024,11 @@ export default function Formation() {
       subtitle="Programa de capacitação e desenvolvimento espiritual"
     >
       <div className="space-y-6">
-        <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
+        <Card className="ios-material-card border-0">
           <CardContent className="p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-neutral-badgeNeutral dark:bg-dark-5 rounded-full flex items-center justify-center">
+                <div className="liquid-glass-chip w-12 h-12 rounded-full flex items-center justify-center">
                   <Cross className="h-6 w-6 text-neutral-neutral dark:text-text-gold" />
                 </div>
                 <div>
@@ -956,7 +1044,7 @@ export default function Formation() {
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                   {formatPercentage(summary?.percentageCompleted)} concluído
                 </Badge>
-                {isAdmin && (
+                {canManageFormation && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -964,7 +1052,7 @@ export default function Formation() {
                     data-testid="button-open-admin-mode"
                   >
                     <Settings className="h-4 w-4 mr-2" />
-                    Área Administrativa
+                    Gerenciar aulas
                   </Button>
                 )}
               </div>
@@ -974,7 +1062,7 @@ export default function Formation() {
 
         {/* Painel geral */}
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <Card>
+          <Card className="ios-material-card border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <GraduationCap className="h-5 w-5 text-purple-600" />
@@ -1016,7 +1104,7 @@ export default function Formation() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="ios-material-card border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <Shield className="h-5 w-5 text-blue-600" />
@@ -1028,7 +1116,7 @@ export default function Formation() {
                 const category = getCategoryMeta(track);
                 const nextLesson = track.nextLesson;
                 return (
-                  <Card key={track.id} className="border-dashed">
+                  <Card key={track.id} className="liquid-glass-chip border-0">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center gap-2 text-sm font-semibold">
                         <category.icon className={`h-4 w-4 ${category.accent}`} />
@@ -1064,7 +1152,7 @@ export default function Formation() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="ios-material-card border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <Award className="h-5 w-5 text-amber-600" />
@@ -1084,7 +1172,7 @@ export default function Formation() {
                     issueCertificateMutation.variables === track.id;
 
                   return (
-                    <div key={track.id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-muted/50">
+                    <div key={track.id} className="formation-glass-panel flex items-center justify-between gap-3 rounded-xl p-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         {hasCertificate ? (
                           <Award className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -1148,7 +1236,7 @@ export default function Formation() {
         </div>
 
         {/* Tabs com trilhas e módulos */}
-        <Card>
+        <Card className="ios-material-card border-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold">
               <BookOpen className="h-5 w-5 text-indigo-600" />
@@ -1162,23 +1250,21 @@ export default function Formation() {
               </div>
             ) : (
               <Tabs defaultValue={tracks[0].id} className="w-full">
-                <div className="overflow-x-auto pb-2">
-                  <TabsList className="inline-flex w-auto min-w-full bg-muted p-2 gap-2">
-                    {tracks.map((track) => {
-                      const category = getCategoryMeta(track);
-                      return (
-                        <TabsTrigger
-                          key={track.id}
-                          value={track.id}
-                          className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
-                        >
-                          <category.icon className={`h-4 w-4 ${category.accent}`} />
-                          <span className="font-medium">{track.title}</span>
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
-                </div>
+                <TabsList className="formation-native-tabs liquid-glass-chip border-0" data-columns="3">
+                  {tracks.map((track) => {
+                    const category = getCategoryMeta(track);
+                    return (
+                      <TabsTrigger
+                        key={track.id}
+                        value={track.id}
+                        className="formation-native-trigger flex items-center gap-2 px-2.5 py-2 text-xs sm:text-sm"
+                      >
+                        <category.icon className={`h-4 w-4 flex-shrink-0 ${category.accent}`} />
+                        <span className="min-w-0 text-center font-medium leading-tight">{track.title}</span>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
 
                 {tracks.map((track) => {
                   const category = getCategoryMeta(track);
@@ -1196,15 +1282,15 @@ export default function Formation() {
                         </Badge>
                       </div>
 
-                      <Accordion type="single" collapsible className="w-full">
+                      <Accordion type="single" collapsible className="w-full space-y-3">
                         {track.modules.map((module) => (
-                          <AccordionItem key={module.id} value={module.id}>
-                            <AccordionTrigger className="py-4 px-3 text-left">
+                          <AccordionItem key={module.id} value={module.id} className="formation-glass-panel rounded-xl border-0">
+                            <AccordionTrigger className="px-3 py-4 text-left hover:no-underline">
                               <div className="flex flex-col gap-1 text-left w-full">
-                                <div className="flex items-center gap-2">
-                                  <BookOpen className="h-4 w-4" />
-                                  <span className="font-medium">{module.title}</span>
-                                  <Badge variant="outline">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <BookOpen className="h-4 w-4 flex-shrink-0" />
+                                  <span className="min-w-0 font-medium">{module.title}</span>
+                                  <Badge variant="outline" className="liquid-glass-chip border-0">
                                     {module.stats.completedLessons}/{module.stats.totalLessons} aulas
                                   </Badge>
                                 </div>
@@ -1226,7 +1312,7 @@ export default function Formation() {
                                 </div>
                                 <div className="flex gap-2">
                                   <Button
-                                    className={`${category.button}`}
+                                    className={`${category.button} w-full sm:w-auto`}
                                     onClick={() => navigate(`/formation/${track.id}/${module.id}`)}
                                     data-testid={`button-open-module-${module.id}`}
                                   >
@@ -1259,112 +1345,293 @@ export default function Formation() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMapZoom((prev) => Math.min(prev + 0.2, 2))}
-                  data-testid="button-zoom-in"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMapZoom((prev) => Math.max(prev - 0.2, 0.5))}
-                  data-testid="button-zoom-out"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMapZoom(1)}
-                  data-testid="button-zoom-reset"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+            {formationMaterialLoading ? (
+              <div className="flex items-center justify-center py-10 text-muted-foreground">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Carregando biblioteca oficial...
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMapInfo((prev) => !prev)}
-                data-testid="button-toggle-info"
-              >
-                <Info className="h-4 w-4 mr-2" />
-                {showMapInfo ? "Ocultar orientações" : "Mostrar orientações"}
-              </Button>
-            </div>
-
-            {showMapInfo && (
-              <Card className="bg-gradient-to-r from-neutral-whiteBeige to-neutral-cream dark:from-dark-6 dark:to-dark-5">
-                <CardContent className="p-4 space-y-3 text-sm">
+            ) : formationMaterialError || !formationMaterial ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <div>
-                    <h4 className="font-semibold">Posicionamento dos ministros</h4>
-                    <ul className="space-y-1 text-muted-foreground">
-                      <li>• Corredores laterais: distribuição principal da comunhão</li>
-                      <li>• Corredor central: apoio e fluidez das filas</li>
-                      <li>• Presbitério: início da distribuição e reposição de âmbulas</li>
-                      <li>• Capela do Santíssimo: atendimento especial</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mt-2">Numeração dos bancos</h4>
-                    <ul className="space-y-1 text-muted-foreground">
-                      <li>• Bancos 1-3: região frontal esquerda</li>
-                      <li>• Bancos 16-18: região frontal direita</li>
-                      <li>• Bancos 4-12: nave central</li>
-                      <li>• Bancos 13-14: mezanino</li>
-                      <li>• Cadeiras 24-26: área posterior</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="border rounded-lg bg-white dark:bg-gray-900 p-4 overflow-auto">
-              <div
-                className="flex justify-center"
-                style={{ transform: `scale(${mapZoom})`, transformOrigin: "center top" }}
-              >
-                <div
-                  className="w-full max-w-2xl h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600"
-                  data-testid="placeholder-church-map"
-                >
-                  <div className="text-center">
-                    <Map className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400 font-medium">Mapa do Santuário</p>
-                    <p className="text-sm text-gray-400 dark:text-gray-500">Em desenvolvimento</p>
+                    <p className="font-semibold">Biblioteca oficial indisponível no momento.</p>
+                    <p className="mt-1">
+                      Os módulos de formação continuam disponíveis. A biblioteca de mapas,
+                      funções e checklists aparecerá assim que o backend publicado responder.
+                    </p>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="liquid-glass-chip border-0 text-amber-700 dark:text-text-gold">
+                    {formationMaterial.version}
+                  </Badge>
+                  <Badge variant="outline" className="liquid-glass-chip border-0">
+                    {formationMaterial.modules.length} módulos
+                  </Badge>
+                  <Badge variant="outline" className="liquid-glass-chip border-0">
+                    {formationMaterial.data.funcoes_escala.funcoes.length} funções
+                  </Badge>
+                  <Badge variant="outline" className="liquid-glass-chip border-0">
+                    {formationMaterial.data.checklists.checklists.length} checklists
+                  </Badge>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                    <FileText className="h-5 w-5 text-green-600" />
-                    Documentos litúrgicos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                  Conteúdo em curadoria. Em breve disponibilizaremos materiais oficiais da CNBB e orientações paroquiais.
-                </CardContent>
-              </Card>
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                    <PlayCircle className="h-5 w-5 text-blue-600" />
-                    Vídeos formativos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                  Estamos produzindo novos conteúdos audiovisuais para complementar a formação teórica.
-                </CardContent>
-              </Card>
-            </div>
+                <Tabs defaultValue="maps" className="w-full">
+                  <TabsList className="formation-native-tabs liquid-glass-chip border-0">
+                    <TabsTrigger value="maps" className="formation-native-trigger flex items-center gap-2 px-2.5 py-2 text-xs sm:text-sm">
+                      <Map className="h-4 w-4 flex-shrink-0" />
+                      <span className="leading-tight">Mapas</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="masses" className="formation-native-trigger flex items-center gap-2 px-2.5 py-2 text-xs sm:text-sm">
+                      <Cross className="h-4 w-4 flex-shrink-0" />
+                      <span className="leading-tight">Missas</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="functions" className="formation-native-trigger flex items-center gap-2 px-2.5 py-2 text-xs sm:text-sm">
+                      <Users className="h-4 w-4 flex-shrink-0" />
+                      <span className="leading-tight">Funções</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="checklists" className="formation-native-trigger flex items-center gap-2 px-2.5 py-2 text-xs sm:text-sm">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                      <span className="leading-tight">Checklists</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="reference" className="formation-native-trigger flex items-center gap-2 px-2.5 py-2 text-xs sm:text-sm">
+                      <BookOpen className="h-4 w-4 flex-shrink-0" />
+                      <span className="leading-tight">Referência</span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="maps" className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        {formationMaterial.assets.maps.map((map, index) => (
+                          <Button
+                            key={`${map.mass}-${map.sourcePath}`}
+                            variant={index === selectedMapIndex ? "default" : "outline"}
+                            size="sm"
+                            className={index === selectedMapIndex ? "min-w-0" : "liquid-glass-chip min-w-0 border-0"}
+                            onClick={() => {
+                              setSelectedMapIndex(index);
+                              setMapZoom(1);
+                            }}
+                          >
+                            <span className="truncate">{map.mass}</span>
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 sm:flex sm:items-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="liquid-glass-chip border-0"
+                          onClick={() => setMapZoom((prev) => Math.min(prev + 0.2, 2))}
+                          data-testid="button-zoom-in"
+                        >
+                          <ZoomIn className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="liquid-glass-chip border-0"
+                          onClick={() => setMapZoom((prev) => Math.max(prev - 0.2, 0.5))}
+                          data-testid="button-zoom-out"
+                        >
+                          <ZoomOut className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="liquid-glass-chip border-0"
+                          onClick={() => setMapZoom(1)}
+                          data-testid="button-zoom-reset"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="liquid-glass-chip border-0"
+                          onClick={() => setShowMapInfo((prev) => !prev)}
+                          data-testid="button-toggle-info"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {selectedFormationMap && (
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                        <div className="formation-glass-panel overflow-hidden rounded-xl p-3 sm:p-4">
+                          <div
+                            className="flex min-h-[280px] items-start justify-center sm:min-h-[360px]"
+                            style={{ transform: `scale(${mapZoom})`, transformOrigin: "center top" }}
+                          >
+                            <img
+                              src={selectedFormationMap.assetUrl}
+                              alt={`Mapa de posição - ${selectedFormationMap.mass}`}
+                              className="max-h-[560px] w-full max-w-full rounded-lg border border-white/50 bg-white object-contain shadow-sm"
+                              data-testid="formation-map-image"
+                            />
+                          </div>
+                        </div>
+                        <div className="formation-glass-panel rounded-xl p-4 space-y-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Missa</p>
+                            <p className="font-semibold">{selectedFormationMap.mass}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Ministros</p>
+                              <p className="text-lg font-bold">{selectedFormationMap.ministers}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Partículas</p>
+                              <p className="text-lg font-bold">{selectedFormationMap.particles}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{selectedFormationMap.observation}</p>
+                          {showMapInfo && (
+                            <p className="text-sm text-muted-foreground">
+                              {formationMaterial.data.missas_e_particulas.regra_calculo_particulas}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="masses" className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {formationMaterial.data.missas_e_particulas.escala_por_missa.map((mass) => (
+                        <div key={mass.missa} className="formation-glass-panel rounded-xl p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold">{mass.missa}</h3>
+                              <p className="text-sm text-muted-foreground mt-1">{mass.observacao}</p>
+                            </div>
+                            <Badge variant="outline">{mass.ministros} ministros</Badge>
+                          </div>
+                          <div className="mt-4 flex items-center gap-3 text-sm">
+                            <span className="liquid-glass-chip rounded-md border-0 px-2 py-1 font-medium">
+                              {mass.eucaristias} partículas
+                            </span>
+                            <span className="text-muted-foreground">
+                              Igreja: {formationMaterial.data.missas_e_particulas.capacidade_igreja} lugares
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="functions" className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {formationMaterial.data.funcoes_escala.descricao}
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {formationMaterial.data.funcoes_escala.funcoes.map((funcao) => (
+                        <div key={funcao.numero} className="formation-glass-panel rounded-xl p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <Badge variant="outline" className="mb-2">Nº {funcao.numero}</Badge>
+                              <h3 className="font-semibold">{funcao.papel}</h3>
+                              <p className="text-sm text-muted-foreground">{funcao.resumo}</p>
+                            </div>
+                            <Badge variant="outline">{funcao.categoria}</Badge>
+                          </div>
+                          <ul className="space-y-1 text-sm text-muted-foreground">
+                            {funcao.responsabilidades.slice(0, 3).map((item) => (
+                              <li key={item}>• {item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="checklists" className="space-y-3">
+                    <Accordion type="single" collapsible className="w-full space-y-3">
+                      {formationMaterial.data.checklists.checklists.map((checklist) => (
+                        <AccordionItem key={checklist.id} value={checklist.id} className="formation-glass-panel rounded-xl border-0">
+                          <AccordionTrigger className="px-3 text-left hover:no-underline">
+                            <div>
+                              <span className="font-medium">{checklist.titulo}</span>
+                              <p className="text-xs text-muted-foreground">{checklist.descricao}</p>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <ul className="space-y-2 px-3 pb-3 text-sm text-muted-foreground">
+                              {checklist.itens.map((item) => (
+                                <li key={item} className="flex gap-2">
+                                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </TabsContent>
+
+                  <TabsContent value="reference" className="space-y-5">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {formationMaterial.data.cores_e_tempos.cores_liturgicas.map((cor) => (
+                        <div key={cor.cor} className="formation-glass-panel rounded-xl p-4">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="h-8 w-8 rounded-full border shadow-sm"
+                              style={{ backgroundColor: cor.hex }}
+                            />
+                            <div>
+                              <h3 className="font-semibold">{cor.cor}</h3>
+                              <p className="text-xs text-muted-foreground">{cor.uso}</p>
+                            </div>
+                          </div>
+                          <p className="mt-3 text-sm text-muted-foreground">{cor.simbolismo}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="formation-glass-panel rounded-xl p-4">
+                        <h3 className="font-semibold">Orações</h3>
+                        <div className="mt-3 space-y-3">
+                          {formationMaterial.data.oracoes.oracoes.map((oracao) => (
+                            <div key={oracao.id} className="border-t pt-3 first:border-t-0 first:pt-0">
+                              <p className="font-medium">{oracao.titulo}</p>
+                              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{oracao.texto}</p>
+                              {oracao.complemento && (
+                                <p className="mt-1 text-sm text-muted-foreground">{oracao.complemento}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="formation-glass-panel rounded-xl p-4">
+                        <h3 className="font-semibold">Glossário litúrgico</h3>
+                        <div className="mt-3 space-y-3">
+                          {[
+                            ...formationMaterial.data.glossario_liturgico.espaco_celebrativo,
+                            ...formationMaterial.data.glossario_liturgico.vestes,
+                            ...formationMaterial.data.glossario_liturgico.objetos,
+                          ].slice(0, 12).map((termo) => (
+                            <div key={`${termo.termo}-${termo.definicao}`}>
+                              <p className="font-medium">{termo.termo}</p>
+                              <p className="text-sm text-muted-foreground">{termo.definicao}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

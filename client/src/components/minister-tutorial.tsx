@@ -149,28 +149,28 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
   const StepIcon = step.icon;
 
   return (
-    <div className="native-tutorial-shell fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+    <div className="native-tutorial-shell fixed inset-0 z-50 flex items-center justify-center overflow-hidden px-4">
       {/* Overlay escuro */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/48 backdrop-blur-md dark:bg-black/68"
         onClick={handleSkip}
       />
 
       {/* Card do Tutorial */}
-      <Card className={`native-tutorial-card liquid-glass relative w-full max-w-lg min-w-0 overflow-hidden border-0 shadow-2xl transition-all duration-200 ${
+      <Card className={`native-tutorial-card liquid-glass relative w-full max-w-[22.5rem] min-w-0 overflow-hidden border-0 transition-all duration-200 sm:max-w-lg ${
         isAnimating ? "scale-95 opacity-50" : "scale-100 opacity-100"
       }`}>
-        <CardContent className="native-tutorial-scroll overflow-y-auto p-5 sm:p-6">
+        <CardContent className="native-tutorial-scroll overflow-y-auto p-4 sm:p-6">
           {/* Header com botão fechar e pular tutorial */}
-          <div className="flex items-start justify-between mb-4">
+          <div className="mb-4 flex items-start justify-between">
             <div className="min-w-0 flex-1">
               {/* Progress Bar */}
               <div className="mb-2">
-                <div className="mb-2 flex items-center justify-between gap-3 pr-9 text-sm text-mesc-text/60">
+                <div className="mb-2 flex items-center justify-between gap-3 pr-10 text-sm text-muted-foreground">
                   <span className="shrink-0">Passo {currentStep + 1} de {tutorialSteps.length}</span>
                   <button 
                     onClick={handleSkip}
-                    className="min-w-0 truncate text-sm text-mesc-text/60 underline hover:text-mesc-text"
+                    className="min-w-0 truncate text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
                   >
                     Pular tutorial
                   </button>
@@ -182,7 +182,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-2 z-10 h-8 w-8 rounded-lg hover:bg-white/40 dark:hover:bg-white/10"
+              className="absolute right-2 top-2 z-10 h-8 w-8 rounded-lg"
               onClick={handleSkip}
             >
               <X className="h-4 w-4" />
@@ -192,36 +192,32 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
           {/* Conteúdo do Step */}
           <div className="text-center">
             {/* Ícone */}
-            <div className="flex justify-center mb-4">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+            <div className="mb-4 flex justify-center">
+              <div className={`liquid-glass-chip flex h-16 w-16 items-center justify-center rounded-full ${
                 currentStep === tutorialSteps.length - 1 
-                  ? "bg-green-100 dark:bg-green-900/20" 
-                  : "bg-neutral-accentWarm/20 dark:bg-amber-900/20"
+                  ? "text-green-700 dark:text-green-300"
+                  : "text-burgundy dark:text-text-gold"
               }`}>
-                <StepIcon className={`h-8 w-8 ${
-                  currentStep === tutorialSteps.length - 1 
-                    ? "text-green-600 dark:text-green-400" 
-                    : "text-neutral-accentWarm dark:text-amber-500"
-                }`} />
+                <StepIcon className="h-8 w-8" />
               </div>
             </div>
 
             {/* Título */}
-            <h3 className="text-xl font-bold text-mesc-text mb-3">
+            <h3 className="mb-3 text-xl font-bold leading-tight text-foreground">
               {step.title}
             </h3>
 
             {/* Descrição */}
-            <p className="text-mesc-text/70 leading-relaxed mb-6">
+            <p className="mb-6 text-sm leading-relaxed text-muted-foreground sm:text-base">
               {step.description}
             </p>
 
             {/* Dica adicional para alguns steps */}
             {step.target && currentStep !== tutorialSteps.length - 1 && (
-              <div className="bg-muted/30 rounded-lg p-3 mb-6">
+              <div className="liquid-glass-chip mb-6 rounded-lg p-3">
                 <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-neutral-accentWarm dark:text-amber-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-mesc-text/60 text-left">
+                  <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-burgundy dark:text-text-gold" />
+                  <p className="text-left text-xs text-muted-foreground">
                     Após o tutorial, você pode acessar esta funcionalidade através do menu lateral.
                   </p>
                 </div>
@@ -230,10 +226,10 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
 
             {/* Informação sobre onde encontrar o tutorial novamente */}
             {currentStep === tutorialSteps.length - 1 && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
+              <div className="mb-6 rounded-lg border border-green-500/25 bg-green-50/70 p-3 dark:bg-green-950/20">
                 <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-green-800 text-left">
+                  <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-700 dark:text-green-300" />
+                  <p className="text-left text-xs text-green-900 dark:text-green-100">
                     <strong>Dica:</strong> Você pode rever este tutorial a qualquer momento acessando o menu <strong>Configurações → Tutorial do Sistema</strong> na barra lateral.
                   </p>
                 </div>
@@ -241,12 +237,12 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
             )}
 
             {/* Botões de Navegação */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 0}
-                className="min-w-0 flex-1 border-2 bg-white/72 font-semibold shadow-md hover:bg-white/86 dark:bg-white/10 dark:hover:bg-white/15"
+                className="min-w-0"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 <span className="truncate">Anterior</span>
@@ -255,7 +251,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               {currentStep === tutorialSteps.length - 1 ? (
                 <Button
                   onClick={handleFinish}
-                  className="min-w-0 flex-1 border border-green-500 bg-green-600 font-semibold text-neutral-cream shadow-lg hover:bg-green-700 dark:text-text-light"
+                  className="min-w-0 border border-green-600 bg-green-600 text-white hover:bg-green-700"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
                   <span className="truncate">Concluir</span>
@@ -263,7 +259,7 @@ export function MinisterTutorial({ onClose, isOpen }: MinisterTutorialProps) {
               ) : (
                 <Button
                   onClick={handleNext}
-                  className="min-w-0 flex-1 border border-amber-500 bg-neutral-accentWarm font-semibold text-neutral-textDark shadow-lg hover:bg-neutral-accentWarm/90 dark:bg-amber-700 dark:text-text-light dark:hover:bg-amber-600"
+                  className="min-w-0"
                 >
                   <span className="truncate">Próximo</span>
                   <ChevronRight className="h-4 w-4 ml-1" />

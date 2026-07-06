@@ -555,6 +555,91 @@ paths:
           description: Invalid payload or missing/invalid Idempotency-Key.
         "409":
           description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /formation/overview:
+    get:
+      summary: Read the authenticated minister's native formation overview.
+      responses:
+        "200":
+          description: Formation tracks, modules, lessons, progress and summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, overview]
+                properties:
+                  success:
+                    type: boolean
+                  overview:
+                    type: object
+        "401":
+          description: Missing or invalid bearer token.
+  /formation/{trackId}/{moduleId}/{lessonNumber}:
+    get:
+      summary: Read a native formation lesson with content sections and progress.
+      parameters:
+        - in: path
+          name: trackId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: moduleId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: lessonNumber
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Lesson detail, sections and progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, lesson, sections, progress]
+                properties:
+                  success:
+                    type: boolean
+                  lesson:
+                    type: object
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                  progress:
+                    type: object
+        "404":
+          description: Lesson not found.
+  /formation/lessons/{lessonId}/complete:
+    post:
+      summary: Mark a formation lesson as completed from the native app.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: lessonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lesson progress updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, progress]
+                properties:
+                  success:
+                    type: boolean
+                  progress:
+                    type: object
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
   /substitutions:
     get:
       summary: List visible substitution requests for the active community.

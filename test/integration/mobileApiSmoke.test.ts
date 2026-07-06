@@ -1,7 +1,7 @@
 import express from "express";
 import { randomUUID } from "crypto";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
 import { db } from "../../server/db";
@@ -30,6 +30,9 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
   let baseUrl: string;
 
   beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+
     process.env.JWT_SECRET = "mobile-api-smoke-test-secret";
     await seedMobileP0Demo();
 
@@ -51,7 +54,10 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
   });
 
   afterAll(async () => {
-    if (!server) return;
+    if (!server) {
+      vi.useRealTimers();
+      return;
+    }
 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
@@ -59,6 +65,8 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
         else resolve();
       });
     });
+
+    vi.useRealTimers();
   });
 
   it("runs login, refresh, mission, notifications, questionnaire, confirmation and substitution", async () => {
@@ -421,7 +429,10 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
 
     const notificationsAfterReminder = await client.listNotifications({ limit: 5 });
     expect(notificationsAfterReminder.unreadCount).toBe(1);
-    expect(notificationsAfterReminder.notifications[0]).toMatchObject({
+    const reminderNotification = notificationsAfterReminder.notifications.find((notification) =>
+      notification.id === questionnaireReminder.reminder.recipients[0].notificationId
+    );
+    expect(reminderNotification).toMatchObject({
       eventKey: "coordinator_announcement",
       type: "reminder",
       deepLink: "/questionnaire",

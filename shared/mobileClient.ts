@@ -286,6 +286,118 @@ export interface MobileQuestionnaireSubmitResponse {
   };
 }
 
+export type MobileFormationProgressStatus = "not_started" | "in_progress" | "completed";
+
+export interface MobileFormationProgress {
+  status: MobileFormationProgressStatus;
+  progressPercentage: number;
+  timeSpent: number;
+  completedSections: string[];
+}
+
+export interface MobileFormationLesson {
+  id: string;
+  moduleId: string;
+  trackId: string | null;
+  title: string;
+  description: string | null;
+  orderIndex?: number | null;
+  lessonNumber: number;
+  estimatedDuration: number | null;
+  contentType: string | null;
+  contentUrl: string | null;
+  videoUrl: string | null;
+  documentUrl: string | null;
+  progress: MobileFormationProgress;
+}
+
+export interface MobileFormationModule {
+  id: string;
+  trackId: string;
+  title: string;
+  description: string | null;
+  orderIndex: number | null;
+  estimatedDuration: number | null;
+  durationMinutes: number | null;
+  content: string | null;
+  videoUrl: string | null;
+  isActive?: boolean | number | null;
+  lessons: MobileFormationLesson[];
+  stats: {
+    totalLessons: number;
+    completedLessons: number;
+    inProgressLessons: number;
+    progressPercentage: number;
+  };
+}
+
+export interface MobileFormationTrack {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  orderIndex: number | null;
+  isRequired: boolean | number | null;
+  estimatedDuration: number | null;
+  icon: string | null;
+  isActive: boolean | number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  modules: MobileFormationModule[];
+  stats: {
+    totalModules: number;
+    totalLessons: number;
+    completedLessons: number;
+    inProgressLessons: number;
+    progressPercentage: number;
+  };
+  nextLesson: MobileFormationLesson | null;
+}
+
+export interface MobileFormationSummary {
+  totalTracks: number;
+  totalModules: number;
+  totalLessons: number;
+  completedLessons: number;
+  inProgressLessons: number;
+  percentageCompleted: number;
+  lastUpdated: string;
+}
+
+export interface MobileFormationOverviewResponse {
+  success: true;
+  overview: {
+    tracks: MobileFormationTrack[];
+    summary: MobileFormationSummary;
+  };
+}
+
+export interface MobileFormationLessonSection {
+  id: string;
+  title: string;
+  content: string | null;
+  contentType: string | null;
+  orderIndex: number;
+  videoUrl: string | null;
+  audioUrl: string | null;
+  documentUrl: string | null;
+  estimatedMinutes: number | null;
+  quizData?: MobileJsonValue;
+  interactiveData?: MobileJsonValue;
+}
+
+export interface MobileFormationLessonResponse {
+  success: true;
+  lesson: Omit<MobileFormationLesson, "progress" | "orderIndex">;
+  sections: MobileFormationLessonSection[];
+  progress: MobileFormationProgress;
+}
+
+export interface MobileFormationLessonCompleteResponse {
+  success: true;
+  progress: MobileFormationProgress;
+}
+
 export interface MobileScheduleMonthResponse {
   success: true;
   community: MobileCommunity;
@@ -867,6 +979,10 @@ export const mobileEndpoints = {
   currentQuestionnaire: (input: { month?: string } = {}) =>
     withQuery("/questionnaires/current", { month: input.month }),
   submitQuestionnaire: (id: string) => `/questionnaires/${encodePathSegment(id)}/response`,
+  formationOverview: () => "/formation/overview",
+  formationLesson: (trackId: string, moduleId: string, lessonNumber: number | string) =>
+    `/formation/${encodePathSegment(trackId)}/${encodePathSegment(moduleId)}/${encodePathSegment(String(lessonNumber))}`,
+  completeFormationLesson: (lessonId: string) => `/formation/lessons/${encodePathSegment(lessonId)}/complete`,
   substitutions: () => "/substitutions",
   substitution: (id: string) => `/substitutions/${encodePathSegment(id)}`,
   claimSubstitution: (id: string) => `/substitutions/${encodePathSegment(id)}/claim`,
@@ -1128,6 +1244,34 @@ export class MescMobileApiClient {
       method: "POST",
       path: mobileEndpoints.submitQuestionnaire(questionnaireId),
       body: payload,
+      ...options,
+    });
+  }
+
+  async getFormationOverview(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileFormationOverviewResponse>({
+      method: "GET",
+      path: mobileEndpoints.formationOverview(),
+      ...options,
+    });
+  }
+
+  async getFormationLesson(
+    input: { trackId: string; moduleId: string; lessonNumber: number | string },
+    options: MobileClientRequestOptions = {},
+  ) {
+    return this.request<MobileFormationLessonResponse>({
+      method: "GET",
+      path: mobileEndpoints.formationLesson(input.trackId, input.moduleId, input.lessonNumber),
+      ...options,
+    });
+  }
+
+  async completeFormationLesson(lessonId: string, options: MobileClientRequestOptions) {
+    return this.request<MobileFormationLessonCompleteResponse>({
+      method: "POST",
+      path: mobileEndpoints.completeFormationLesson(lessonId),
+      body: {},
       ...options,
     });
   }
