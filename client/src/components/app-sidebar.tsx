@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@/hooks/use-navigate";
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { MinisterTutorial } from "@/components/minister-tutorial";
 import { mobileListNotifications, shouldUseMobileAuth } from "@/lib/mobile-auth-session";
 
@@ -87,6 +87,7 @@ export function AppSidebar() {
   const [location] = useLocation();
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { setOpenMobile, isMobile } = useSidebar();
   const useNativeNotifications = shouldUseMobileAuth();
   
@@ -140,9 +141,25 @@ export function AppSidebar() {
     navigate("/login");
   };
 
+  useEffect(() => {
+    setAccountMenuOpen(false);
+    setIsTutorialOpen(false);
+  }, [location]);
+
+  const releaseStaleInteractionLock = () => {
+    window.setTimeout(() => {
+      const hasOpenModal = document.querySelector('[role="dialog"][data-state="open"]');
+      if (!hasOpenModal && document.body.style.pointerEvents === "none") {
+        document.body.style.pointerEvents = "";
+      }
+    }, 250);
+  };
+
   const closeMobileSidebar = () => {
+    setAccountMenuOpen(false);
     if (!isMobile) return;
-    window.requestAnimationFrame(() => setOpenMobile(false));
+    setOpenMobile(false);
+    releaseStaleInteractionLock();
   };
 
   const navigateAndClose = (href: string, event?: MouseEvent<HTMLElement>) => {
@@ -399,7 +416,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
+            <DropdownMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen} modal={false}>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton className="flex items-center gap-2" tooltip="Configurações">
                   <Settings />
@@ -409,20 +426,23 @@ export function AppSidebar() {
               <DropdownMenuContent align="start" side="top" className="w-56 mb-2">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => {
+                <DropdownMenuItem onSelect={(event) => {
+                  event.preventDefault();
                   navigateAndClose('/profile');
                 }}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Meu Perfil</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
+                <DropdownMenuItem onSelect={(event) => {
+                  event.preventDefault();
                   navigateAndClose('/settings');
                 }}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </DropdownMenuItem>
                 {user?.role === "ministro" && (
-                  <DropdownMenuItem onClick={() => {
+                  <DropdownMenuItem onSelect={(event) => {
+                    event.preventDefault();
                     setIsTutorialOpen(true);
                     closeMobileSidebar();
                   }}>
@@ -430,7 +450,8 @@ export function AppSidebar() {
                     <span>Tutorial do Sistema</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => {
+                <DropdownMenuItem onSelect={(event) => {
+                  event.preventDefault();
                   navigateAndClose('/change-password');
                 }}>
                   <KeyRound className="mr-2 h-4 w-4" />

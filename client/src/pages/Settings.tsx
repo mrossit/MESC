@@ -28,6 +28,7 @@ import { APP_VERSION } from '@/lib/queryClient';
 import { clearLocalSession } from '@/lib/persistent-storage';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { isNativeRuntime } from '@/lib/api-url';
 import {
   disableNativeBiometricLogin,
   enableNativeBiometricLogin,
@@ -122,7 +123,7 @@ export default function Settings() {
   const deleteAccountPhrase = 'EXCLUIR MINHA CONTA';
 
   // Dev mode detection
-  const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
+  const isDev = import.meta.env.DEV || (!isNativeRuntime() && window.location.hostname === 'localhost');
 
   // Get current user
   const { data: authData } = useQuery({
