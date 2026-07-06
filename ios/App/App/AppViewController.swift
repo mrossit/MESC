@@ -1107,11 +1107,11 @@ struct MESCNativeRootView: View {
             MESCBackground()
 
             currentScreen
-                .padding(.bottom, 92)
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             MESCGlassTabBar(selectedTab: $selectedTab)
                 .padding(.horizontal, 14)
+                .padding(.top, 6)
                 .padding(.bottom, 8)
         }
     }
@@ -1186,7 +1186,22 @@ struct MESCGlassTabBar: View {
                     .background {
                         if selectedTab == tab {
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(MESCColor.gold.opacity(0.16))
+                                .fill(MESCColor.gold.opacity(0.13))
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.26),
+                                                    Color.white.opacity(0.05),
+                                                    MESCColor.gold.opacity(0.10)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                                         .stroke(MESCColor.gold.opacity(0.28), lineWidth: 1)
@@ -1199,7 +1214,7 @@ struct MESCGlassTabBar: View {
             }
         }
         .padding(8)
-        .mescGlass(cornerRadius: 28)
+        .mescGlass(cornerRadius: 28, intensity: .floating)
     }
 }
 
@@ -3237,41 +3252,118 @@ struct MESCSecondaryButton: View {
 
 struct MESCBackground: View {
     var body: some View {
-        LinearGradient(
-            colors: [
-                MESCColor.background,
-                MESCColor.background,
-                MESCColor.ivoryWarm
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            LinearGradient(
+                colors: [
+                    MESCColor.background,
+                    MESCColor.background,
+                    MESCColor.ivoryWarm
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.18),
+                    MESCColor.gold.opacity(0.055),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .center
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    MESCColor.primaryWine.opacity(0.035),
+                    MESCColor.gold.opacity(0.045)
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
+        }
         .ignoresSafeArea()
+    }
+}
+
+enum MESCGlassIntensity {
+    case panel
+    case floating
+
+    var tint: Color {
+        switch self {
+        case .panel:
+            return MESCColor.glassTint
+        case .floating:
+            return MESCColor.glassFloatingTint
+        }
+    }
+
+    var base: Color {
+        switch self {
+        case .panel:
+            return MESCColor.glassBase
+        case .floating:
+            return MESCColor.glassFloatingBase
+        }
+    }
+
+    var material: Material {
+        switch self {
+        case .panel:
+            return .ultraThinMaterial
+        case .floating:
+            return .thinMaterial
+        }
+    }
+
+    var shadowOpacity: Double {
+        switch self {
+        case .panel:
+            return 0.13
+        case .floating:
+            return 0.20
+        }
+    }
+
+    var highlightOpacity: Double {
+        switch self {
+        case .panel:
+            return 0.22
+        case .floating:
+            return 0.30
+        }
     }
 }
 
 extension View {
     @ViewBuilder
-    func mescGlass(cornerRadius: CGFloat) -> some View {
+    func mescGlass(cornerRadius: CGFloat, intensity: MESCGlassIntensity = .panel) -> some View {
         if #available(iOS 26.0, *) {
             GlassEffectContainer(spacing: 10) {
                 self
-                    .background(MESCColor.glassBase, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .background(intensity.material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                     .glassEffect(
                         .regular
-                            .tint(MESCColor.glassTint)
+                            .tint(intensity.tint)
                             .interactive(),
                         in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     )
+                    .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
                     .overlay(glassBorder(cornerRadius: cornerRadius))
-                    .shadow(color: MESCColor.primaryWine.opacity(0.13), radius: 28, x: 0, y: 14)
+                    .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity), radius: intensity == .floating ? 30 : 24, x: 0, y: intensity == .floating ? 12 : 10)
+                    .shadow(color: Color.white.opacity(intensity == .floating ? 0.28 : 0.18), radius: 1, x: -0.5, y: -0.5)
             }
         } else {
             self
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .background(MESCColor.glassBase, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .background(intensity.material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
                 .overlay(glassBorder(cornerRadius: cornerRadius))
-                .shadow(color: MESCColor.primaryWine.opacity(0.10), radius: 22, x: 0, y: 10)
+                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity * 0.82), radius: intensity == .floating ? 26 : 20, x: 0, y: intensity == .floating ? 10 : 8)
+                .shadow(color: Color.white.opacity(intensity == .floating ? 0.24 : 0.14), radius: 1, x: -0.5, y: -0.5)
         }
     }
 
@@ -3290,6 +3382,39 @@ extension View {
                 lineWidth: 1
             )
     }
+
+    private func glassRefraction(cornerRadius: CGFloat, opacity: Double) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        return ZStack {
+            shape
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(opacity),
+                            Color.white.opacity(opacity * 0.18),
+                            MESCColor.gold.opacity(opacity * 0.34),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            shape
+                .stroke(Color.white.opacity(opacity * 0.70), lineWidth: 0.7)
+                .blur(radius: 0.6)
+                .offset(x: -0.5, y: -0.5)
+                .mask(shape)
+
+            shape
+                .stroke(MESCColor.primaryWine.opacity(opacity * 0.28), lineWidth: 1)
+                .blur(radius: 1.4)
+                .offset(x: 1.2, y: 1.2)
+                .mask(shape)
+        }
+        .allowsHitTesting(false)
+    }
 }
 
 enum MESCColor {
@@ -3306,6 +3431,8 @@ enum MESCColor {
     static let surface = dynamic(light: 0xFFFFFF, dark: 0x1C1C1E, lightAlpha: 0.74, darkAlpha: 0.74)
     static let glassBase = dynamic(light: 0xFFFFFF, dark: 0x1C1C1E, lightAlpha: 0.12, darkAlpha: 0.18)
     static let glassTint = dynamic(light: 0xFFFFFF, dark: 0xEDEDED, lightAlpha: 0.08, darkAlpha: 0.04)
+    static let glassFloatingBase = dynamic(light: 0xFFFFFF, dark: 0x1C1C1E, lightAlpha: 0.18, darkAlpha: 0.24)
+    static let glassFloatingTint = dynamic(light: 0xFFFFFF, dark: 0xEDEDED, lightAlpha: 0.12, darkAlpha: 0.07)
     static let separator = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.12, darkAlpha: 0.12)
 
     private static func dynamic(light: UInt, dark: UInt, lightAlpha: Double = 1, darkAlpha: Double = 1) -> Color {
