@@ -1,7 +1,10 @@
 import express from "express";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
+import { db } from "../../server/db";
+import { schedules, substitutionRequests } from "../../shared/schema";
 import {
   getMobileP0DemoData,
   MOBILE_P0_DEMO_IDS,
@@ -274,6 +277,71 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
   });
 
   it("does not leak substitution requests across communities", async () => {
+    const scopedScheduleA = "13131313-1313-4313-8313-131313131313";
+    const scopedScheduleB = "14141414-1414-4414-8414-141414141414";
+    const scopedSubstitutionA = "15151515-1515-4515-8515-151515151515";
+    const scopedSubstitutionB = "16161616-1616-4616-8616-161616161616";
+    const createdAt = new Date("2026-06-21T12:00:00.000Z");
+
+    await db.delete(substitutionRequests).where(eq(substitutionRequests.id, scopedSubstitutionA));
+    await db.delete(substitutionRequests).where(eq(substitutionRequests.id, scopedSubstitutionB));
+    await db.delete(schedules).where(eq(schedules.id, scopedScheduleA));
+    await db.delete(schedules).where(eq(schedules.id, scopedScheduleB));
+
+    await db.insert(schedules).values([
+      {
+        id: scopedScheduleA,
+        communityId: MOBILE_P0_DEMO_IDS.communityA,
+        date: "2026-08-15",
+        time: "08:00",
+        type: "missa",
+        location: "Igreja Matriz",
+        ministerId: MOBILE_P0_DEMO_IDS.ministerA,
+        position: 4,
+        status: "published",
+        notes: "Escala isolada para anti-vazamento mobile",
+        createdAt,
+      },
+      {
+        id: scopedScheduleB,
+        communityId: MOBILE_P0_DEMO_IDS.communityB,
+        date: "2026-08-16",
+        time: "10:00",
+        type: "missa",
+        location: "Comunidade Sao Lucas",
+        ministerId: MOBILE_P0_DEMO_IDS.ministerB,
+        position: 4,
+        status: "published",
+        notes: "Escala isolada para anti-vazamento mobile",
+        createdAt,
+      },
+    ]);
+
+    await db.insert(substitutionRequests).values([
+      {
+        id: scopedSubstitutionA,
+        communityId: MOBILE_P0_DEMO_IDS.communityA,
+        scheduleId: scopedScheduleA,
+        requesterId: MOBILE_P0_DEMO_IDS.ministerA,
+        status: "available",
+        urgency: "medium",
+        reason: "Anti-vazamento comunidade A",
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: scopedSubstitutionB,
+        communityId: MOBILE_P0_DEMO_IDS.communityB,
+        scheduleId: scopedScheduleB,
+        requesterId: MOBILE_P0_DEMO_IDS.ministerB,
+        status: "available",
+        urgency: "medium",
+        reason: "Anti-vazamento comunidade B",
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ]);
+
     const response = await mobileGet("/substitutions", {
       userId: MOBILE_P0_DEMO_IDS.ministerA,
     });
@@ -281,7 +349,7 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     expect(response.status).toBe(200);
     expect(response.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
     const visibleSubstitutionIds = response.body.substitutions.map((substitution: { id: string }) => substitution.id);
-    expect(visibleSubstitutionIds).toContain(MOBILE_P0_DEMO_IDS.substitutionA);
-    expect(visibleSubstitutionIds).not.toContain(MOBILE_P0_DEMO_IDS.substitutionB);
+    expect(visibleSubstitutionIds).toContain(scopedSubstitutionA);
+    expect(visibleSubstitutionIds).not.toContain(scopedSubstitutionB);
   });
 });

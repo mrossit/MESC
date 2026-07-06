@@ -31944,6 +31944,87 @@ router42.post("/questionnaires/:id/response", authenticateToken, async (req, res
     return handleMobileError(res, error, "Erro ao salvar resposta do questionario");
   }
 });
+router42.get("/formation/overview", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const overview = await getFormationOverview(user.id);
+    res.json({
+      success: true,
+      overview
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar formacao");
+  }
+});
+router42.get("/formation/:trackId/:moduleId/:lessonNumber", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const lessonNumber = Number.parseInt(req.params.lessonNumber, 10);
+    if (!Number.isFinite(lessonNumber) || lessonNumber <= 0) {
+      throw new MobileHttpError(400, "Numero da aula invalido");
+    }
+    const detail = await getLessonDetail({
+      userId: user.id,
+      trackId: req.params.trackId,
+      moduleId: req.params.moduleId,
+      lessonNumber
+    });
+    if (!detail) {
+      throw new MobileHttpError(404, "Aula nao encontrada");
+    }
+    res.json({
+      success: true,
+      ...detail
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar aula de formacao");
+  }
+});
+router42.post("/formation/lessons/:lessonId/complete", authenticateToken, async (req, res) => {
+  let idempotencyRecordId = null;
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+    const activeCommunity = await resolveActiveCommunity(req);
+    const body = { lessonId: req.params.lessonId };
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body
+    });
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+    idempotencyRecordId = idempotency.recordId;
+    const progress = await markLessonCompleted({
+      userId: user.id,
+      lessonId: req.params.lessonId
+    });
+    const responseBody = {
+      success: true,
+      progress
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody
+    });
+    idempotencyRecordId = null;
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao concluir aula de formacao");
+  }
+});
 router42.get("/substitutions", authenticateToken, async (req, res) => {
   try {
     const user = req.user;

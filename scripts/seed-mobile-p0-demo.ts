@@ -442,7 +442,7 @@ async function seedSqlite() {
   const sqlite = new Database.default("local.db");
   await ensureSqliteDemoSchema(sqlite);
 
-  const deleteRows = sqlite.transaction(() => {
+  const seedRows = sqlite.transaction(() => {
     sqlite.prepare(`DELETE FROM substitution_requests WHERE schedule_id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM schedule_confirmations WHERE schedule_id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM schedules WHERE id IN (${ids(demo.schedules.map((item) => item.id))})`).run();
@@ -452,9 +452,7 @@ async function seedSqlite() {
     sqlite.prepare(`DELETE FROM notifications WHERE id IN (${ids(demo.notifications.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM users WHERE id IN (${ids(demo.users.map((item) => item.id))})`).run();
     sqlite.prepare(`DELETE FROM communities WHERE id IN (${ids(demo.communities.map((item) => item.id))})`).run();
-  });
 
-  const insertRows = sqlite.transaction(() => {
     const insertCommunity = sqlite.prepare(`
       INSERT INTO communities (
         id, parish_name, name, slug, color_hex, is_matriz, active, created_at, updated_at
@@ -580,8 +578,7 @@ async function seedSqlite() {
   });
 
   try {
-    deleteRows();
-    insertRows();
+    seedRows();
   } finally {
     sqlite.close();
   }
