@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 import SwiftUI
 import UIKit
@@ -60,9 +61,18 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var isCompletingFormationLesson = false
     @Published var questionnaireMessage: String?
     @Published var formationMessage: String?
+    @Published var scheduleActionMessage: String?
+    @Published var isMutatingSchedule = false
     @Published var isUsingFallbackData = false
     @Published var pushAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published var pushPermissionMessage: String?
+    @Published var currentDevice: MobileDeviceDTO?
+    @Published var notificationPreferences = MESCNotificationPreference.defaults
+    @Published var biometricAvailable = false
+    @Published var biometricEnabled = false
+    @Published var biometricTypeLabel = "Face ID ou Touch ID"
+    @Published var settingsMessage: String?
+    @Published var isUpdatingSettings = false
 
     private let client = MESCMobileAPIClient()
     private let sessionStore = MESCNativeSessionStore()
@@ -110,6 +120,22 @@ final class MESCNativeAppModel: ObservableObject {
         @unknown default:
             return "Status desconhecido"
         }
+    }
+
+    var canManageFormation: Bool {
+        let role = user?.role.lowercased() ?? ""
+        return role == "gestor" || role == "coordenador"
+    }
+
+    var formationVideoLessons: [MobileFormationLessonDTO] {
+        formationOverview?.tracks.flatMap { track in
+            track.modules.flatMap { module in
+                module.lessons.filter { lesson in
+                    guard let videoUrl = lesson.videoUrl else { return false }
+                    return !videoUrl.isEmpty
+                }
+            }
+        } ?? []
     }
 
     func restoreSessionIfNeeded() async {
@@ -226,6 +252,9 @@ final class MESCNativeAppModel: ObservableObject {
         formationLessonDetail = nil
         questionnaireMessage = nil
         formationMessage = nil
+        scheduleActionMessage = nil
+        settingsMessage = nil
+        currentDevice = nil
         errorMessage = nil
         isUsingFallbackData = false
         selectedMonth = Self.currentMonthString()
@@ -235,6 +264,7 @@ final class MESCNativeAppModel: ObservableObject {
     func refreshDevicePermissions() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         pushAuthorizationStatus = settings.authorizationStatus
+        refreshBiometricCapability()
     }
 
     func requestPushNotifications() async {
@@ -252,8 +282,10 @@ final class MESCNativeAppModel: ObservableObject {
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
+                await updateCurrentDevice(pushEnabled: true)
             } else {
                 pushPermissionMessage = "Permissão não concedida. Você pode habilitar em Ajustes do iPhone."
+                await updateCurrentDevice(pushEnabled: false)
             }
         } catch {
             pushPermissionMessage = "Não foi possível solicitar notificações agora."
@@ -282,12 +314,18 @@ final class MESCNativeAppModel: ObservableObject {
                     return nil
                 }
                 return ScheduleMission(
+                    id: schedule.id,
+                    scheduleId: schedule.id,
                     dayNumber: day,
                     time: Self.timeLabel(schedule.time),
                     title: Self.scheduleTitle(type: schedule.type),
                     community: schedule.location ?? activeCommunity?.name ?? scheduleMonth.community.name,
                     role: Self.positionLabel(schedule.position),
-                    ministers: [user?.name ?? firstName]
+                    ministers: [user?.name ?? firstName],
+                    confirmationStatus: schedule.confirmationStatus,
+                    canConfirm: schedule.canConfirm ?? false,
+                    canRequestSubstitution: schedule.canRequestSubstitution ?? false,
+                    isCurrentUser: true
                 )
             }, by: \.dayNumber)
             .mapValues { $0.sorted { $0.time < $1.time } }
@@ -356,6 +394,49 @@ final class MESCNativeAppModel: ObservableObject {
 
         isSavingQuestionnaire = false
         return false
+    }
+
+    func confirmSchedule(scheduleId: String) async -> Bool {
+        await mutateSchedule(messageOnSuccess: "Presença confirmada com sucesso.") { accessToken in
+            _ = try await self.client.confirmSchedule(
+                scheduleId: scheduleId,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: UUID().uuidString,
+                status: "confirmed",
+                notes: nil
+            )
+        }
+    }
+
+    func requestSubstitution(scheduleId: String, reason: String?) async -> Bool {
+        await mutateSchedule(messageOnSuccess: "Pedido de substituição publicado.") { accessToken in
+            _ = try await self.client.requestSubstitution(
+                scheduleId: scheduleId,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: UUID().uuidString,
+                reason: reason
+            )
+        }
+    }
+
+    func createOfficialScheduleExport() throws -> URL {
+        guard let scheduleMonth else {
+            throw MESCMobileAPIError.server(status: 400, message: "Escala do mês ainda não carregada.")
+        }
+
+        let html = Self.officialScheduleHTML(
+            monthLabel: currentMonthLabel,
+            communityName: scheduleMonth.community.name,
+            assignments: scheduleMonth.publicSchedule.assignments
+        )
+        let fileName = "Escala-\(scheduleMonth.month)-MESC.html"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        try html.write(to: url, atomically: true, encoding: .utf8)
+        return url
     }
 
     func shiftScheduleMonth(by monthDelta: Int) async {
@@ -440,6 +521,43 @@ final class MESCNativeAppModel: ObservableObject {
 
         isLoadingFormationLesson = false
         return false
+    }
+
+    func setBiometricPreference(_ enabled: Bool) async {
+        settingsMessage = nil
+        refreshBiometricCapability()
+
+        guard biometricAvailable || !enabled else {
+            biometricEnabled = false
+            settingsMessage = "Este aparelho não possui biometria disponível."
+            return
+        }
+
+        let previous = biometricEnabled
+        biometricEnabled = enabled
+        let success = await updateCurrentDevice(biometricCapable: biometricAvailable, biometricEnabled: enabled)
+        if success {
+            settingsMessage = enabled ? "\(biometricTypeLabel) registrado neste aparelho." : "Biometria desativada neste aparelho."
+        } else {
+            biometricEnabled = previous
+        }
+    }
+
+    func setNotificationPreference(key: String, enabled: Bool) async {
+        guard MESCNotificationPreference.options.contains(where: { $0.key == key }) else { return }
+
+        settingsMessage = nil
+        var next = notificationPreferences
+        let previous = notificationPreferences
+        next[key] = enabled
+        notificationPreferences = next
+
+        let success = await updateCurrentDevice(notificationPreferences: next)
+        if success {
+            settingsMessage = "Preferências atualizadas."
+        } else {
+            notificationPreferences = previous
+        }
     }
 
     func completeCurrentFormationLesson() async -> Bool {
@@ -545,6 +663,14 @@ final class MESCNativeAppModel: ObservableObject {
                 throw error
             }
         }
+
+        do {
+            try await loadCurrentDevice(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error) {
+                throw error
+            }
+        }
     }
 
     private func loadCurrentQuestionnaire(accessToken: String) async throws {
@@ -565,6 +691,15 @@ final class MESCNativeAppModel: ObservableObject {
         formationOverview = response.overview
     }
 
+    private func loadCurrentDevice(accessToken: String) async throws {
+        let response = try await client.currentDevice(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId
+        )
+        applyDevice(response.device)
+    }
+
     private func refreshSession() async -> Bool {
         guard let refreshToken = sessionStore.refreshToken else { return false }
 
@@ -573,6 +708,7 @@ final class MESCNativeAppModel: ObservableObject {
             persist(authResponse: response)
             user = response.user
             activeCommunity = response.communities.first(where: { $0.id == response.activeCommunityId }) ?? response.communities.first
+            applyDevice(response.device)
             return true
         } catch {
             return false
@@ -583,6 +719,7 @@ final class MESCNativeAppModel: ObservableObject {
         sessionStore.accessToken = response.auth.accessToken
         sessionStore.refreshToken = response.auth.refreshToken
         sessionStore.activeCommunityId = response.activeCommunityId
+        applyDevice(response.device)
     }
 
     private func handleSessionFailure(_ error: Error) {
@@ -599,6 +736,136 @@ final class MESCNativeAppModel: ObservableObject {
             return status == 401
         default:
             return false
+        }
+    }
+
+    private func mutateSchedule(
+        messageOnSuccess: String,
+        operation: @escaping (String) async throws -> Void
+    ) async -> Bool {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        isMutatingSchedule = true
+        scheduleActionMessage = nil
+
+        do {
+            try await operation(accessToken)
+            try await loadHomeAndSchedules()
+            scheduleActionMessage = messageOnSuccess
+            isMutatingSchedule = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let accessToken = sessionStore.accessToken {
+                do {
+                    try await operation(accessToken)
+                    try await loadHomeAndSchedules()
+                    scheduleActionMessage = messageOnSuccess
+                    isMutatingSchedule = false
+                    return true
+                } catch {
+                    scheduleActionMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                scheduleActionMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isMutatingSchedule = false
+        return false
+    }
+
+    @discardableResult
+    private func updateCurrentDevice(
+        pushEnabled: Bool? = nil,
+        biometricCapable: Bool? = nil,
+        biometricEnabled: Bool? = nil,
+        notificationPreferences: [String: Bool]? = nil
+    ) async -> Bool {
+        guard let accessToken = sessionStore.accessToken else { return false }
+
+        isUpdatingSettings = true
+        settingsMessage = nil
+
+        do {
+            let response = try await client.updateCurrentDevice(
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId,
+                appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                pushEnabled: pushEnabled,
+                biometricCapable: biometricCapable,
+                biometricEnabled: biometricEnabled,
+                notificationPreferences: notificationPreferences
+            )
+            applyDevice(response.device)
+            isUpdatingSettings = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let accessToken = sessionStore.accessToken {
+                do {
+                    let response = try await client.updateCurrentDevice(
+                        accessToken: accessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId,
+                        appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                        pushEnabled: pushEnabled,
+                        biometricCapable: biometricCapable,
+                        biometricEnabled: biometricEnabled,
+                        notificationPreferences: notificationPreferences
+                    )
+                    applyDevice(response.device)
+                    isUpdatingSettings = false
+                    return true
+                } catch {
+                    settingsMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                settingsMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isUpdatingSettings = false
+        return false
+    }
+
+    private func applyDevice(_ device: MobileDeviceDTO?) {
+        guard let device else { return }
+
+        currentDevice = device
+        if let enabled = device.biometricEnabled {
+            biometricEnabled = enabled
+        }
+
+        if let preferences = device.notificationPreferences {
+            var merged = MESCNotificationPreference.defaults
+            for (key, value) in preferences {
+                if case let .bool(enabled) = value {
+                    merged[key] = enabled
+                }
+            }
+            notificationPreferences = merged
+        }
+    }
+
+    private func refreshBiometricCapability() {
+        let context = LAContext()
+        var error: NSError?
+        biometricAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+
+        switch context.biometryType {
+        case .faceID:
+            biometricTypeLabel = "Face ID"
+        case .touchID:
+            biometricTypeLabel = "Touch ID"
+        default:
+            biometricTypeLabel = "Face ID ou Touch ID"
         }
     }
 
@@ -635,14 +902,98 @@ final class MESCNativeAppModel: ObservableObject {
                 }
 
             return ScheduleMission(
+                id: "\(first.date)-\(first.time)-\(first.location ?? "")",
+                scheduleId: nil,
                 dayNumber: day,
                 time: Self.timeLabel(first.time),
                 title: Self.scheduleTitle(type: first.type),
                 community: first.location ?? activeCommunity?.name ?? "Comunidade",
                 role: group.first(where: { $0.isCurrentUser }).map { Self.positionLabel($0.position) } ?? "\(group.count) ministros",
-                ministers: ministers
+                ministers: ministers,
+                confirmationStatus: nil,
+                canConfirm: false,
+                canRequestSubstitution: false,
+                isCurrentUser: group.contains { $0.isCurrentUser }
             )
         }
+    }
+
+    private static func officialScheduleHTML(
+        monthLabel: String,
+        communityName: String,
+        assignments: [MobilePublicScheduleAssignmentDTO]
+    ) -> String {
+        let grouped = Dictionary(grouping: assignments) { assignment in
+            "\(assignment.date)|\(timeLabel(assignment.time))|\(scheduleTitle(type: assignment.type))|\(assignment.location ?? communityName)"
+        }
+        let sortedGroups = grouped.keys.sorted()
+        let maxPosition = max(28, assignments.map(\.position).max() ?? 0)
+        let headerCells = (1...maxPosition).map { "<th>P\($0)</th>" }.joined()
+
+        let bodyRows = sortedGroups.map { key -> String in
+            let parts = key.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+            let group = grouped[key] ?? []
+            var namesByPosition: [Int: String] = [:]
+            for assignment in group {
+                let name = assignment.scheduleDisplayName ?? assignment.ministerName ?? "VACANTE"
+                namesByPosition[assignment.position] = escapeHTML(name)
+            }
+
+            let ministerCells = (1...maxPosition)
+                .map { "<td>\(namesByPosition[$0] ?? "")</td>" }
+                .joined()
+
+            return """
+            <tr>
+              <td>\(escapeHTML(parts[safe: 0] ?? ""))</td>
+              <td>\(escapeHTML(parts[safe: 1] ?? ""))</td>
+              <td>\(escapeHTML(parts[safe: 2] ?? ""))</td>
+              <td>\(escapeHTML(parts[safe: 3] ?? ""))</td>
+              \(ministerCells)
+            </tr>
+            """
+        }.joined(separator: "\n")
+
+        return """
+        <!doctype html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Escala MESC - \(escapeHTML(monthLabel))</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px; color: #2C2C2C; }
+            h1 { font-family: Georgia, serif; color: #722F37; margin-bottom: 4px; }
+            p { margin-top: 0; color: #666; }
+            table { border-collapse: collapse; width: 100%; font-size: 12px; }
+            th { background: #722F37; color: white; }
+            th, td { border: 1px solid #D7C7A1; padding: 6px 7px; text-align: left; vertical-align: top; }
+            tr:nth-child(even) td { background: #FDFBF7; }
+          </style>
+        </head>
+        <body>
+          <h1>Escala MESC - \(escapeHTML(monthLabel))</h1>
+          <p>\(escapeHTML(communityName))</p>
+          <table>
+            <thead>
+              <tr><th>Data</th><th>Hora</th><th>Tipo</th><th>Local</th>\(headerCells)</tr>
+            </thead>
+            <tbody>
+              \(bodyRows.isEmpty ? "<tr><td colspan=\"\(maxPosition + 4)\">Sem escala publicada para este mês.</td></tr>" : bodyRows)
+            </tbody>
+          </table>
+        </body>
+        </html>
+        """
+    }
+
+    private static func escapeHTML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
 
     private static func currentMonthString() -> String {
@@ -852,6 +1203,90 @@ struct MESCGlassTabBar: View {
     }
 }
 
+struct ShareFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+struct SubstitutionTarget: Identifiable {
+    let id: String
+    let scheduleId: String
+    let title: String
+    let subtitle: String
+}
+
+struct MESCNotificationPreference: Identifiable {
+    let key: String
+    let title: String
+    let detail: String
+    let symbol: String
+
+    var id: String { key }
+
+    static let options = [
+        MESCNotificationPreference(
+            key: "questionnaire_published",
+            title: "Novo questionário",
+            detail: "Quando a coordenação publicar o questionário.",
+            symbol: "list.clipboard"
+        ),
+        MESCNotificationPreference(
+            key: "coordinator_announcement",
+            title: "Avisos da coordenação",
+            detail: "Comunicados importantes do ministério.",
+            symbol: "megaphone"
+        ),
+        MESCNotificationPreference(
+            key: "questionnaire_closed",
+            title: "Encerramento do questionário",
+            detail: "Aviso quando o prazo for encerrado.",
+            symbol: "lock.doc"
+        ),
+        MESCNotificationPreference(
+            key: "schedule_published",
+            title: "Escala publicada",
+            detail: "Quando uma nova escala estiver disponível.",
+            symbol: "calendar.badge.checkmark"
+        ),
+        MESCNotificationPreference(
+            key: "substitution_requested",
+            title: "Pedidos de substituição",
+            detail: "Quando alguém precisar de substituto.",
+            symbol: "arrow.triangle.2.circlepath"
+        ),
+        MESCNotificationPreference(
+            key: "substitute_accepted",
+            title: "Substituto aceitou",
+            detail: "Quando seu pedido for atendido.",
+            symbol: "person.crop.circle.badge.checkmark"
+        ),
+        MESCNotificationPreference(
+            key: "formation_available",
+            title: "Novo treinamento",
+            detail: "Quando houver nova aula ou material.",
+            symbol: "graduationcap"
+        ),
+        MESCNotificationPreference(
+            key: "schedule_reminder",
+            title: "Lembrete de escalação",
+            detail: "Antes da missa em que você foi escalado.",
+            symbol: "bell.badge"
+        ),
+    ]
+
+    static let defaults = Dictionary(uniqueKeysWithValues: options.map { ($0.key, true) })
+}
+
+struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 struct LoadingScreen: View {
     var body: some View {
         ZStack {
@@ -966,6 +1401,7 @@ struct NativeLoginScreen: View {
 struct MissionScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @State private var isQuestionnairePresented = false
+    @State private var substitutionTarget: SubstitutionTarget?
 
     var body: some View {
         let mission = appModel.missionHome?.nextMission
@@ -994,8 +1430,32 @@ struct MissionScreen: View {
                 }
 
                 HStack(spacing: 12) {
-                    MESCPrimaryButton(title: "Confirmar", symbol: "checkmark.circle")
-                    MESCSecondaryButton(title: "Trocar", symbol: "arrow.triangle.2.circlepath")
+                    MESCPrimaryButton(
+                        title: mission?.confirmationStatus == "confirmed" ? "Confirmado" : "Confirmar",
+                        symbol: mission?.confirmationStatus == "confirmed" ? "checkmark.seal.fill" : "checkmark.circle"
+                    ) {
+                        guard let mission else { return }
+                        Task { await appModel.confirmSchedule(scheduleId: mission.id) }
+                    }
+                    .disabled(mission?.canConfirm != true || appModel.isMutatingSchedule)
+
+                    MESCSecondaryButton(title: "Trocar", symbol: "arrow.triangle.2.circlepath") {
+                        guard let mission else { return }
+                        substitutionTarget = SubstitutionTarget(
+                            id: mission.id,
+                            scheduleId: mission.id,
+                            title: "\(MESCNativeAppModel.scheduleDateTitle(date: mission.date)) às \(MESCNativeAppModel.timeLabel(mission.time))",
+                            subtitle: mission.location ?? appModel.activeCommunity?.name ?? "Comunidade"
+                        )
+                    }
+                    .disabled(mission?.canRequestSubstitution != true || appModel.isMutatingSchedule)
+                }
+
+                if let message = appModel.scheduleActionMessage {
+                    Label(message, systemImage: message.contains("sucesso") || message.contains("publicado") ? "checkmark.seal" : "info.circle")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(message.contains("sucesso") || message.contains("publicado") ? MESCColor.accent : MESCColor.primaryWine)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -1028,14 +1488,36 @@ struct MissionScreen: View {
             }
 
             GlassPanel(spacing: 12) {
-                SectionTitle(title: "Hoje no MESC", symbol: "sun.max")
-                MissionRow(time: "07:30", title: "Chegar e preparar a comunhão", detail: "Chegue 30 minutos antes.")
-                MissionRow(time: "08:00", title: "Missa", detail: "Atue conforme posição indicada.")
-                MissionRow(time: "09:10", title: "Registro", detail: "Confirme presenca ao final.")
+                SectionTitle(title: "Pendências e avisos", symbol: "bell.badge")
+                let pendingActions = appModel.missionHome?.pendingActions ?? []
+                let notices = appModel.missionHome?.notices ?? []
+
+                if pendingActions.isEmpty && notices.isEmpty {
+                    EmptyState(title: "Nada pendente agora", detail: "Quando houver avisos, questionários ou substituições, eles aparecerão aqui.")
+                } else {
+                    ForEach(pendingActions) { action in
+                        Button {
+                            if action.type == "questionnaire" {
+                                isQuestionnairePresented = true
+                            }
+                        } label: {
+                            PendingActionRow(action: action)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(notices) { notice in
+                        NoticeSummaryRow(notice: notice)
+                    }
+                }
             }
         }
         .sheet(isPresented: $isQuestionnairePresented) {
             QuestionnaireSheet()
+                .environmentObject(appModel)
+        }
+        .sheet(item: $substitutionTarget) { target in
+            SubstitutionRequestSheet(target: target)
                 .environmentObject(appModel)
         }
     }
@@ -1185,6 +1667,92 @@ struct QuestionnaireSheet: View {
         }
 
         return (payload, nil)
+    }
+}
+
+struct SubstitutionRequestSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let target: SubstitutionTarget
+    @State private var reason = ""
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            VStack(alignment: .leading, spacing: 18) {
+                GlassPanel(spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        SymbolTile(symbol: "arrow.triangle.2.circlepath", tint: MESCColor.gold)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Pedido de substituição")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.accent)
+                            Text(target.title)
+                                .font(MESCFont.title2)
+                            Text(target.subtitle)
+                                .font(MESCFont.body)
+                                .foregroundStyle(MESCColor.textSecondary)
+                        }
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(MESCColor.textPrimary)
+                                .frame(width: 34, height: 34)
+                                .background(MESCColor.surface.opacity(0.72), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                GlassPanel(spacing: 12) {
+                    SectionTitle(title: "Mensagem para quem puder ajudar", symbol: "text.bubble")
+                    TextEditor(text: $reason)
+                        .font(MESCFont.body)
+                        .frame(minHeight: 110)
+                        .padding(10)
+                        .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(MESCColor.separator, lineWidth: 1)
+                        )
+                    Text("O pedido ficará disponível para ministros da sua comunidade. A coordenação acompanha o fluxo.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let message = appModel.scheduleActionMessage {
+                    Label(message, systemImage: message.contains("publicado") ? "checkmark.seal" : "info.circle")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(message.contains("publicado") ? MESCColor.accent : MESCColor.primaryWine)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                MESCPrimaryButton(
+                    title: appModel.isMutatingSchedule ? "Publicando..." : "Publicar pedido",
+                    symbol: "paperplane.fill"
+                ) {
+                    Task {
+                        let success = await appModel.requestSubstitution(
+                            scheduleId: target.scheduleId,
+                            reason: reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : reason
+                        )
+                        if success {
+                            dismiss()
+                        }
+                    }
+                }
+                .disabled(appModel.isMutatingSchedule)
+
+                Spacer()
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+        }
     }
 }
 
@@ -1340,6 +1908,8 @@ struct SchedulesScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @State private var mode: ScheduleMode = .mine
     @State private var selectedDayNumber = Calendar.current.component(.day, from: Date())
+    @State private var substitutionTarget: SubstitutionTarget?
+    @State private var shareFile: ShareFile?
 
     var body: some View {
         let days = appModel.scheduleDays(for: mode)
@@ -1403,12 +1973,46 @@ struct SchedulesScreen: View {
                     EmptyState(title: "Nenhuma missa para esta data", detail: "Toque em outra data para consultar a escala.")
                 } else {
                     ForEach(selectedDay.missions) { mission in
-                        ScheduleMissionRow(mission: mission, mode: mode)
+                        ScheduleMissionRow(
+                            mission: mission,
+                            mode: mode,
+                            onConfirm: mission.canConfirm && mission.scheduleId != nil ? {
+                                Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
+                            } : nil,
+                            onRequestSubstitution: mission.canRequestSubstitution && mission.scheduleId != nil ? {
+                                substitutionTarget = SubstitutionTarget(
+                                    id: mission.id,
+                                    scheduleId: mission.scheduleId ?? mission.id,
+                                    title: "\(selectedDay.formattedTitle) às \(mission.time)",
+                                    subtitle: "\(mission.title) - \(mission.community)"
+                                )
+                            } : nil
+                        )
                     }
                 }
 
-                MESCSecondaryButton(title: "Exportar lista no modelo oficial", symbol: "square.and.arrow.up")
+                if let message = appModel.scheduleActionMessage {
+                    Label(message, systemImage: message.contains("sucesso") || message.contains("publicado") ? "checkmark.seal" : "info.circle")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(message.contains("sucesso") || message.contains("publicado") ? MESCColor.accent : MESCColor.primaryWine)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                MESCSecondaryButton(title: "Exportar lista no modelo oficial", symbol: "square.and.arrow.up") {
+                    do {
+                        shareFile = ShareFile(url: try appModel.createOfficialScheduleExport())
+                    } catch {
+                        appModel.scheduleActionMessage = MESCMobileAPIClient.userMessage(for: error)
+                    }
+                }
             }
+        }
+        .sheet(item: $substitutionTarget) { target in
+            SubstitutionRequestSheet(target: target)
+                .environmentObject(appModel)
+        }
+        .sheet(item: $shareFile) { file in
+            ActivityView(activityItems: [file.url])
         }
     }
 }
@@ -1471,7 +2075,9 @@ struct CalendarMonthGrid: View {
 
 struct FormationScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.openURL) private var openURL
     @State private var isLessonPresented = false
+    @State private var isVideoLibraryPresented = false
 
     var body: some View {
         MESCScrollScreen(title: "Formação", subtitle: "Trilhas e aulas") {
@@ -1509,10 +2115,8 @@ struct FormationScreen: View {
                 }
             } else {
                 GlassPanel(spacing: 14) {
-                    SectionTitle(title: "Continuar aprendendo", symbol: "play.circle")
-                    FormationLessonRow(title: "Ministério e espiritualidade", progress: 0.72, detail: "Módulo 1 - aula 3")
-                    FormationLessonRow(title: "Rito da comunhão", progress: 0.38, detail: "Módulo 2 - aula 1")
-                    FormationLessonRow(title: "Cuidado com enfermos", progress: 0.12, detail: "Vídeo disponível")
+                    SectionTitle(title: "Formação não carregada", symbol: "wifi.exclamationmark")
+                    EmptyState(title: "Não foi possível carregar as aulas", detail: "Toque em Atualizar nos Ajustes para sincronizar novamente.")
                 }
             }
 
@@ -1524,13 +2128,28 @@ struct FormationScreen: View {
             }
 
             GlassPanel(spacing: 14) {
-                SectionTitle(title: "Área do coordenador", symbol: "plus.rectangle.on.folder")
-                Text("Gerencie aulas, conteúdos, vídeos e progresso dos ministros.")
+                SectionTitle(title: "Biblioteca de vídeos", symbol: "play.rectangle")
+                Text(videoLibraryDescription)
                     .font(MESCFont.body)
                     .foregroundStyle(MESCColor.textSecondary)
-                HStack(spacing: 12) {
-                    MESCPrimaryButton(title: "Nova aula", symbol: "plus")
-                    MESCSecondaryButton(title: "Vídeos", symbol: "video")
+                    .fixedSize(horizontal: false, vertical: true)
+                MESCSecondaryButton(title: "Ver vídeos", symbol: "video") {
+                    isVideoLibraryPresented = true
+                }
+            }
+
+            if appModel.canManageFormation {
+                GlassPanel(spacing: 14) {
+                    SectionTitle(title: "Área do coordenador", symbol: "plus.rectangle.on.folder")
+                    Text("A autoria completa de aulas ainda está no painel de formação atual. O app nativo já consome trilhas, aulas, vídeos e progresso; o próximo contrato é trazer criação/edição para `/api/mobile/v1`.")
+                        .font(MESCFont.body)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    MESCPrimaryButton(title: "Abrir estúdio de formação", symbol: "square.and.pencil") {
+                        if let url = URL(string: "https://saojudastadeu.app/formation-admin") {
+                            openURL(url)
+                        }
+                    }
                 }
             }
         }
@@ -1540,6 +2159,18 @@ struct FormationScreen: View {
             FormationLessonSheet()
                 .environmentObject(appModel)
         }
+        .sheet(isPresented: $isVideoLibraryPresented) {
+            FormationVideoLibrarySheet(onOpenLesson: openLesson)
+                .environmentObject(appModel)
+        }
+    }
+
+    private var videoLibraryDescription: String {
+        let count = appModel.formationVideoLessons.count
+        if count == 0 {
+            return "Nenhum vídeo publicado nas aulas carregadas até agora."
+        }
+        return count == 1 ? "1 aula com vídeo disponível." : "\(count) aulas com vídeo disponíveis."
     }
 
     private func openLesson(_ lesson: MobileFormationLessonDTO) {
@@ -1770,6 +2401,83 @@ struct FormationLessonSheet: View {
     }
 }
 
+struct FormationVideoLibrarySheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let onOpenLesson: (MobileFormationLessonDTO) -> Void
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    GlassPanel(spacing: 12) {
+                        HStack(alignment: .top, spacing: 12) {
+                            SymbolTile(symbol: "play.rectangle", tint: MESCColor.gold)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Formação")
+                                    .font(MESCFont.caption)
+                                    .foregroundStyle(MESCColor.accent)
+                                Text("Vídeos disponíveis")
+                                    .font(MESCFont.title2)
+                                Text("Conteúdos publicados pela coordenação para estudo no app.")
+                                    .font(MESCFont.body)
+                                    .foregroundStyle(MESCColor.textSecondary)
+                            }
+                            Spacer()
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(MESCColor.textPrimary)
+                                    .frame(width: 34, height: 34)
+                                    .background(MESCColor.surface.opacity(0.72), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if appModel.formationVideoLessons.isEmpty {
+                        EmptyState(title: "Nenhum vídeo publicado", detail: "Quando a coordenação incluir vídeos nas aulas, eles aparecerão aqui.")
+                    } else {
+                        ForEach(appModel.formationVideoLessons) { lesson in
+                            Button {
+                                dismiss()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    onOpenLesson(lesson)
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    SymbolTile(symbol: "play.fill", tint: MESCColor.accent)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(lesson.title)
+                                            .font(MESCFont.body.weight(.semibold))
+                                            .foregroundStyle(MESCColor.textPrimary)
+                                        Text("Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " - \($0) min" } ?? "")")
+                                            .font(MESCFont.caption)
+                                            .foregroundStyle(MESCColor.textSecondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(MESCColor.textSecondary)
+                                }
+                                .padding(14)
+                                .mescGlass(cornerRadius: 18)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+    }
+}
+
 struct FormationLessonSectionCard: View {
     let section: MobileFormationLessonSectionDTO
 
@@ -1860,16 +2568,28 @@ struct ProfileScreen: View {
                 ProfileInfoRow(title: "Comunidade", value: appModel.activeCommunity?.name ?? "Não carregada")
                 ProfileInfoRow(title: "Paróquia", value: appModel.activeCommunity?.parishName ?? "São Judas Tadeu")
             }
+
+            GlassPanel(spacing: 14) {
+                SectionTitle(title: "Resumo do mês", symbol: "chart.bar")
+                ProfileInfoRow(
+                    title: "Escalas publicadas",
+                    value: "\(appModel.missionHome?.monthlySummary.publishedAssignments ?? 0)"
+                )
+                ProfileInfoRow(
+                    title: "Mês ativo",
+                    value: appModel.currentMonthLabel
+                )
+                ProfileInfoRow(
+                    title: "Notificações",
+                    value: appModel.pushStatusText
+                )
+            }
         }
     }
 }
 
 struct SettingsScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
-    @State private var emailEnabled = true
-    @State private var biometricEnabled = true
-    @State private var cameraEnabled = false
-    @State private var locationEnabled = false
 
     var body: some View {
         MESCScrollScreen(title: "Ajustes", subtitle: "Permissões e preferências") {
@@ -1890,18 +2610,52 @@ struct SettingsScreen: View {
                         .foregroundStyle(MESCColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                SettingsToggleRow(title: "Biometria", detail: "Usar Face ID ou Touch ID depois do login.", symbol: "faceid", isOn: $biometricEnabled)
-                SettingsToggleRow(title: "Camera e fotos", detail: "Foto de perfil e anexos autorizados.", symbol: "camera", isOn: $cameraEnabled)
-                SettingsToggleRow(title: "Localização", detail: "Somente para fluxos pastorais aprovados.", symbol: "location", isOn: $locationEnabled)
+                SettingsToggleRow(
+                    title: appModel.biometricTypeLabel,
+                    detail: appModel.biometricAvailable ? "Permitir desbloqueio biométrico depois do login." : "Biometria não disponível neste aparelho.",
+                    symbol: "faceid",
+                    isOn: biometricBinding
+                )
+                .disabled(!appModel.biometricAvailable || appModel.isUpdatingSettings)
+
+                NativePermissionRow(
+                    title: "Camera e fotos",
+                    detail: "Será solicitada no momento de foto de perfil, aula ou anexo.",
+                    status: "Sob demanda",
+                    symbol: "camera",
+                    isEnabled: false
+                ) {
+                    appModel.openSystemSettings()
+                }
+                NativePermissionRow(
+                    title: "Localização",
+                    detail: "Somente para fluxos pastorais aprovados no PRD.",
+                    status: "Sob demanda",
+                    symbol: "location",
+                    isEnabled: false
+                ) {
+                    appModel.openSystemSettings()
+                }
             }
 
             GlassPanel(spacing: 16) {
-                SectionTitle(title: "Preferencias", symbol: "slider.horizontal.3")
-                SettingsToggleRow(title: "E-mail", detail: "Receber lembretes tambem por e-mail.", symbol: "envelope", isOn: $emailEnabled)
-                NotificationTypeRow(title: "Novo questionario", enabled: true)
-                NotificationTypeRow(title: "Escala publicada", enabled: true)
-                NotificationTypeRow(title: "Substituto aceitou", enabled: true)
-                NotificationTypeRow(title: "Novo treinamento", enabled: true)
+                SectionTitle(title: "Preferências por tipo", symbol: "slider.horizontal.3")
+                ForEach(MESCNotificationPreference.options) { option in
+                    SettingsToggleRow(
+                        title: option.title,
+                        detail: option.detail,
+                        symbol: option.symbol,
+                        isOn: notificationBinding(option.key)
+                    )
+                    .disabled(appModel.isUpdatingSettings)
+                }
+            }
+
+            if let message = appModel.settingsMessage {
+                Label(message, systemImage: message.contains("atualizadas") || message.contains("registrado") ? "checkmark.seal" : "info.circle")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(message.contains("atualizadas") || message.contains("registrado") ? MESCColor.accent : MESCColor.primaryWine)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: 12) {
@@ -1916,6 +2670,24 @@ struct SettingsScreen: View {
         .task {
             await appModel.refreshDevicePermissions()
         }
+    }
+
+    private var biometricBinding: Binding<Bool> {
+        Binding(
+            get: { appModel.biometricEnabled },
+            set: { enabled in
+                Task { await appModel.setBiometricPreference(enabled) }
+            }
+        )
+    }
+
+    private func notificationBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { appModel.notificationPreferences[key] ?? true },
+            set: { enabled in
+                Task { await appModel.setNotificationPreference(key: key, enabled: enabled) }
+            }
+        )
     }
 }
 
@@ -2056,9 +2828,103 @@ struct MissionRow: View {
     }
 }
 
+struct PendingActionRow: View {
+    let action: MobilePendingActionDTO
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            SymbolTile(symbol: symbol, tint: tint)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(action.title)
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                if let subtitle = action.subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let dueAt = action.dueAt {
+                    Text("Prazo: \(MESCNativeAppModel.compactDateTimeLabel(dueAt))")
+                        .font(MESCFont.caption2)
+                        .foregroundStyle(MESCColor.accent)
+                }
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(MESCColor.textSecondary)
+        }
+        .padding(12)
+        .background(MESCColor.surface.opacity(0.68), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var symbol: String {
+        switch action.type {
+        case "questionnaire":
+            return "list.clipboard"
+        case "substitution":
+            return "arrow.triangle.2.circlepath"
+        default:
+            return "exclamationmark.circle"
+        }
+    }
+
+    private var tint: Color {
+        action.priority == "high" ? MESCColor.primaryWine : MESCColor.gold
+    }
+}
+
+struct NoticeSummaryRow: View {
+    let notice: MobileNoticeDTO
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            SymbolTile(symbol: symbol, tint: notice.read ? MESCColor.textSecondary : MESCColor.accent)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(notice.title)
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                Text(notice.message)
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let createdAt = notice.createdAt {
+                    Text(MESCNativeAppModel.compactDateTimeLabel(createdAt))
+                        .font(MESCFont.caption2)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+            }
+            Spacer()
+            if !notice.read {
+                Circle()
+                    .fill(MESCColor.gold)
+                    .frame(width: 8, height: 8)
+            }
+        }
+        .padding(12)
+        .background(MESCColor.surface.opacity(0.68), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var symbol: String {
+        switch notice.type {
+        case "schedule":
+            return "calendar"
+        case "substitution":
+            return "arrow.triangle.2.circlepath"
+        case "formation":
+            return "graduationcap"
+        default:
+            return "bell"
+        }
+    }
+}
+
 struct ScheduleMissionRow: View {
     let mission: ScheduleMission
     let mode: ScheduleMode
+    var onConfirm: (() -> Void)?
+    var onRequestSubstitution: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -2084,6 +2950,26 @@ struct ScheduleMissionRow: View {
                     .font(MESCFont.body)
                     .foregroundStyle(MESCColor.textSecondary)
             }
+
+            if mission.isCurrentUser {
+                HStack(spacing: 8) {
+                    Label(confirmationLabel, systemImage: confirmationSymbol)
+                        .font(MESCFont.caption)
+                        .foregroundStyle(confirmationTint)
+                    Spacer()
+                }
+
+                if onConfirm != nil || onRequestSubstitution != nil {
+                    HStack(spacing: 10) {
+                        if let onConfirm {
+                            MESCPrimaryButton(title: "Confirmar", symbol: "checkmark.circle", action: onConfirm)
+                        }
+                        if let onRequestSubstitution {
+                            MESCSecondaryButton(title: "Trocar", symbol: "arrow.triangle.2.circlepath", action: onRequestSubstitution)
+                        }
+                    }
+                }
+            }
         }
         .padding(14)
         .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -2091,6 +2977,41 @@ struct ScheduleMissionRow: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(MESCColor.gold.opacity(0.14), lineWidth: 1)
         )
+    }
+
+    private var confirmationLabel: String {
+        switch mission.confirmationStatus {
+        case "confirmed":
+            return "Presença confirmada"
+        case "declined":
+            return "Presença recusada"
+        case "pending":
+            return "Confirmação pendente"
+        default:
+            return mission.canConfirm ? "Aguardando confirmação" : "Sem ação pendente"
+        }
+    }
+
+    private var confirmationSymbol: String {
+        switch mission.confirmationStatus {
+        case "confirmed":
+            return "checkmark.seal.fill"
+        case "declined":
+            return "xmark.circle"
+        default:
+            return "clock"
+        }
+    }
+
+    private var confirmationTint: Color {
+        switch mission.confirmationStatus {
+        case "confirmed":
+            return MESCColor.accent
+        case "declined":
+            return MESCColor.primaryWine
+        default:
+            return MESCColor.gold
+        }
     }
 }
 
@@ -2450,6 +3371,12 @@ extension String {
     }
 }
 
+extension Collection {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
 extension UIColor {
     convenience init(hex: UInt, alpha: Double = 1) {
         self.init(
@@ -2534,9 +3461,12 @@ struct MobileDeviceDTO: Codable {
     let platform: String?
     let appVersion: String?
     let pushEnabled: Bool?
+    let pushProvider: String?
+    let notificationPreferences: [String: JSONValue]?
     let biometricCapable: Bool?
     let biometricEnabled: Bool?
     let registered: Bool?
+    let lastSeenAt: String?
 }
 
 enum JSONValue: Codable, Equatable {
@@ -2752,6 +3682,19 @@ struct MobileQuestionnaireAnswerDTO: Codable, Equatable {
 struct MobileQuestionnaireSubmitResponseDTO: Codable {
     let success: Bool
     let response: MobileQuestionnaireSavedResponseDTO
+}
+
+struct MobileScheduleConfirmResponseDTO: Codable {
+    let success: Bool
+}
+
+struct MobileSubstitutionCreateResponseDTO: Codable {
+    let success: Bool
+}
+
+struct MobileDeviceResponseDTO: Codable {
+    let success: Bool
+    let device: MobileDeviceDTO
 }
 
 struct MobileQuestionnaireSavedResponseDTO: Codable {
@@ -3037,6 +3980,83 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func confirmSchedule(
+        scheduleId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        status: String,
+        notes: String?
+    ) async throws -> MobileScheduleConfirmResponseDTO {
+        try await authenticatedPost(
+            "schedules/\(scheduleId)/confirm",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: ScheduleConfirmRequestBody(status: status, notes: notes)
+        )
+    }
+
+    func requestSubstitution(
+        scheduleId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        reason: String?
+    ) async throws -> MobileSubstitutionCreateResponseDTO {
+        try await authenticatedPost(
+            "substitutions",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: SubstitutionCreateRequestBody(scheduleId: scheduleId, reason: reason)
+        )
+    }
+
+    func currentDevice(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileDeviceResponseDTO {
+        try await get(
+            "devices/current",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func updateCurrentDevice(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        appVersion: String?,
+        pushEnabled: Bool?,
+        biometricCapable: Bool?,
+        biometricEnabled: Bool?,
+        notificationPreferences: [String: Bool]?
+    ) async throws -> MobileDeviceResponseDTO {
+        try await authenticatedPut(
+            "devices/current",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            body: DeviceUpdateRequestBody(
+                deviceId: deviceId,
+                platform: "ios",
+                appVersion: appVersion,
+                pushEnabled: pushEnabled,
+                biometricCapable: biometricCapable,
+                biometricEnabled: biometricEnabled,
+                notificationPreferences: notificationPreferences
+            )
+        )
+    }
+
     static func userMessage(for error: Error) -> String {
         if let apiError = error as? MESCMobileAPIError {
             return apiError.localizedDescription
@@ -3084,6 +4104,25 @@ final class MESCMobileAPIClient {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
         request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        request.httpBody = try encoder.encode(body)
+        return try await send(request)
+    }
+
+    private func authenticatedPut<Response: Decodable, Body: Encodable>(
+        _ path: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        body: Body
+    ) async throws -> Response {
+        var request = try makeRequest(path: path)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
         if let communityId {
             request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
         }
@@ -3155,6 +4194,26 @@ private struct RefreshRequestBody: Encodable {
 
 private struct QuestionnaireSubmitRequestBody: Encodable {
     let responses: [MobileQuestionnaireAnswerDTO]
+}
+
+private struct ScheduleConfirmRequestBody: Encodable {
+    let status: String
+    let notes: String?
+}
+
+private struct SubstitutionCreateRequestBody: Encodable {
+    let scheduleId: String
+    let reason: String?
+}
+
+private struct DeviceUpdateRequestBody: Encodable {
+    let deviceId: String
+    let platform: String
+    let appVersion: String?
+    let pushEnabled: Bool?
+    let biometricCapable: Bool?
+    let biometricEnabled: Bool?
+    let notificationPreferences: [String: Bool]?
 }
 
 private struct EmptyRequestBody: Encodable {}
@@ -3270,13 +4329,18 @@ struct ScheduleDay: Identifiable, Equatable {
 }
 
 struct ScheduleMission: Identifiable, Equatable {
-    let id = UUID()
+    let id: String
+    let scheduleId: String?
     let dayNumber: Int
     let time: String
     let title: String
     let community: String
     let role: String
     let ministers: [String]
+    let confirmationStatus: String?
+    let canConfirm: Bool
+    let canRequestSubstitution: Bool
+    let isCurrentUser: Bool
 }
 
 enum ScheduleFixtures {
@@ -3304,53 +4368,83 @@ enum ScheduleFixtures {
         case 5:
             return [
                 ScheduleMission(
+                    id: "fixture-5-0800",
+                    scheduleId: nil,
                     dayNumber: day,
                     time: "08:00",
                     title: "Missa Dominical",
                     community: "Santuário",
                     role: "P1: Auxiliar 1",
-                    ministers: ["Ana Maria", "Carlos Roberto", "Fatima Lima", "Jose Paulo"]
+                    ministers: ["Ana Maria", "Carlos Roberto", "Fatima Lima", "Jose Paulo"],
+                    confirmationStatus: nil,
+                    canConfirm: false,
+                    canRequestSubstitution: false,
+                    isCurrentUser: false
                 ),
                 ScheduleMission(
+                    id: "fixture-5-1800",
+                    scheduleId: nil,
                     dayNumber: day,
                     time: "18:00",
                     title: "Missa da Noite",
                     community: "Santuário",
                     role: "Reserva",
-                    ministers: ["Marina Costa", "Paulo Sergio", "Ana Maria"]
+                    ministers: ["Marina Costa", "Paulo Sergio", "Ana Maria"],
+                    confirmationStatus: nil,
+                    canConfirm: false,
+                    canRequestSubstitution: false,
+                    isCurrentUser: false
                 )
             ]
         case 12:
             return [
                 ScheduleMission(
+                    id: "fixture-12-1000",
+                    scheduleId: nil,
                     dayNumber: day,
                     time: "10:00",
                     title: "Missa da Comunidade",
                     community: "São Judas",
                     role: "P2: Patena",
-                    ministers: ["Ana Maria", "Lucia Helena", "Roberto Alves"]
+                    ministers: ["Ana Maria", "Lucia Helena", "Roberto Alves"],
+                    confirmationStatus: nil,
+                    canConfirm: false,
+                    canRequestSubstitution: false,
+                    isCurrentUser: false
                 )
             ]
         case 19:
             return [
                 ScheduleMission(
+                    id: "fixture-19-0800",
+                    scheduleId: nil,
                     dayNumber: day,
                     time: "08:00",
                     title: "Missa Dominical",
                     community: "Santuário",
                     role: "P1: Auxiliar 2",
-                    ministers: ["Ana Maria", "Beatriz Souza", "Miguel Rocha", "Clara Dias"]
+                    ministers: ["Ana Maria", "Beatriz Souza", "Miguel Rocha", "Clara Dias"],
+                    confirmationStatus: nil,
+                    canConfirm: false,
+                    canRequestSubstitution: false,
+                    isCurrentUser: false
                 )
             ]
         case 26:
             return [
                 ScheduleMission(
+                    id: "fixture-26-1930",
+                    scheduleId: nil,
                     dayNumber: day,
                     time: "19:30",
                     title: "Missa Votiva",
                     community: "Santuário",
                     role: "P3: Apoio",
-                    ministers: ["Ana Maria", "Ricardo Nunes", "Helena Prado"]
+                    ministers: ["Ana Maria", "Ricardo Nunes", "Helena Prado"],
+                    confirmationStatus: nil,
+                    canConfirm: false,
+                    canRequestSubstitution: false,
+                    isCurrentUser: false
                 )
             ]
         default:
