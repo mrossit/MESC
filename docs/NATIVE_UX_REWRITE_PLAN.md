@@ -1,5 +1,12 @@
 # MESC Native UX Rewrite Plan
 
+> **Status em 2026-07-06:** este plano foi superado pela decisao
+> `docs/NATIVE_FRONTEND_REWRITE_DECISION_2026-07-06.md`.
+> O caminho final do MVP deixa de ser aprimorar a UI Capacitor/WebView e passa
+> a ser reconstruir o frontend mobile como cliente nativo SwiftUI/UIKit no iOS
+> e Kotlin/Jetpack Compose no Android. Este documento permanece como historico
+> dos sintomas e criterios levantados durante os testes.
+
 ## Objective
 
 Replace the remaining PWA-like frontend behavior with a native-first app experience while preserving the backend, mobile API contracts, data model, and TestFlight delivery flow.
@@ -9,20 +16,21 @@ Replace the remaining PWA-like frontend behavior with a native-first app experie
 - Keep Liquid Glass for functional layers: navigation, tab bars, sidebars, transient controls, modals, and active control states.
 - Use stable iOS-style materials for content cards so schedules, formation material, questionnaires, and profile data stay legible.
 - Avoid horizontal scrolling for primary navigation on phone screens.
-- Prefer device integrations through Capacitor bridges instead of browser APIs in native builds.
+- Prefer device integrations through native platform APIs. Capacitor bridges are
+  acceptable only enquanto o app WebView existir como baseline temporario.
 - Keep every screen usable before visual flourish: readable text, clear states, touch targets, safe areas, and predictable navigation.
 
 ## Native Capability Tracks
 
 1. Notifications
-   - Use Capacitor Push Notifications in native builds.
+   - Use UserNotifications/APNs on iOS and FCM on Android in the final native clients.
    - Request permission only after an explicit user action.
    - Store APNs/FCM tokens in the mobile device registry.
    - Surface a clear build/provisioning error when APNs entitlement is missing.
    - Re-enable Release entitlements only after Apple Developer Push capability and distribution profile are valid.
 
 2. Biometry
-   - Keep Capgo Native Biometric for Face ID/Touch ID.
+   - Use LocalAuthentication on iOS and BiometricPrompt on Android.
    - Prevent biometric loops on expired sessions.
    - Keep manual login as the fallback for expired or revoked credentials.
 
@@ -47,8 +55,8 @@ Replace the remaining PWA-like frontend behavior with a native-first app experie
 
 Each TestFlight candidate must pass:
 
-- TypeScript check.
+- Native compiler/type check for the active client.
 - Focused unit/integration tests for touched flows.
-- `build:mobile` and `cap sync ios`.
+- Platform build for the active client.
 - Visual pass on iPhone viewport for safe areas, no horizontal overflow, touch targets, and dark mode.
 - App Store Connect processing state `VALID`.

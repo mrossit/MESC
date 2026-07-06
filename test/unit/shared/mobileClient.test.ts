@@ -26,6 +26,11 @@ describe("mobileClient contract", () => {
       .toBe("/notifications/notification%2Fwith%20slash/read");
     expect(mobileEndpoints.revokeDevice("device/with slash")).toBe("/devices/device%2Fwith%20slash");
     expect(mobileEndpoints.account()).toBe("/account");
+    expect(mobileEndpoints.formationOverview()).toBe("/formation/overview");
+    expect(mobileEndpoints.formationLesson("track/with slash", "module/with slash", 3))
+      .toBe("/formation/track%2Fwith%20slash/module%2Fwith%20slash/3");
+    expect(mobileEndpoints.completeFormationLesson("lesson/with slash"))
+      .toBe("/formation/lessons/lesson%2Fwith%20slash/complete");
     expect(mobileEndpoints.adminCommunityHome({ month: "2026-07" }))
       .toBe("/admin/community/home?month=2026-07");
     expect(mobileEndpoints.adminScheduleReadiness({ month: "2026-07" }))
@@ -121,6 +126,106 @@ describe("mobileClient contract", () => {
       "X-Community-Id": "community-1",
       "X-Device-Id": "ios-device-1",
       [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  it("calls formation endpoints with native auth and idempotency", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const fetcher: MobileFetch = async (input, init) => {
+      requests.push({ input, init });
+
+      if (input.endsWith("/formation/overview")) {
+        return new Response(JSON.stringify({
+          success: true,
+          overview: {
+            tracks: [],
+            summary: {
+              totalTracks: 0,
+              totalModules: 0,
+              totalLessons: 0,
+              completedLessons: 0,
+              inProgressLessons: 0,
+              percentageCompleted: 0,
+              lastUpdated: "2026-07-01T00:00:00.000Z",
+            },
+          },
+        }), { status: 200 });
+      }
+
+      if (input.endsWith("/formation/track-1/module-1/2")) {
+        return new Response(JSON.stringify({
+          success: true,
+          lesson: {
+            id: "lesson-2",
+            moduleId: "module-1",
+            trackId: "track-1",
+            title: "Rito da comunhao",
+            description: null,
+            lessonNumber: 2,
+            estimatedDuration: 12,
+            contentType: "text",
+            contentUrl: null,
+            videoUrl: null,
+            documentUrl: null,
+          },
+          sections: [],
+          progress: {
+            status: "in_progress",
+            progressPercentage: 40,
+            timeSpent: 5,
+            completedSections: [],
+          },
+        }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        progress: {
+          status: "completed",
+          progressPercentage: 100,
+          timeSpent: 5,
+          completedSections: ["section-1"],
+        },
+      }), { status: 200 });
+    };
+
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      communityId: "community-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      fetch: fetcher,
+    });
+
+    await client.getFormationOverview();
+    await client.getFormationLesson({ trackId: "track-1", moduleId: "module-1", lessonNumber: 2 });
+    await client.completeFormationLesson("lesson-2", {
+      idempotencyKey: "11111111-1111-4111-8111-111111111111",
+    });
+
+    expect(requests[0].input).toBe("https://example.test/api/mobile/v1/formation/overview");
+    expect(requests[0].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+    });
+
+    expect(requests[1].input).toBe("https://example.test/api/mobile/v1/formation/track-1/module-1/2");
+    expect(requests[1].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+    });
+
+    expect(requests[2].input).toBe("https://example.test/api/mobile/v1/formation/lessons/lesson-2/complete");
+    expect(requests[2].init.method).toBe("POST");
+    expect(requests[2].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+      [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
+      "Content-Type": "application/json",
     });
   });
 
