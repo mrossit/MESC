@@ -133,7 +133,7 @@ final class MESCNativeAppModel: ObservableObject {
         questionnaireCurrent?.questionnaire
     }
 
-    var pushEnabled: Bool {
+    var pushAuthorizationGranted: Bool {
         switch pushAuthorizationStatus {
         case .authorized, .provisional, .ephemeral:
             return true
@@ -142,13 +142,26 @@ final class MESCNativeAppModel: ObservableObject {
         }
     }
 
+    var pushEnabled: Bool {
+        pushAuthorizationGranted
+    }
+
+    var pushLinkedToServer: Bool {
+        pushAuthorizationGranted
+            && currentDevice?.pushEnabled == true
+            && currentDevice?.pushProvider == "apns"
+    }
+
     var pushStatusText: String {
         switch pushAuthorizationStatus {
         case .authorized:
-            if sessionStore.remotePushToken != nil || currentDevice?.pushProvider == "apns" {
+            if pushLinkedToServer {
                 return "Ativas e vinculadas"
             }
-            return "Ativas neste iPhone"
+            if sessionStore.remotePushToken != nil {
+                return "Sincronizando com o MESC"
+            }
+            return "Permissão ativa no iPhone"
         case .provisional:
             return "Ativas silenciosamente"
         case .ephemeral:
@@ -159,6 +172,34 @@ final class MESCNativeAppModel: ObservableObject {
             return "Toque para permitir"
         @unknown default:
             return "Status desconhecido"
+        }
+    }
+
+    var pushConnectionText: String {
+        let iosState = pushAuthorizationGranted ? "iOS ativo" : "iOS pendente"
+        let serverState = pushLinkedToServer ? "MESC vinculado" : "MESC pendente"
+        return "\(iosState) • \(serverState)"
+    }
+
+    var pushActionTitle: String {
+        switch pushAuthorizationStatus {
+        case .denied:
+            return "Abrir Ajustes"
+        case .notDetermined:
+            return "Permitir"
+        default:
+            return pushLinkedToServer ? "Revalidar" : "Vincular"
+        }
+    }
+
+    var pushPermissionDetail: String {
+        switch pushAuthorizationStatus {
+        case .denied:
+            return "O iOS bloqueou as notificações. Abra os Ajustes do iPhone para permitir novamente."
+        case .notDetermined:
+            return "Receba escala, questionário, substituições e avisos sem depender do navegador."
+        default:
+            return "Permissão nativa do iPhone com entrega pelo cadastro seguro deste aparelho."
         }
     }
 
@@ -307,11 +348,45 @@ final class MESCNativeAppModel: ObservableObject {
         refreshBiometricCapability()
     }
 
+    func refreshNativeNotificationState() async {
+        await refreshDevicePermissions()
+
+        guard sessionState == .authenticated else { return }
+
+        if pushAuthorizationGranted {
+            await MainActor.run {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+            await syncStoredRemotePushTokenIfNeeded()
+        } else if currentDevice?.pushEnabled == true {
+            await updateCurrentDevice(pushEnabled: false)
+        }
+    }
+
     func requestPushNotifications() async {
         pushPermissionMessage = nil
+        await refreshDevicePermissions()
 
         if pushAuthorizationStatus == .denied {
+            pushPermissionMessage = "Ative as notificações em Ajustes do iPhone para receber avisos do MESC."
             openSystemSettings()
+            return
+        }
+
+        if pushAuthorizationGranted {
+            await MainActor.run {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+            if let token = sessionStore.remotePushToken {
+                await updateCurrentDevice(
+                    pushToken: token,
+                    pushProvider: "apns",
+                    pushEnabled: true
+                )
+                pushPermissionMessage = "Notificações nativas vinculadas a este iPhone."
+            } else {
+                pushPermissionMessage = "Permissão ativa. Finalizando o vínculo seguro deste iPhone."
+            }
             return
         }
 
@@ -322,11 +397,16 @@ final class MESCNativeAppModel: ObservableObject {
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
-                await updateCurrentDevice(
-                    pushToken: sessionStore.remotePushToken,
-                    pushProvider: sessionStore.remotePushToken == nil ? nil : "apns",
-                    pushEnabled: true
-                )
+                if let token = sessionStore.remotePushToken {
+                    await updateCurrentDevice(
+                        pushToken: token,
+                        pushProvider: "apns",
+                        pushEnabled: true
+                    )
+                    pushPermissionMessage = "Notificações nativas vinculadas a este iPhone."
+                } else {
+                    pushPermissionMessage = "Permissão concedida. Finalizando o vínculo seguro deste iPhone."
+                }
             } else {
                 pushPermissionMessage = "Permissão não concedida. Você pode habilitar em Ajustes do iPhone."
                 await updateCurrentDevice(pushEnabled: false)
@@ -1161,6 +1241,7 @@ final class MESCNativeAppModel: ObservableObject {
 }
 
 struct MESCNativeRootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: MESCTab = .mission
     @StateObject private var appModel = MESCNativeAppModel()
 
@@ -1179,6 +1260,10 @@ struct MESCNativeRootView: View {
         }
         .task {
             await appModel.restoreSessionIfNeeded()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task { await appModel.refreshNativeNotificationState() }
         }
         .tint(MESCColor.primaryRed)
     }
@@ -2693,13 +2778,18 @@ struct SettingsScreen: View {
                 SectionTitle(title: "Central do aparelho", symbol: "iphone")
                 NativePermissionRow(
                     title: "Notificações push",
-                    detail: "Escala, questionário, substituições e avisos.",
+                    detail: appModel.pushPermissionDetail,
                     status: appModel.pushStatusText,
                     symbol: "bell",
-                    isEnabled: appModel.pushEnabled
+                    isEnabled: appModel.pushLinkedToServer,
+                    actionTitle: appModel.pushActionTitle
                 ) {
                     Task { await appModel.requestPushNotifications() }
                 }
+                Label(appModel.pushConnectionText, systemImage: appModel.pushLinkedToServer ? "checkmark.icloud" : "iphone.badge.exclamationmark")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(appModel.pushLinkedToServer ? MESCColor.gold : MESCColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let message = appModel.pushPermissionMessage {
                     Label(message, systemImage: "info.circle")
                         .font(MESCFont.caption)
@@ -2719,7 +2809,8 @@ struct SettingsScreen: View {
                     detail: "Será solicitada no momento de foto de perfil, aula ou anexo.",
                     status: "Sob demanda",
                     symbol: "camera",
-                    isEnabled: false
+                    isEnabled: false,
+                    actionTitle: "Ajustes"
                 ) {
                     appModel.openSystemSettings()
                 }
@@ -2728,7 +2819,8 @@ struct SettingsScreen: View {
                     detail: "Somente para fluxos pastorais aprovados no PRD.",
                     status: "Sob demanda",
                     symbol: "location",
-                    isEnabled: false
+                    isEnabled: false,
+                    actionTitle: "Ajustes"
                 ) {
                     appModel.openSystemSettings()
                 }
@@ -2764,7 +2856,7 @@ struct SettingsScreen: View {
             }
         }
         .task {
-            await appModel.refreshDevicePermissions()
+            await appModel.refreshNativeNotificationState()
         }
     }
 
@@ -3181,7 +3273,7 @@ struct SettingsToggleRow: View {
                 .labelsHidden()
         }
         .padding(12)
-        .background(MESCColor.surface.opacity(0.68), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .mescGlass(cornerRadius: 18)
     }
 }
 
@@ -3191,6 +3283,7 @@ struct NativePermissionRow: View {
     let status: String
     let symbol: String
     let isEnabled: Bool
+    let actionTitle: String
     let action: () -> Void
 
     var body: some View {
@@ -3212,12 +3305,20 @@ struct NativePermissionRow: View {
 
                 Spacer()
 
-                Image(systemName: isEnabled ? "checkmark.circle.fill" : "chevron.right")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(isEnabled ? MESCColor.gold : MESCColor.textSecondary)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Image(systemName: isEnabled ? "checkmark.circle.fill" : "chevron.right")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(isEnabled ? MESCColor.gold : MESCColor.textSecondary)
+
+                    Text(actionTitle)
+                        .font(MESCFont.caption2.weight(.semibold))
+                        .foregroundStyle(isEnabled ? MESCColor.gold : MESCColor.accent)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
             }
             .padding(12)
-            .background(MESCColor.surface.opacity(0.68), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .mescGlass(cornerRadius: 18)
         }
         .buttonStyle(.plain)
     }
