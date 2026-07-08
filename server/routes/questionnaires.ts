@@ -22,6 +22,7 @@ import {
   convertResponsesToCSV
 } from '../utils/csvExporter';
 import { QuestionnaireService } from '../services/questionnaireService';
+import { sanitizeQuestionnaireResponses } from '../utils/questionnaireSanitization';
 
 const router = Router();
 
@@ -360,10 +361,13 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Verificar se existe template e se não está encerrado
+    let templateForSanitization: typeof questionnaires.$inferSelect | null = null;
+
     if (data.questionnaireId) {
       const [template] = await db.select().from(questionnaires)
         .where(eq(questionnaires.id, data.questionnaireId))
         .limit(1);
+      templateForSanitization = template || null;
       
       if (template && template.status === 'closed') {
         return res.status(400).json({ error: 'Este questionário foi encerrado e não aceita mais respostas' });
@@ -422,6 +426,7 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
 
       if (template) {
         templateId = template.id;
+        templateForSanitization = template;
         console.log('[RESPONSES] Template existente encontrado:', templateId);
       } else {
         console.log('[RESPONSES] Template não encontrado, criando novo...');
@@ -439,15 +444,21 @@ router.post('/responses', requireAuth, async (req: AuthRequest, res) => {
           })
           .returning();
         templateId = newTemplate.id;
+        templateForSanitization = newTemplate;
         console.log('[RESPONSES] Novo template criado:', templateId);
       }
     }
     console.log('[RESPONSES] Template ID final:', templateId);
 
+    const sanitizedResponses = sanitizeQuestionnaireResponses(
+      templateForSanitization?.questions,
+      data.responses
+    );
+
     // 🛡️ CRITICAL: Standardize ALL responses to v2.0 format WITH SAFETY NET
     console.log('[RESPONSES] Standardizing responses to v2.0 format with tracking');
     const processingResult = QuestionnaireService.standardizeResponseWithTracking(
-      data.responses,
+      sanitizedResponses,
       data.month,
       data.year
     );

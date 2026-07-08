@@ -26,6 +26,7 @@ import { auditLoginAttempt } from "../middleware/auditLogger";
 import { logActivity } from "../utils/activityLogger";
 import { createSession } from "./session";
 import { QuestionnaireService } from "../services/questionnaireService";
+import { sanitizeQuestionnaireResponses } from "../utils/questionnaireSanitization";
 import { scheduleCache } from "../services/scheduleCache";
 import { trackSubstitutionFulfillment, trackSubstitutionRequest } from "../services/reliabilityScoreService";
 import { isMissingTableError } from "../utils/databaseErrors";
@@ -1635,8 +1636,10 @@ router.post("/questionnaires/:id/response", authenticateToken, async (req: AuthR
       throw new MobileHttpError(400, "Questionario ainda nao esta publicado");
     }
 
+    const sanitizedResponses = sanitizeQuestionnaireResponses(questionnaire.questions, parsed.responses);
+
     const processingResult = QuestionnaireService.standardizeResponseWithTracking(
-      parsed.responses,
+      sanitizedResponses,
       questionnaire.month,
       questionnaire.year,
     );
