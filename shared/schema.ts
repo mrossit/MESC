@@ -490,14 +490,7 @@ export const mobileDevices = pgTable('mobile_devices', {
   pushToken: text('push_token'),
   pushProvider: varchar('push_provider', { length: 32 }),
   pushEnabled: boolean('push_enabled').notNull().default(false),
-  notificationPreferences: jsonb('notification_preferences').$type<{
-    schedules?: boolean;
-    questionnaires?: boolean;
-    substitutions?: boolean;
-    announcements?: boolean;
-    quietHoursStart?: string;
-    quietHoursEnd?: string;
-  }>().default({}),
+  notificationPreferences: jsonb('notification_preferences').$type<Record<string, unknown>>().default({}),
   biometricCapable: boolean('biometric_capable').notNull().default(false),
   biometricEnabled: boolean('biometric_enabled').notNull().default(false),
   lastSeenAt: timestamp('last_seen_at').defaultNow(),

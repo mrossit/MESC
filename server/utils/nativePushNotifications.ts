@@ -2,6 +2,10 @@ import http2 from "http2";
 import jwt from "jsonwebtoken";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { mobileDevices } from "@shared/schema";
+import {
+  extractMobileNotificationEventKey,
+  type MobileNotificationEventKey,
+} from "@shared/mobileNotificationEvents";
 import { db } from "../db";
 
 type NativePushProvider = "apns" | "fcm";
@@ -20,6 +24,7 @@ type NativePushDevice = {
   platform: string;
   pushToken: string | null;
   pushProvider: string | null;
+  notificationPreferences: Record<string, unknown> | null;
 };
 
 type NativePushResult = {
@@ -40,6 +45,17 @@ const APNS_PRODUCTION_HOST = "https://api.push.apple.com";
 const APNS_SANDBOX_HOST = "https://api.sandbox.push.apple.com";
 const FCM_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+
+const LEGACY_NOTIFICATION_PREFERENCE_KEYS: Partial<Record<MobileNotificationEventKey, string>> = {
+  questionnaire_published: "questionnaires",
+  questionnaire_closed: "questionnaires",
+  schedule_published: "schedules",
+  schedule_reminder: "schedules",
+  sanctuary_event_published: "announcements",
+  substitution_requested: "substitutions",
+  substitute_accepted: "substitutions",
+  coordinator_announcement: "announcements",
+};
 
 let cachedFcmAccessToken: { value: string; expiresAt: number } | null = null;
 
@@ -114,6 +130,26 @@ function compactData(data: Record<string, unknown> = {}) {
   }
 
   return result;
+}
+
+function booleanPreference(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function isNativePushEnabledForPayload(device: NativePushDevice, payload: NativePushPayload) {
+  const eventKey = extractMobileNotificationEventKey(payload.data);
+  if (!eventKey) return true;
+
+  const preferences = device.notificationPreferences ?? {};
+  const eventPreference = booleanPreference(preferences[eventKey]);
+  if (eventPreference !== null) return eventPreference;
+
+  const legacyPreferenceKey = LEGACY_NOTIFICATION_PREFERENCE_KEYS[eventKey];
+  const legacyPreference = legacyPreferenceKey
+    ? booleanPreference(preferences[legacyPreferenceKey])
+    : null;
+
+  return legacyPreference ?? true;
 }
 
 function buildApnsPayload(payload: NativePushPayload) {
@@ -298,6 +334,7 @@ async function loadNativePushDevices(userIds: string[]): Promise<NativePushDevic
       platform: mobileDevices.platform,
       pushToken: mobileDevices.pushToken,
       pushProvider: mobileDevices.pushProvider,
+      notificationPreferences: mobileDevices.notificationPreferences,
     })
     .from(mobileDevices)
     .where(and(
@@ -325,7 +362,13 @@ export async function sendNativePushNotificationToUsers(userIds: string[], paylo
     return { sent: 0, failed: 0, skipped: false };
   }
 
-  const results: NativePushResult[] = await Promise.all(devices.map(async (device) => {
+  const eligibleDevices = devices.filter((device) => isNativePushEnabledForPayload(device, payload));
+  if (eligibleDevices.length === 0) {
+    console.info("[NATIVE_PUSH] No active native devices opted in for this notification event.");
+    return { sent: 0, failed: 0, skipped: false };
+  }
+
+  const results: NativePushResult[] = await Promise.all(eligibleDevices.map(async (device) => {
     const token = device.pushToken ?? "";
     const provider = device.pushProvider === "fcm" || device.platform === "android" ? "fcm" : "apns";
 
