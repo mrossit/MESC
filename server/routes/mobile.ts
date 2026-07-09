@@ -37,9 +37,13 @@ import {
   type GeneratedSchedule,
 } from "../utils/scheduleGenerator";
 import {
+  createFormationAdminLesson,
+  createFormationAdminLessonSection,
+  getFormationAdminStudio,
   getFormationOverview,
   getLessonDetail,
   markLessonCompleted,
+  updateFormationAdminLesson,
 } from "../services/formationService";
 import { sendPushNotificationToUsers } from "../utils/pushNotifications";
 import {
@@ -137,6 +141,51 @@ const confirmationSchema = z.object({
   status: z.enum(["confirmed", "declined"]).default("confirmed"),
   declineReason: z.string().max(1000).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
+});
+
+const optionalTrimmedText = (maxLength: number) =>
+  z.preprocess(
+    (value) => {
+      if (typeof value !== "string") return value;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    },
+    z.string().max(maxLength).nullable().optional(),
+  );
+
+const optionalUrlText = optionalTrimmedText(512);
+
+const formationAdminLessonCreateSchema = z.object({
+  moduleId: z.string().uuid(),
+  title: z.string().trim().min(3).max(255),
+  description: optionalTrimmedText(4000),
+  lessonNumber: z.number().int().min(1).max(999).optional(),
+  durationMinutes: z.number().int().min(1).max(600).nullable().optional(),
+  isActive: z.boolean().optional().default(true),
+  sectionTitle: optionalTrimmedText(255),
+  sectionContent: optionalTrimmedText(10000),
+  videoUrl: optionalUrlText,
+});
+
+const formationAdminLessonUpdateSchema = z.object({
+  title: z.string().trim().min(3).max(255).optional(),
+  description: optionalTrimmedText(4000),
+  lessonNumber: z.number().int().min(1).max(999).optional(),
+  durationMinutes: z.number().int().min(1).max(600).nullable().optional(),
+  isActive: z.boolean().optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: "Informe ao menos um campo para atualizar",
+});
+
+const formationAdminSectionCreateSchema = z.object({
+  title: z.string().trim().min(3).max(255),
+  content: optionalTrimmedText(10000),
+  type: z.enum(["text", "video", "audio", "document", "quiz", "interactive"]).optional(),
+  videoUrl: optionalUrlText,
+  audioUrl: optionalUrlText,
+  documentUrl: optionalUrlText,
+  estimatedMinutes: z.number().int().min(1).max(600).nullable().optional(),
+  isRequired: z.boolean().optional().default(true),
 });
 
 function normalizeMobileScheduleTime(time: string | null | undefined): string {
@@ -871,6 +920,75 @@ function handleMobileError(res: Response, error: unknown, fallbackMessage: strin
     success: false,
     message: fallbackMessage,
   });
+}
+
+function requireFormationAdmin(user: AuthRequest["user"]) {
+  if (!user) {
+    throw new MobileHttpError(401, "Usuario nao autenticado");
+  }
+
+  if (!isAdmin(user.role)) {
+    throw new MobileHttpError(403, "Apenas gestores e coordenadores podem editar formacao");
+  }
+}
+
+async function notifyFormationAvailableFromMobile(input: {
+  communityId: string;
+  lessonId: string;
+  moduleId: string;
+  trackId?: string | null;
+  title: string;
+}) {
+  try {
+    const recipients = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.homeCommunityId, input.communityId),
+          eq(users.status, "active"),
+          inArray(users.role, DB_MINISTER_AND_COORDINATOR_ROLES),
+        ),
+      );
+    const recipientIds = [...new Set(recipients.map((recipient) => recipient.id))];
+
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const title = "Novo treinamento disponível";
+    const message = `${input.title} já está disponível na formação.`;
+    const actionUrl = input.trackId ? `/formation/${input.trackId}` : "/formation";
+    const data = mobileNotificationData("formation_available", {
+      trackId: input.trackId ?? null,
+      moduleId: input.moduleId,
+      lessonId: input.lessonId,
+    });
+
+    const notificationRows: Array<typeof notifications.$inferInsert> = recipientIds.map((userId) => ({
+      ...localUuid(),
+      userId,
+      title,
+      message,
+      type: "formation",
+      read: dbBoolean(false),
+      actionUrl,
+      priority: "normal",
+      data: dbJson(data),
+      createdAt: new Date(),
+    }));
+
+    await db.insert(notifications).values(notificationRows);
+
+    await sendPushNotificationToUsers(recipientIds, {
+      title,
+      body: message,
+      url: actionUrl,
+      data,
+    });
+  } catch (error) {
+    console.error("[Mobile API] Erro ao notificar nova formacao:", error);
+  }
 }
 
 router.get("/app/config", (req, res) => {
@@ -1827,6 +1945,199 @@ router.post("/formation/lessons/:lessonId/complete", authenticateToken, async (r
   } catch (error) {
     await releaseMobileIdempotencyQuietly(idempotencyRecordId);
     return handleMobileError(res, error, "Erro ao concluir aula de formacao");
+  }
+});
+
+router.get("/formation/admin/studio", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    requireFormationAdmin(req.user);
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const studio = await getFormationAdminStudio();
+
+    res.json({
+      success: true,
+      community: activeCommunity,
+      studio,
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar estudio de formacao");
+  }
+});
+
+router.post("/formation/admin/lessons", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireFormationAdmin(user);
+
+    const parsed = formationAdminLessonCreateSchema.parse(req.body);
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const created = await createFormationAdminLesson(parsed);
+
+    if (!created?.detail) {
+      throw new MobileHttpError(404, "Modulo de formacao nao encontrado");
+    }
+
+    await logActivity(user!.id, "create_formation_lesson", {
+      source: "mobile-v1",
+      lessonId: created.detail.lesson.id,
+      moduleId: created.detail.lesson.moduleId,
+      communityId: activeCommunity.id,
+      idempotencyKey: idempotency.idempotencyKey,
+    }, req);
+
+    if (created.detail.lesson.isActive) {
+      await notifyFormationAvailableFromMobile({
+        communityId: activeCommunity.id,
+        lessonId: created.detail.lesson.id,
+        moduleId: created.detail.lesson.moduleId,
+        trackId: created.detail.lesson.trackId,
+        title: created.detail.lesson.title,
+      });
+    }
+
+    const responseBody = {
+      success: true,
+      lesson: created.detail.lesson,
+      sections: created.detail.sections,
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 201,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.status(201).json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao criar aula de formacao");
+  }
+});
+
+router.patch("/formation/admin/lessons/:lessonId", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireFormationAdmin(user);
+
+    const parsed = formationAdminLessonUpdateSchema.parse(req.body);
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const updated = await updateFormationAdminLesson(req.params.lessonId, parsed);
+
+    if (!updated?.detail) {
+      throw new MobileHttpError(404, "Aula de formacao nao encontrada");
+    }
+
+    await logActivity(user!.id, "update_formation_lesson", {
+      source: "mobile-v1",
+      lessonId: updated.detail.lesson.id,
+      moduleId: updated.detail.lesson.moduleId,
+      communityId: activeCommunity.id,
+      idempotencyKey: idempotency.idempotencyKey,
+    }, req);
+
+    const responseBody = {
+      success: true,
+      lesson: updated.detail.lesson,
+      sections: updated.detail.sections,
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao atualizar aula de formacao");
+  }
+});
+
+router.post("/formation/admin/lessons/:lessonId/sections", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireFormationAdmin(user);
+
+    const parsed = formationAdminSectionCreateSchema.parse(req.body);
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const created = await createFormationAdminLessonSection(req.params.lessonId, parsed);
+
+    if (!created?.detail) {
+      throw new MobileHttpError(404, "Aula de formacao nao encontrada");
+    }
+
+    await logActivity(user!.id, "create_formation_lesson_section", {
+      source: "mobile-v1",
+      lessonId: created.detail.lesson.id,
+      moduleId: created.detail.lesson.moduleId,
+      communityId: activeCommunity.id,
+      idempotencyKey: idempotency.idempotencyKey,
+    }, req);
+
+    const responseBody = {
+      success: true,
+      section: created.section,
+      lesson: created.detail.lesson,
+      sections: created.detail.sections,
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 201,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.status(201).json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao criar conteudo da aula");
   }
 });
 

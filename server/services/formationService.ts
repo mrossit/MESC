@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import {
+  formationLessonSections,
+  formationLessons,
+  formationModules,
+} from "@shared/schema";
 import { db } from "../db";
 
 type TrackRow = {
@@ -157,6 +162,92 @@ export type FormationOverviewResponse = {
   };
 };
 
+export type FormationAdminLessonView = {
+  id: string;
+  moduleId: string;
+  trackId: string | null;
+  title: string;
+  description: string | null;
+  orderIndex: number;
+  lessonNumber: number;
+  estimatedDuration: number | null;
+  isActive: boolean;
+  videoUrl: string | null;
+  documentUrl: string | null;
+  sectionsCount: number;
+  updatedAt: string | null;
+};
+
+export type FormationAdminModuleView = {
+  id: string;
+  trackId: string;
+  title: string;
+  description: string | null;
+  orderIndex: number;
+  durationMinutes: number | null;
+  videoUrl: string | null;
+  lessons: FormationAdminLessonView[];
+};
+
+export type FormationAdminTrackView = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  orderIndex: number;
+  icon: string | null;
+  isActive: boolean;
+  modules: FormationAdminModuleView[];
+};
+
+export type FormationAdminStudioResponse = {
+  tracks: FormationAdminTrackView[];
+  summary: {
+    totalTracks: number;
+    totalModules: number;
+    totalLessons: number;
+    activeLessons: number;
+    videoLessons: number;
+    lastUpdated: string;
+  };
+};
+
+export type FormationAdminLessonDetailView = {
+  lesson: FormationAdminLessonView;
+  sections: LessonSectionView[];
+};
+
+export type CreateFormationAdminLessonInput = {
+  moduleId: string;
+  title: string;
+  description?: string | null;
+  lessonNumber?: number;
+  durationMinutes?: number | null;
+  isActive?: boolean;
+  sectionTitle?: string | null;
+  sectionContent?: string | null;
+  videoUrl?: string | null;
+};
+
+export type UpdateFormationAdminLessonInput = Partial<{
+  title: string;
+  description: string | null;
+  lessonNumber: number;
+  durationMinutes: number | null;
+  isActive: boolean;
+}>;
+
+export type CreateFormationAdminSectionInput = {
+  title: string;
+  content?: string | null;
+  type?: "text" | "video" | "audio" | "document" | "quiz" | "interactive";
+  videoUrl?: string | null;
+  audioUrl?: string | null;
+  documentUrl?: string | null;
+  estimatedMinutes?: number | null;
+  isRequired?: boolean;
+};
+
 type QueryResult = { rows?: unknown[] } | unknown[] | null | undefined;
 
 const parseRows = <T>(result: QueryResult): T[] => {
@@ -210,6 +301,11 @@ const parseProgressMeta = (
   } catch {
     return { completedSections: [], progressPercentage: 0 };
   }
+};
+
+const toBool = (value: unknown, fallback = false) => {
+  if (value === null || value === undefined) return fallback;
+  return value === true || value === 1 || value === "1" || value === "true";
 };
 
 const buildLessonProgressView = (
@@ -317,8 +413,24 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
         duration_minutes AS "estimatedDuration",
         'text' AS "contentType",
         '' AS "contentUrl",
-        '' AS "videoUrl",
-        '' AS "documentUrl"
+        COALESCE((
+          SELECT section.video_url
+          FROM formation_lesson_sections section
+          WHERE section.lesson_id = formation_lessons.id
+            AND section.video_url IS NOT NULL
+            AND section.video_url <> ''
+          ORDER BY COALESCE(section.order_index, 0), section.created_at
+          LIMIT 1
+        ), '') AS "videoUrl",
+        COALESCE((
+          SELECT section.document_url
+          FROM formation_lesson_sections section
+          WHERE section.lesson_id = formation_lessons.id
+            AND section.document_url IS NOT NULL
+            AND section.document_url <> ''
+          ORDER BY COALESCE(section.order_index, 0), section.created_at
+          LIMIT 1
+        ), '') AS "documentUrl"
       FROM formation_lessons
       WHERE COALESCE(is_active, true) = true
       ORDER BY module_id, lesson_number
@@ -467,8 +579,24 @@ export async function getLessonDetail(params: {
       duration_minutes AS "estimatedDuration",
       'text' AS "contentType",
       '' AS "contentUrl",
-      '' AS "videoUrl",
-      '' AS "documentUrl"
+      COALESCE((
+        SELECT section.video_url
+        FROM formation_lesson_sections section
+        WHERE section.lesson_id = formation_lessons.id
+          AND section.video_url IS NOT NULL
+          AND section.video_url <> ''
+        ORDER BY COALESCE(section.order_index, 0), section.created_at
+        LIMIT 1
+      ), '') AS "videoUrl",
+      COALESCE((
+        SELECT section.document_url
+        FROM formation_lesson_sections section
+        WHERE section.lesson_id = formation_lessons.id
+          AND section.document_url IS NOT NULL
+          AND section.document_url <> ''
+        ORDER BY COALESCE(section.order_index, 0), section.created_at
+        LIMIT 1
+      ), '') AS "documentUrl"
     FROM formation_lessons
     WHERE module_id = ${moduleId}
       AND lesson_number = ${lessonNumber}
@@ -977,4 +1105,384 @@ export async function listLessonProgressEntries(params: {
       row
     ),
   }));
+}
+
+type AdminTrackRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  orderIndex: number | null;
+  icon: string | null;
+  isActive: boolean | number | string | null;
+};
+
+type AdminModuleRow = {
+  id: string;
+  trackId: string;
+  title: string;
+  description: string | null;
+  orderIndex: number | null;
+  durationMinutes: number | null;
+  videoUrl: string | null;
+};
+
+type AdminLessonRow = {
+  id: string;
+  moduleId: string;
+  trackId: string | null;
+  title: string;
+  description: string | null;
+  orderIndex: number | null;
+  lessonNumber: number;
+  estimatedDuration: number | null;
+  isActive: boolean | number | string | null;
+  videoUrl: string | null;
+  documentUrl: string | null;
+  sectionsCount: number | string | null;
+  updatedAt: string | Date | null;
+};
+
+const toIsoStringOrNull = (value: string | Date | null | undefined) => {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+};
+
+const toFormationAdminLessonView = (lesson: AdminLessonRow): FormationAdminLessonView => ({
+  id: lesson.id,
+  moduleId: lesson.moduleId,
+  trackId: lesson.trackId,
+  title: lesson.title,
+  description: lesson.description,
+  orderIndex: lesson.orderIndex ?? 0,
+  lessonNumber: lesson.lessonNumber,
+  estimatedDuration: lesson.estimatedDuration,
+  isActive: toBool(lesson.isActive, true),
+  videoUrl: lesson.videoUrl || null,
+  documentUrl: lesson.documentUrl || null,
+  sectionsCount: Number(lesson.sectionsCount ?? 0),
+  updatedAt: toIsoStringOrNull(lesson.updatedAt),
+});
+
+async function getNextLessonNumber(moduleId: string) {
+  const result = await db.execute(sql`
+    SELECT COALESCE(MAX(lesson_number), 0) + 1 AS "nextLessonNumber"
+    FROM formation_lessons
+    WHERE module_id = ${moduleId}
+  `);
+  const row = parseRows<{ nextLessonNumber: number | string }>(result)[0];
+  return Number(row?.nextLessonNumber ?? 1);
+}
+
+async function getNextSectionOrder(lessonId: string) {
+  const result = await db.execute(sql`
+    SELECT COALESCE(MAX(order_index), 0) + 1 AS "nextOrderIndex"
+    FROM formation_lesson_sections
+    WHERE lesson_id = ${lessonId}
+  `);
+  const row = parseRows<{ nextOrderIndex: number | string }>(result)[0];
+  return Number(row?.nextOrderIndex ?? 1);
+}
+
+export async function getFormationAdminStudio(): Promise<FormationAdminStudioResponse> {
+  const [tracksResult, modulesResult, lessonsResult] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        id,
+        title,
+        description,
+        category,
+        COALESCE(order_index, 0) AS "orderIndex",
+        icon,
+        COALESCE(is_active, true) AS "isActive"
+      FROM formation_tracks
+      ORDER BY COALESCE(order_index, 0), title
+    `),
+    db.execute(sql`
+      SELECT
+        id,
+        track_id AS "trackId",
+        title,
+        description,
+        COALESCE(order_index, 0) AS "orderIndex",
+        duration_minutes AS "durationMinutes",
+        video_url AS "videoUrl"
+      FROM formation_modules
+      ORDER BY track_id, COALESCE(order_index, 0), title
+    `),
+    db.execute(sql`
+      SELECT
+        lesson.id,
+        lesson.module_id AS "moduleId",
+        lesson.track_id AS "trackId",
+        lesson.title,
+        lesson.description,
+        COALESCE(lesson.order_index, 0) AS "orderIndex",
+        lesson.lesson_number AS "lessonNumber",
+        lesson.duration_minutes AS "estimatedDuration",
+        COALESCE(lesson.is_active, true) AS "isActive",
+        COALESCE((
+          SELECT section.video_url
+          FROM formation_lesson_sections section
+          WHERE section.lesson_id = lesson.id
+            AND section.video_url IS NOT NULL
+            AND section.video_url <> ''
+          ORDER BY COALESCE(section.order_index, 0), section.created_at
+          LIMIT 1
+        ), '') AS "videoUrl",
+        COALESCE((
+          SELECT section.document_url
+          FROM formation_lesson_sections section
+          WHERE section.lesson_id = lesson.id
+            AND section.document_url IS NOT NULL
+            AND section.document_url <> ''
+          ORDER BY COALESCE(section.order_index, 0), section.created_at
+          LIMIT 1
+        ), '') AS "documentUrl",
+        COUNT(section.id) AS "sectionsCount",
+        lesson.updated_at AS "updatedAt"
+      FROM formation_lessons lesson
+      LEFT JOIN formation_lesson_sections section ON section.lesson_id = lesson.id
+      GROUP BY lesson.id
+      ORDER BY lesson.module_id, lesson.lesson_number, COALESCE(lesson.order_index, 0)
+    `),
+  ]);
+
+  const tracks = parseRows<AdminTrackRow>(tracksResult);
+  const modules = parseRows<AdminModuleRow>(modulesResult);
+  const lessons = parseRows<AdminLessonRow>(lessonsResult).map(toFormationAdminLessonView);
+  const lessonsByModule = groupBy(lessons, (lesson) => lesson.moduleId);
+  const modulesByTrack = groupBy(
+    modules.map<FormationAdminModuleView>((module) => ({
+      id: module.id,
+      trackId: module.trackId,
+      title: module.title,
+      description: module.description,
+      orderIndex: module.orderIndex ?? 0,
+      durationMinutes: module.durationMinutes,
+      videoUrl: module.videoUrl || null,
+      lessons: lessonsByModule[module.id] ?? [],
+    })),
+    (module) => module.trackId,
+  );
+
+  const trackViews = tracks.map<FormationAdminTrackView>((track) => ({
+    id: track.id,
+    title: track.title,
+    description: track.description,
+    category: track.category,
+    orderIndex: track.orderIndex ?? 0,
+    icon: track.icon,
+    isActive: toBool(track.isActive, true),
+    modules: modulesByTrack[track.id] ?? [],
+  }));
+
+  return {
+    tracks: trackViews,
+    summary: {
+      totalTracks: trackViews.length,
+      totalModules: modules.length,
+      totalLessons: lessons.length,
+      activeLessons: lessons.filter((lesson) => lesson.isActive).length,
+      videoLessons: lessons.filter((lesson) => Boolean(lesson.videoUrl)).length,
+      lastUpdated: new Date().toISOString(),
+    },
+  };
+}
+
+export async function getFormationAdminLessonDetail(lessonId: string): Promise<FormationAdminLessonDetailView | null> {
+  const lessonResult = await db.execute(sql`
+    SELECT
+      lesson.id,
+      lesson.module_id AS "moduleId",
+      lesson.track_id AS "trackId",
+      lesson.title,
+      lesson.description,
+      COALESCE(lesson.order_index, 0) AS "orderIndex",
+      lesson.lesson_number AS "lessonNumber",
+      lesson.duration_minutes AS "estimatedDuration",
+      COALESCE(lesson.is_active, true) AS "isActive",
+      COALESCE((
+        SELECT section.video_url
+        FROM formation_lesson_sections section
+        WHERE section.lesson_id = lesson.id
+          AND section.video_url IS NOT NULL
+          AND section.video_url <> ''
+        ORDER BY COALESCE(section.order_index, 0), section.created_at
+        LIMIT 1
+      ), '') AS "videoUrl",
+      COALESCE((
+        SELECT section.document_url
+        FROM formation_lesson_sections section
+        WHERE section.lesson_id = lesson.id
+          AND section.document_url IS NOT NULL
+          AND section.document_url <> ''
+        ORDER BY COALESCE(section.order_index, 0), section.created_at
+        LIMIT 1
+      ), '') AS "documentUrl",
+      COUNT(section.id) AS "sectionsCount",
+      lesson.updated_at AS "updatedAt"
+    FROM formation_lessons lesson
+    LEFT JOIN formation_lesson_sections section ON section.lesson_id = lesson.id
+    WHERE lesson.id = ${lessonId}
+    GROUP BY lesson.id
+    LIMIT 1
+  `);
+  const lesson = parseRows<AdminLessonRow>(lessonResult)[0];
+  if (!lesson) return null;
+
+  const sectionsResult = await db.execute(sql`
+    SELECT
+      id,
+      lesson_id AS "lessonId",
+      title,
+      content,
+      COALESCE(order_index, 0) AS "orderIndex",
+      type AS "contentType",
+      video_url AS "videoUrl",
+      audio_url AS "audioUrl",
+      document_url AS "documentUrl",
+      quiz_data AS "quizData",
+      '' AS "interactiveData"
+    FROM formation_lesson_sections
+    WHERE lesson_id = ${lessonId}
+    ORDER BY COALESCE(order_index, 0), title
+  `);
+
+  const sectionRows = parseRows<SectionRow>(sectionsResult);
+  return {
+    lesson: toFormationAdminLessonView(lesson),
+    sections: sectionRows.map((section) => ({
+      id: section.id,
+      title: section.title,
+      content: section.content,
+      contentType: section.contentType,
+      orderIndex: section.orderIndex ?? 0,
+      videoUrl: section.videoUrl,
+      audioUrl: section.audioUrl,
+      documentUrl: section.documentUrl,
+      estimatedMinutes: null,
+      quizData: section.quizData ? JSON.parse(section.quizData) : undefined,
+      interactiveData: section.interactiveData ? JSON.parse(section.interactiveData) : undefined,
+    })),
+  };
+}
+
+export async function createFormationAdminLesson(input: CreateFormationAdminLessonInput) {
+  const [module] = await db
+    .select({
+      id: formationModules.id,
+      trackId: formationModules.trackId,
+    })
+    .from(formationModules)
+    .where(eq(formationModules.id, input.moduleId))
+    .limit(1);
+
+  if (!module) return null;
+
+  const lessonNumber = input.lessonNumber ?? await getNextLessonNumber(input.moduleId);
+  const lessonId = randomUUID();
+  const [lesson] = await db
+    .insert(formationLessons)
+    .values({
+      id: lessonId,
+      moduleId: input.moduleId,
+      trackId: module.trackId,
+      title: input.title,
+      description: input.description ?? null,
+      lessonNumber,
+      durationMinutes: input.durationMinutes ?? null,
+      isActive: input.isActive ?? true,
+      orderIndex: lessonNumber,
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  const sectionContent = input.sectionContent?.trim();
+  const sectionVideoUrl = input.videoUrl?.trim();
+  if (sectionContent || sectionVideoUrl) {
+    await db.insert(formationLessonSections).values({
+      id: randomUUID(),
+      lessonId,
+      type: sectionVideoUrl ? "video" : "text",
+      title: input.sectionTitle || (sectionVideoUrl ? "Vídeo da aula" : "Conteúdo da aula"),
+      content: sectionContent || null,
+      videoUrl: sectionVideoUrl || null,
+      orderIndex: 1,
+      isRequired: true,
+      estimatedMinutes: input.durationMinutes ?? null,
+      updatedAt: new Date(),
+    });
+  }
+
+  return {
+    lesson,
+    detail: await getFormationAdminLessonDetail(lessonId),
+  };
+}
+
+export async function updateFormationAdminLesson(lessonId: string, input: UpdateFormationAdminLessonInput) {
+  const updates: Partial<typeof formationLessons.$inferInsert> = {
+    updatedAt: new Date(),
+  };
+
+  if (input.title !== undefined) updates.title = input.title;
+  if (input.description !== undefined) updates.description = input.description;
+  if (input.lessonNumber !== undefined) {
+    updates.lessonNumber = input.lessonNumber;
+    updates.orderIndex = input.lessonNumber;
+  }
+  if (input.durationMinutes !== undefined) updates.durationMinutes = input.durationMinutes;
+  if (input.isActive !== undefined) updates.isActive = input.isActive;
+
+  const [lesson] = await db
+    .update(formationLessons)
+    .set(updates)
+    .where(eq(formationLessons.id, lessonId))
+    .returning();
+
+  if (!lesson) return null;
+  return {
+    lesson,
+    detail: await getFormationAdminLessonDetail(lessonId),
+  };
+}
+
+export async function createFormationAdminLessonSection(
+  lessonId: string,
+  input: CreateFormationAdminSectionInput,
+) {
+  const [lesson] = await db
+    .select({ id: formationLessons.id })
+    .from(formationLessons)
+    .where(eq(formationLessons.id, lessonId))
+    .limit(1);
+
+  if (!lesson) return null;
+
+  const orderIndex = await getNextSectionOrder(lessonId);
+  const [section] = await db
+    .insert(formationLessonSections)
+    .values({
+      id: randomUUID(),
+      lessonId,
+      type: input.type ?? (input.videoUrl ? "video" : "text"),
+      title: input.title,
+      content: input.content ?? null,
+      videoUrl: input.videoUrl ?? null,
+      audioUrl: input.audioUrl ?? null,
+      documentUrl: input.documentUrl ?? null,
+      orderIndex,
+      isRequired: input.isRequired ?? true,
+      estimatedMinutes: input.estimatedMinutes ?? null,
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  return {
+    section,
+    detail: await getFormationAdminLessonDetail(lessonId),
+  };
 }

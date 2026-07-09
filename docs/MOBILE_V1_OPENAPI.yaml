@@ -640,6 +640,210 @@ paths:
                     type: object
         "409":
           description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /formation/admin/studio:
+    get:
+      summary: Read the native formation authoring studio for coordinators and managers.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+      responses:
+        "200":
+          description: Formation authoring tracks, modules, lessons and summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, community, studio]
+                properties:
+                  success:
+                    type: boolean
+                  community:
+                    $ref: "#/components/schemas/Community"
+                  studio:
+                    type: object
+        "403":
+          description: Only coordinators and managers can access formation authoring.
+  /formation/admin/lessons:
+    post:
+      summary: Create a native formation lesson, optionally with initial text/video content.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [moduleId, title]
+              properties:
+                moduleId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                lessonNumber:
+                  type: integer
+                  minimum: 1
+                durationMinutes:
+                  type: integer
+                  nullable: true
+                isActive:
+                  type: boolean
+                sectionTitle:
+                  type: string
+                  nullable: true
+                sectionContent:
+                  type: string
+                  nullable: true
+                videoUrl:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Formation lesson created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, lesson, sections]
+                properties:
+                  success:
+                    type: boolean
+                  lesson:
+                    type: object
+                  sections:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          description: Invalid payload or missing/invalid Idempotency-Key.
+        "403":
+          description: Only coordinators and managers can create formation lessons.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /formation/admin/lessons/{lessonId}:
+    patch:
+      summary: Update native formation lesson metadata.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: lessonId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                lessonNumber:
+                  type: integer
+                  minimum: 1
+                durationMinutes:
+                  type: integer
+                  nullable: true
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Formation lesson updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, lesson, sections]
+                properties:
+                  success:
+                    type: boolean
+                  lesson:
+                    type: object
+                  sections:
+                    type: array
+                    items:
+                      type: object
+        "403":
+          description: Only coordinators and managers can update formation lessons.
+        "404":
+          description: Lesson not found.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /formation/admin/lessons/{lessonId}/sections:
+    post:
+      summary: Create a native formation lesson content section.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: lessonId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                  nullable: true
+                type:
+                  type: string
+                  enum: [text, video, audio, document, quiz, interactive]
+                videoUrl:
+                  type: string
+                  nullable: true
+                audioUrl:
+                  type: string
+                  nullable: true
+                documentUrl:
+                  type: string
+                  nullable: true
+                estimatedMinutes:
+                  type: integer
+                  nullable: true
+                isRequired:
+                  type: boolean
+      responses:
+        "201":
+          description: Formation lesson section created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, section, lesson, sections]
+                properties:
+                  success:
+                    type: boolean
+                  section:
+                    type: object
+                  lesson:
+                    type: object
+                  sections:
+                    type: array
+                    items:
+                      type: object
+        "403":
+          description: Only coordinators and managers can create formation content.
+        "404":
+          description: Lesson not found.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
   /substitutions:
     get:
       summary: List visible substitution requests for the active community.

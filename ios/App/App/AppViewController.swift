@@ -61,9 +61,12 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var questionnaireCurrent: MobileQuestionnaireCurrentDTO?
     @Published var formationOverview: MobileFormationOverviewDTO?
     @Published var formationLessonDetail: MobileFormationLessonDetailDTO?
+    @Published var formationAdminStudio: MobileFormationAdminStudioDTO?
     @Published var isSavingQuestionnaire = false
     @Published var isLoadingFormationLesson = false
     @Published var isCompletingFormationLesson = false
+    @Published var isLoadingFormationStudio = false
+    @Published var isSavingFormationContent = false
     @Published var questionnaireMessage: String?
     @Published var formationMessage: String?
     @Published var scheduleActionMessage: String?
@@ -205,7 +208,7 @@ final class MESCNativeAppModel: ObservableObject {
 
     var canManageFormation: Bool {
         let role = user?.role.lowercased() ?? ""
-        return role == "gestor" || role == "coordenador"
+        return role == "gestor" || role == "reitor" || role == "coordenador" || role.hasPrefix("coordenador_")
     }
 
     var formationVideoLessons: [MobileFormationLessonDTO] {
@@ -331,6 +334,7 @@ final class MESCNativeAppModel: ObservableObject {
         questionnaireCurrent = nil
         formationOverview = nil
         formationLessonDetail = nil
+        formationAdminStudio = nil
         questionnaireMessage = nil
         formationMessage = nil
         scheduleActionMessage = nil
@@ -742,6 +746,106 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         isCompletingFormationLesson = false
+        return false
+    }
+
+    func loadFormationAdminStudio() async {
+        guard canManageFormation else {
+            formationMessage = "Apenas gestores e coordenadores podem editar formação."
+            return
+        }
+
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isLoadingFormationStudio = true
+        formationMessage = nil
+
+        do {
+            let response = try await client.formationAdminStudio(
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            formationAdminStudio = response.studio
+            isLoadingFormationStudio = false
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let accessToken = sessionStore.accessToken {
+                do {
+                    let response = try await client.formationAdminStudio(
+                        accessToken: accessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                    formationAdminStudio = response.studio
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+
+            isLoadingFormationStudio = false
+        }
+    }
+
+    func createFormationAdminLesson(_ payload: FormationAdminLessonRequestBody) async -> Bool {
+        guard canManageFormation else {
+            formationMessage = "Apenas gestores e coordenadores podem editar formação."
+            return false
+        }
+
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        isSavingFormationContent = true
+        formationMessage = nil
+
+        do {
+            _ = try await client.createFormationAdminLesson(
+                payload: payload,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId,
+                idempotencyKey: UUID().uuidString
+            )
+            try await loadFormationOverview(accessToken: accessToken)
+            await loadFormationAdminStudio()
+            formationMessage = payload.isActive == false ? "Aula salva como rascunho." : "Aula publicada com sucesso."
+            isSavingFormationContent = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let accessToken = sessionStore.accessToken {
+                do {
+                    _ = try await client.createFormationAdminLesson(
+                        payload: payload,
+                        accessToken: accessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId,
+                        idempotencyKey: UUID().uuidString
+                    )
+                    try await loadFormationOverview(accessToken: accessToken)
+                    await loadFormationAdminStudio()
+                    formationMessage = payload.isActive == false ? "Aula salva como rascunho." : "Aula publicada com sucesso."
+                    isSavingFormationContent = false
+                    return true
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isSavingFormationContent = false
         return false
     }
 
@@ -2256,9 +2360,9 @@ struct CalendarMonthGrid: View {
 
 struct FormationScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
-    @Environment(\.openURL) private var openURL
     @State private var isLessonPresented = false
     @State private var isVideoLibraryPresented = false
+    @State private var isStudioPresented = false
 
     var body: some View {
         MESCScrollScreen(title: "Formação", subtitle: "Trilhas e aulas") {
@@ -2322,14 +2426,12 @@ struct FormationScreen: View {
             if appModel.canManageFormation {
                 GlassPanel(spacing: 14) {
                     SectionTitle(title: "Área do coordenador", symbol: "plus.rectangle.on.folder")
-                    Text("A autoria completa de aulas ainda está no painel de formação atual. O app nativo já consome trilhas, aulas, vídeos e progresso; o próximo contrato é trazer criação/edição para `/api/mobile/v1`.")
+                    Text("Crie aulas, publique conteúdo e vincule vídeos diretamente pelo app.")
                         .font(MESCFont.body)
                         .foregroundStyle(MESCColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     MESCPrimaryButton(title: "Abrir estúdio de formação", symbol: "square.and.pencil") {
-                        if let url = URL(string: "https://saojudastadeu.app/formation-admin") {
-                            openURL(url)
-                        }
+                        isStudioPresented = true
                     }
                 }
             }
@@ -2342,6 +2444,10 @@ struct FormationScreen: View {
         }
         .sheet(isPresented: $isVideoLibraryPresented) {
             FormationVideoLibrarySheet(onOpenLesson: openLesson)
+                .environmentObject(appModel)
+        }
+        .sheet(isPresented: $isStudioPresented) {
+            FormationAdminStudioSheet()
                 .environmentObject(appModel)
         }
     }
@@ -2656,6 +2762,294 @@ struct FormationVideoLibrarySheet: View {
                 .padding(.bottom, 34)
             }
         }
+    }
+}
+
+struct FormationAdminStudioSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedModuleId = ""
+    @State private var title = ""
+    @State private var description = ""
+    @State private var sectionContent = ""
+    @State private var videoUrl = ""
+    @State private var durationText = ""
+    @State private var isActive = true
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+
+                    if let studio = appModel.formationAdminStudio {
+                        summary(studio)
+                        lessonForm
+                        recentLessons(studio)
+                    } else if appModel.isLoadingFormationStudio {
+                        GlassPanel(spacing: 12) {
+                            SectionTitle(title: "Carregando estúdio", symbol: "hourglass")
+                            ProgressView()
+                                .tint(MESCColor.accent)
+                        }
+                    } else {
+                        EmptyState(title: "Estúdio indisponível", detail: "Toque em atualizar para carregar trilhas, módulos e aulas.")
+                    }
+
+                    if let message = appModel.formationMessage {
+                        Label(message, systemImage: message.contains("sucesso") || message.contains("salva") ? "checkmark.seal" : "info.circle")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(message.contains("sucesso") || message.contains("salva") ? MESCColor.accent : MESCColor.primaryWine)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+        .task {
+            await appModel.loadFormationAdminStudio()
+            selectDefaultModuleIfNeeded()
+        }
+        .onChange(of: moduleIds) { _ in
+            selectDefaultModuleIfNeeded()
+        }
+    }
+
+    private var header: some View {
+        GlassPanel(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: "square.and.pencil", tint: MESCColor.gold)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Coordenação")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.accent)
+                    Text("Estúdio de formação")
+                        .font(MESCFont.title2)
+                    Text("Publique aulas, conteúdo e vídeos sem sair do app.")
+                        .font(MESCFont.body)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(MESCColor.textPrimary)
+                        .frame(width: 34, height: 34)
+                        .background(MESCColor.surface.opacity(0.72), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func summary(_ studio: MobileFormationAdminStudioDTO) -> some View {
+        GlassPanel(spacing: 14) {
+            SectionTitle(title: "Conteúdo publicado", symbol: "chart.bar.doc.horizontal")
+            HStack(spacing: 10) {
+                StatusPill(title: "\(studio.summary.totalLessons) aulas", symbol: "book.closed", tint: MESCColor.accent)
+                StatusPill(title: "\(studio.summary.videoLessons) vídeos", symbol: "play.rectangle", tint: MESCColor.gold)
+            }
+            HStack(spacing: 10) {
+                StatusPill(title: "\(studio.summary.totalModules) módulos", symbol: "folder", tint: MESCColor.primaryWine)
+                StatusPill(title: "\(studio.summary.activeLessons) ativas", symbol: "checkmark.seal", tint: MESCColor.accent)
+            }
+        }
+    }
+
+    private var lessonForm: some View {
+        GlassPanel(spacing: 14) {
+            SectionTitle(title: "Nova aula", symbol: "plus.circle")
+
+            if modules.isEmpty {
+                EmptyState(title: "Nenhum módulo disponível", detail: "Crie ou ative módulos de formação antes de publicar novas aulas.")
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Módulo")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    Picker("Módulo", selection: $selectedModuleId) {
+                        ForEach(modules) { module in
+                            Text(module.title).tag(module.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(MESCColor.gold.opacity(0.18), lineWidth: 1)
+                    )
+                }
+
+                adminField("Título da aula", text: $title, placeholder: "Ex.: Cuidados no rito da comunhão")
+                adminField("Descrição", text: $description, placeholder: "Resumo para os ministros")
+                adminField("Duração em minutos", text: $durationText, placeholder: "Ex.: 12", keyboard: .numberPad)
+                adminField("URL do vídeo", text: $videoUrl, placeholder: "https://...")
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Conteúdo inicial")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    TextEditor(text: $sectionContent)
+                        .font(MESCFont.body)
+                        .frame(minHeight: 112)
+                        .padding(10)
+                        .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(MESCColor.separator, lineWidth: 1)
+                        )
+                }
+
+                Toggle(isOn: $isActive) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Publicar agora")
+                            .font(MESCFont.body.weight(.semibold))
+                        Text("Quando ativo, os ministros recebem aviso de novo treinamento.")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                }
+                .tint(MESCColor.accent)
+                .padding(12)
+                .mescGlass(cornerRadius: 16)
+
+                MESCPrimaryButton(
+                    title: appModel.isSavingFormationContent ? "Salvando..." : "Salvar aula",
+                    symbol: "tray.and.arrow.down"
+                ) {
+                    Task { await submitLesson() }
+                }
+                .disabled(appModel.isSavingFormationContent || selectedModuleId.isEmpty || trimmed(title).isEmpty)
+                .opacity(appModel.isSavingFormationContent || selectedModuleId.isEmpty || trimmed(title).isEmpty ? 0.55 : 1)
+            }
+        }
+    }
+
+    private func recentLessons(_ studio: MobileFormationAdminStudioDTO) -> some View {
+        GlassPanel(spacing: 12) {
+            SectionTitle(title: "Aulas recentes", symbol: "clock.arrow.circlepath")
+            let lessons = studio.tracks.flatMap { $0.modules }.flatMap { $0.lessons }
+                .sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
+
+            if lessons.isEmpty {
+                EmptyState(title: "Sem aulas cadastradas", detail: "As novas aulas aparecerão aqui após o primeiro salvamento.")
+            } else {
+                ForEach(lessons.prefix(8)) { lesson in
+                    FormationAdminLessonListRow(lesson: lesson)
+                }
+            }
+        }
+    }
+
+    private var modules: [MobileFormationAdminModuleDTO] {
+        appModel.formationAdminStudio?.tracks.flatMap { $0.modules } ?? []
+    }
+
+    private var moduleIds: [String] {
+        modules.map(\.id)
+    }
+
+    private func selectDefaultModuleIfNeeded() {
+        guard selectedModuleId.isEmpty || !moduleIds.contains(selectedModuleId) else { return }
+        selectedModuleId = modules.first?.id ?? ""
+    }
+
+    private func adminField(
+        _ label: String,
+        text: Binding<String>,
+        placeholder: String,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+            TextField(placeholder, text: text)
+                .font(MESCFont.body)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(label == "URL do vídeo" ? .never : .sentences)
+                .autocorrectionDisabled(label == "URL do vídeo")
+                .padding(14)
+                .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(MESCColor.separator, lineWidth: 1)
+                )
+        }
+    }
+
+    private func submitLesson() async {
+        let duration = Int(trimmed(durationText))
+        let payload = FormationAdminLessonRequestBody(
+            moduleId: selectedModuleId,
+            title: trimmed(title),
+            description: nilIfEmpty(description),
+            lessonNumber: nil,
+            durationMinutes: duration,
+            isActive: isActive,
+            sectionTitle: nilIfEmpty(videoUrl) == nil ? "Conteúdo da aula" : "Vídeo da aula",
+            sectionContent: nilIfEmpty(sectionContent),
+            videoUrl: nilIfEmpty(videoUrl)
+        )
+
+        let didSave = await appModel.createFormationAdminLesson(payload)
+        if didSave {
+            title = ""
+            description = ""
+            sectionContent = ""
+            videoUrl = ""
+            durationText = ""
+            isActive = true
+        }
+    }
+
+    private func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func nilIfEmpty(_ value: String) -> String? {
+        let cleaned = trimmed(value)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+}
+
+struct FormationAdminLessonListRow: View {
+    let lesson: MobileFormationAdminLessonDTO
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            SymbolTile(symbol: lesson.videoUrl == nil ? "text.book.closed" : "play.rectangle", tint: lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(lesson.title)
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                    .lineLimit(2)
+                HStack(spacing: 8) {
+                    Text("Aula \(lesson.lessonNumber)")
+                    if let duration = lesson.estimatedDuration {
+                        Text("\(duration) min")
+                    }
+                    Text("\(lesson.sectionsCount) seções")
+                }
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+                Text(lesson.isActive ? "Publicada" : "Rascunho")
+                    .font(MESCFont.caption2.weight(.semibold))
+                    .foregroundStyle(lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .mescGlass(cornerRadius: 16)
     }
 }
 
@@ -4141,6 +4535,70 @@ struct MobileFormationLessonCompleteResponseDTO: Codable {
     let progress: MobileFormationProgressDTO
 }
 
+struct MobileFormationAdminStudioResponseDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let studio: MobileFormationAdminStudioDTO
+}
+
+struct MobileFormationAdminStudioDTO: Codable {
+    let tracks: [MobileFormationAdminTrackDTO]
+    let summary: MobileFormationAdminSummaryDTO
+}
+
+struct MobileFormationAdminSummaryDTO: Codable {
+    let totalTracks: Int
+    let totalModules: Int
+    let totalLessons: Int
+    let activeLessons: Int
+    let videoLessons: Int
+    let lastUpdated: String?
+}
+
+struct MobileFormationAdminTrackDTO: Codable, Identifiable {
+    let id: String
+    let title: String
+    let description: String?
+    let category: String?
+    let orderIndex: Int
+    let icon: String?
+    let isActive: Bool
+    let modules: [MobileFormationAdminModuleDTO]
+}
+
+struct MobileFormationAdminModuleDTO: Codable, Identifiable {
+    let id: String
+    let trackId: String
+    let title: String
+    let description: String?
+    let orderIndex: Int
+    let durationMinutes: Int?
+    let videoUrl: String?
+    let lessons: [MobileFormationAdminLessonDTO]
+}
+
+struct MobileFormationAdminLessonDTO: Codable, Identifiable {
+    let id: String
+    let moduleId: String
+    let trackId: String?
+    let title: String
+    let description: String?
+    let orderIndex: Int
+    let lessonNumber: Int
+    let estimatedDuration: Int?
+    let isActive: Bool
+    let videoUrl: String?
+    let documentUrl: String?
+    let sectionsCount: Int
+    let updatedAt: String?
+}
+
+struct MobileFormationAdminLessonResponseDTO: Codable {
+    let success: Bool
+    let lesson: MobileFormationAdminLessonDTO
+    let sections: [MobileFormationLessonSectionDTO]
+}
+
 final class MESCMobileAPIClient {
     private let baseURL: URL
     private let decoder: JSONDecoder
@@ -4286,6 +4744,36 @@ final class MESCMobileAPIClient {
             deviceId: deviceId,
             idempotencyKey: idempotencyKey,
             body: EmptyRequestBody()
+        )
+    }
+
+    func formationAdminStudio(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileFormationAdminStudioResponseDTO {
+        try await get(
+            "formation/admin/studio",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func createFormationAdminLesson(
+        payload: FormationAdminLessonRequestBody,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileFormationAdminLessonResponseDTO {
+        try await authenticatedPost(
+            "formation/admin/lessons",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: payload
         )
     }
 
@@ -4517,6 +5005,18 @@ private struct ScheduleConfirmRequestBody: Encodable {
 private struct SubstitutionCreateRequestBody: Encodable {
     let scheduleId: String
     let reason: String?
+}
+
+struct FormationAdminLessonRequestBody: Encodable {
+    let moduleId: String
+    let title: String
+    let description: String?
+    let lessonNumber: Int?
+    let durationMinutes: Int?
+    let isActive: Bool?
+    let sectionTitle: String?
+    let sectionContent: String?
+    let videoUrl: String?
 }
 
 private struct DeviceUpdateRequestBody: Encodable {

@@ -66,6 +66,9 @@ describe("mobile OpenAPI contract", () => {
       { path: "/substitutions/{id}/claim", method: "post" },
       { path: "/schedules/{id}/confirm", method: "post" },
       { path: "/formation/lessons/{lessonId}/complete", method: "post" },
+      { path: "/formation/admin/lessons", method: "post" },
+      { path: "/formation/admin/lessons/{lessonId}", method: "patch" },
+      { path: "/formation/admin/lessons/{lessonId}/sections", method: "post" },
       { path: "/admin/schedules/publish", method: "post" },
     ];
 

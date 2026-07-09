@@ -31,6 +31,12 @@ describe("mobileClient contract", () => {
       .toBe("/formation/track%2Fwith%20slash/module%2Fwith%20slash/3");
     expect(mobileEndpoints.completeFormationLesson("lesson/with slash"))
       .toBe("/formation/lessons/lesson%2Fwith%20slash/complete");
+    expect(mobileEndpoints.formationAdminStudio()).toBe("/formation/admin/studio");
+    expect(mobileEndpoints.formationAdminLessons()).toBe("/formation/admin/lessons");
+    expect(mobileEndpoints.formationAdminLesson("lesson/with slash"))
+      .toBe("/formation/admin/lessons/lesson%2Fwith%20slash");
+    expect(mobileEndpoints.formationAdminLessonSections("lesson/with slash"))
+      .toBe("/formation/admin/lessons/lesson%2Fwith%20slash/sections");
     expect(mobileEndpoints.adminCommunityHome({ month: "2026-07" }))
       .toBe("/admin/community/home?month=2026-07");
     expect(mobileEndpoints.adminScheduleReadiness({ month: "2026-07" }))
@@ -178,6 +184,76 @@ describe("mobileClient contract", () => {
         }), { status: 200 });
       }
 
+      if (input.endsWith("/formation/admin/studio")) {
+        return new Response(JSON.stringify({
+          success: true,
+          community: {
+            id: "community-1",
+            name: "Sao Judas",
+            slug: "sao-judas",
+            colorHex: "#8B0000",
+            parishName: "Santuario Sao Judas Tadeu",
+            isMatriz: true,
+          },
+          studio: {
+            tracks: [],
+            summary: {
+              totalTracks: 0,
+              totalModules: 0,
+              totalLessons: 0,
+              activeLessons: 0,
+              videoLessons: 0,
+              lastUpdated: "2026-07-01T00:00:00.000Z",
+            },
+          },
+        }), { status: 200 });
+      }
+
+      if (input.endsWith("/formation/admin/lessons") || input.endsWith("/formation/admin/lessons/lesson-2")) {
+        return new Response(JSON.stringify({
+          success: true,
+          lesson: {
+            id: "lesson-2",
+            moduleId: "module-1",
+            trackId: "track-1",
+            title: "Rito da comunhao",
+            description: "Aula atualizada",
+            orderIndex: 2,
+            lessonNumber: 2,
+            estimatedDuration: 12,
+            isActive: true,
+            videoUrl: "https://video.example/rito",
+            documentUrl: null,
+            sectionsCount: 1,
+            updatedAt: "2026-07-01T00:00:00.000Z",
+          },
+          sections: [],
+        }), { status: input.endsWith("/formation/admin/lessons") ? 201 : 200 });
+      }
+
+      if (input.endsWith("/formation/admin/lessons/lesson-2/sections")) {
+        return new Response(JSON.stringify({
+          success: true,
+          section: { id: "section-1" },
+          lesson: {
+            id: "lesson-2",
+            moduleId: "module-1",
+            trackId: "track-1",
+            title: "Rito da comunhao",
+            description: "Aula atualizada",
+            orderIndex: 2,
+            lessonNumber: 2,
+            estimatedDuration: 12,
+            isActive: true,
+            videoUrl: "https://video.example/rito",
+            documentUrl: null,
+            sectionsCount: 1,
+            updatedAt: "2026-07-01T00:00:00.000Z",
+          },
+          sections: [],
+        }), { status: 201 });
+      }
+
       return new Response(JSON.stringify({
         success: true,
         progress: {
@@ -203,6 +279,21 @@ describe("mobileClient contract", () => {
     await client.completeFormationLesson("lesson-2", {
       idempotencyKey: "11111111-1111-4111-8111-111111111111",
     });
+    await client.getFormationAdminStudio();
+    await client.createFormationAdminLesson({
+      moduleId: "77777777-7777-4777-8777-777777777777",
+      title: "Nova aula",
+      sectionContent: "Conteudo",
+      videoUrl: "https://video.example/aula",
+    }, {
+      idempotencyKey: "22222222-2222-4222-8222-222222222222",
+    });
+    await client.updateFormationAdminLesson("lesson-2", { title: "Aula atualizada" }, {
+      idempotencyKey: "33333333-3333-4333-8333-333333333333",
+    });
+    await client.createFormationAdminSection("lesson-2", { title: "Novo conteúdo", content: "Texto" }, {
+      idempotencyKey: "44444444-4444-4444-8444-444444444444",
+    });
 
     expect(requests[0].input).toBe("https://example.test/api/mobile/v1/formation/overview");
     expect(requests[0].init.headers).toMatchObject({
@@ -225,6 +316,43 @@ describe("mobileClient contract", () => {
       "X-Community-Id": "community-1",
       "X-Device-Id": "ios-device-1",
       [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
+      "Content-Type": "application/json",
+    });
+
+    expect(requests[3].input).toBe("https://example.test/api/mobile/v1/formation/admin/studio");
+    expect(requests[3].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+    });
+
+    expect(requests[4].input).toBe("https://example.test/api/mobile/v1/formation/admin/lessons");
+    expect(requests[4].init.method).toBe("POST");
+    expect(requests[4].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+      [MOBILE_IDEMPOTENCY_HEADER]: "22222222-2222-4222-8222-222222222222",
+      "Content-Type": "application/json",
+    });
+
+    expect(requests[5].input).toBe("https://example.test/api/mobile/v1/formation/admin/lessons/lesson-2");
+    expect(requests[5].init.method).toBe("PATCH");
+    expect(requests[5].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+      [MOBILE_IDEMPOTENCY_HEADER]: "33333333-3333-4333-8333-333333333333",
+      "Content-Type": "application/json",
+    });
+
+    expect(requests[6].input).toBe("https://example.test/api/mobile/v1/formation/admin/lessons/lesson-2/sections");
+    expect(requests[6].init.method).toBe("POST");
+    expect(requests[6].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+      [MOBILE_IDEMPOTENCY_HEADER]: "44444444-4444-4444-8444-444444444444",
       "Content-Type": "application/json",
     });
   });

@@ -398,6 +398,98 @@ export interface MobileFormationLessonCompleteResponse {
   progress: MobileFormationProgress;
 }
 
+export interface MobileFormationAdminLesson {
+  id: string;
+  moduleId: string;
+  trackId: string | null;
+  title: string;
+  description: string | null;
+  orderIndex: number;
+  lessonNumber: number;
+  estimatedDuration: number | null;
+  isActive: boolean;
+  videoUrl: string | null;
+  documentUrl: string | null;
+  sectionsCount: number;
+  updatedAt: string | null;
+}
+
+export interface MobileFormationAdminModule {
+  id: string;
+  trackId: string;
+  title: string;
+  description: string | null;
+  orderIndex: number;
+  durationMinutes: number | null;
+  videoUrl: string | null;
+  lessons: MobileFormationAdminLesson[];
+}
+
+export interface MobileFormationAdminTrack {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  orderIndex: number;
+  icon: string | null;
+  isActive: boolean;
+  modules: MobileFormationAdminModule[];
+}
+
+export interface MobileFormationAdminStudioResponse {
+  success: true;
+  community: MobileCommunity;
+  studio: {
+    tracks: MobileFormationAdminTrack[];
+    summary: {
+      totalTracks: number;
+      totalModules: number;
+      totalLessons: number;
+      activeLessons: number;
+      videoLessons: number;
+      lastUpdated: string;
+    };
+  };
+}
+
+export interface MobileFormationAdminLessonPayload {
+  moduleId: string;
+  title: string;
+  description?: string | null;
+  lessonNumber?: number;
+  durationMinutes?: number | null;
+  isActive?: boolean;
+  sectionTitle?: string | null;
+  sectionContent?: string | null;
+  videoUrl?: string | null;
+}
+
+export type MobileFormationAdminLessonUpdatePayload = Partial<Omit<
+  MobileFormationAdminLessonPayload,
+  "moduleId" | "sectionTitle" | "sectionContent" | "videoUrl"
+>>;
+
+export interface MobileFormationAdminSectionPayload {
+  title: string;
+  content?: string | null;
+  type?: "text" | "video" | "audio" | "document" | "quiz" | "interactive";
+  videoUrl?: string | null;
+  audioUrl?: string | null;
+  documentUrl?: string | null;
+  estimatedMinutes?: number | null;
+  isRequired?: boolean;
+}
+
+export interface MobileFormationAdminLessonResponse {
+  success: true;
+  lesson: MobileFormationAdminLesson;
+  sections: MobileFormationLessonSection[];
+}
+
+export interface MobileFormationAdminSectionResponse extends MobileFormationAdminLessonResponse {
+  section: MobileJsonValue;
+}
+
 export interface MobileScheduleMonthResponse {
   success: true;
   community: MobileCommunity;
@@ -983,6 +1075,11 @@ export const mobileEndpoints = {
   formationLesson: (trackId: string, moduleId: string, lessonNumber: number | string) =>
     `/formation/${encodePathSegment(trackId)}/${encodePathSegment(moduleId)}/${encodePathSegment(String(lessonNumber))}`,
   completeFormationLesson: (lessonId: string) => `/formation/lessons/${encodePathSegment(lessonId)}/complete`,
+  formationAdminStudio: () => "/formation/admin/studio",
+  formationAdminLessons: () => "/formation/admin/lessons",
+  formationAdminLesson: (lessonId: string) => `/formation/admin/lessons/${encodePathSegment(lessonId)}`,
+  formationAdminLessonSections: (lessonId: string) =>
+    `/formation/admin/lessons/${encodePathSegment(lessonId)}/sections`,
   substitutions: () => "/substitutions",
   substitution: (id: string) => `/substitutions/${encodePathSegment(id)}`,
   claimSubstitution: (id: string) => `/substitutions/${encodePathSegment(id)}/claim`,
@@ -1272,6 +1369,52 @@ export class MescMobileApiClient {
       method: "POST",
       path: mobileEndpoints.completeFormationLesson(lessonId),
       body: {},
+      ...options,
+    });
+  }
+
+  async getFormationAdminStudio(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileFormationAdminStudioResponse>({
+      method: "GET",
+      path: mobileEndpoints.formationAdminStudio(),
+      ...options,
+    });
+  }
+
+  async createFormationAdminLesson(
+    payload: MobileFormationAdminLessonPayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileFormationAdminLessonResponse>({
+      method: "POST",
+      path: mobileEndpoints.formationAdminLessons(),
+      body: payload,
+      ...options,
+    });
+  }
+
+  async updateFormationAdminLesson(
+    lessonId: string,
+    payload: MobileFormationAdminLessonUpdatePayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileFormationAdminLessonResponse>({
+      method: "PATCH",
+      path: mobileEndpoints.formationAdminLesson(lessonId),
+      body: payload,
+      ...options,
+    });
+  }
+
+  async createFormationAdminSection(
+    lessonId: string,
+    payload: MobileFormationAdminSectionPayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileFormationAdminSectionResponse>({
+      method: "POST",
+      path: mobileEndpoints.formationAdminLessonSections(lessonId),
+      body: payload,
       ...options,
     });
   }
