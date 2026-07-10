@@ -2198,6 +2198,22 @@ enum ScheduleMode: String, CaseIterable, Identifiable {
     case full = "Escala Completa"
 
     var id: String { rawValue }
+
+    var symbol: String {
+        switch self {
+        case .mine: return "person.crop.circle.badge.checkmark"
+        case .month: return "calendar"
+        case .full: return "tablecells"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .mine: return "Seus turnos"
+        case .month: return "Mês atual"
+        case .full: return "Lista oficial"
+        }
+    }
 }
 
 struct SchedulesScreen: View {
@@ -2210,49 +2226,48 @@ struct SchedulesScreen: View {
     var body: some View {
         let days = appModel.scheduleDays(for: mode)
         let selectedDay = days.first(where: { $0.dayNumber == selectedDayNumber }) ?? days.first ?? ScheduleFixtures.days[0]
+        let scheduledDaysCount = days.filter { !$0.missions.isEmpty }.count
+        let totalMissionsCount = days.reduce(0) { $0 + $1.missions.count }
+        let pendingConfirmationCount = days.flatMap(\.missions).filter { $0.canConfirm }.count
 
         MESCScrollScreen(title: "Escalas", subtitle: appModel.currentMonthLabel) {
             if appModel.isUsingFallbackData {
                 FallbackBanner()
             }
 
-            Picker("Modo de escala", selection: $mode) {
-                ForEach(ScheduleMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 2)
+            MESCGlassSegmentedControl(
+                options: ScheduleMode.allCases,
+                selection: $mode,
+                title: { $0.rawValue },
+                symbol: { $0.symbol }
+            )
 
-            GlassPanel(spacing: 16) {
-                HStack {
-                    Button {
+            GlassPanel(spacing: 14) {
+                HStack(alignment: .center, spacing: 12) {
+                    MESCIconButton(symbol: "chevron.left", accessibilityLabel: "Mês anterior", isDisabled: appModel.isLoading) {
                         Task { await appModel.shiftScheduleMonth(by: -1) }
-                    } label: {
-                        Image(systemName: "chevron.left")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(appModel.isLoading)
 
                     Spacer()
-                    VStack(spacing: 2) {
+                    VStack(spacing: 4) {
                         Text(appModel.currentMonthLabel)
                             .font(MESCFont.cardTitle)
-                        Text(mode.rawValue)
+                        Text(mode.detail)
                             .font(MESCFont.caption)
                             .foregroundStyle(MESCColor.textSecondary)
                     }
                     Spacer()
 
-                    Button {
+                    MESCIconButton(symbol: "chevron.right", accessibilityLabel: "Próximo mês", isDisabled: appModel.isLoading) {
                         Task { await appModel.shiftScheduleMonth(by: 1) }
-                    } label: {
-                        Image(systemName: "chevron.right")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(appModel.isLoading)
                 }
-                .foregroundStyle(MESCColor.accent)
+
+                HStack(spacing: 10) {
+                    StatusPill(title: "\(scheduledDaysCount) dias", symbol: "calendar.badge.checkmark", tint: MESCColor.accent)
+                    StatusPill(title: "\(totalMissionsCount) missas", symbol: "list.bullet.clipboard", tint: MESCColor.gold)
+                    StatusPill(title: "\(pendingConfirmationCount) pend.", symbol: "clock.badge", tint: pendingConfirmationCount == 0 ? MESCColor.textSecondary : MESCColor.primaryWine)
+                }
 
                 CalendarMonthGrid(
                     monthDate: appModel.currentMonthStartDate,
@@ -2262,31 +2277,23 @@ struct SchedulesScreen: View {
                 )
             }
 
-            GlassPanel(spacing: 14) {
-                SectionTitle(title: selectedDay.formattedTitle, symbol: "calendar.badge.clock")
-
-                if selectedDay.missions.isEmpty {
-                    EmptyState(title: "Nenhuma missa para esta data", detail: "Toque em outra data para consultar a escala.")
-                } else {
-                    ForEach(selectedDay.missions) { mission in
-                        ScheduleMissionRow(
-                            mission: mission,
-                            mode: mode,
-                            onConfirm: mission.canConfirm && mission.scheduleId != nil ? {
-                                Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
-                            } : nil,
-                            onRequestSubstitution: mission.canRequestSubstitution && mission.scheduleId != nil ? {
-                                substitutionTarget = SubstitutionTarget(
-                                    id: mission.id,
-                                    scheduleId: mission.scheduleId ?? mission.id,
-                                    title: "\(selectedDay.formattedTitle) às \(mission.time)",
-                                    subtitle: "\(mission.title) - \(mission.community)"
-                                )
-                            } : nil
-                        )
-                    }
+            ScheduleDayPanel(
+                day: selectedDay,
+                mode: mode,
+                onConfirm: { mission in
+                    Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
+                },
+                onRequestSubstitution: { mission in
+                    substitutionTarget = SubstitutionTarget(
+                        id: mission.id,
+                        scheduleId: mission.scheduleId ?? mission.id,
+                        title: "\(selectedDay.formattedTitle) às \(mission.time)",
+                        subtitle: "\(mission.title) - \(mission.community)"
+                    )
                 }
+            )
 
+            GlassPanel(spacing: 12) {
                 if let message = appModel.scheduleActionMessage {
                     Label(message, systemImage: message.contains("sucesso") || message.contains("publicado") ? "checkmark.seal" : "info.circle")
                         .font(MESCFont.caption)
@@ -2294,7 +2301,7 @@ struct SchedulesScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                MESCSecondaryButton(title: "Exportar lista no modelo oficial", symbol: "square.and.arrow.up") {
+                MESCSecondaryButton(title: "Exportar modelo oficial", symbol: "square.and.arrow.up") {
                     do {
                         shareFile = ShareFile(url: try appModel.createOfficialScheduleExport())
                     } catch {
@@ -2309,6 +2316,62 @@ struct SchedulesScreen: View {
         }
         .sheet(item: $shareFile) { file in
             ActivityView(activityItems: [file.url])
+        }
+        .onChange(of: mode) { _ in
+            selectedDayNumber = suggestedDayNumber(from: appModel.scheduleDays(for: mode))
+        }
+        .onChange(of: appModel.selectedMonth) { _ in
+            selectedDayNumber = suggestedDayNumber(from: appModel.scheduleDays(for: mode))
+        }
+    }
+
+    private func suggestedDayNumber(from days: [ScheduleDay]) -> Int {
+        if let firstWithMission = days.first(where: { !$0.missions.isEmpty }) {
+            return firstWithMission.dayNumber
+        }
+        return days.first?.dayNumber ?? Calendar.current.component(.day, from: Date())
+    }
+}
+
+struct ScheduleDayPanel: View {
+    let day: ScheduleDay
+    let mode: ScheduleMode
+    let onConfirm: (ScheduleMission) -> Void
+    let onRequestSubstitution: (ScheduleMission) -> Void
+
+    var body: some View {
+        GlassPanel(spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: mode == .full ? "tablecells" : "calendar.badge.clock", tint: MESCColor.gold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(day.formattedTitle)
+                        .font(MESCFont.cardTitle)
+                        .foregroundStyle(MESCColor.textPrimary)
+                    Text(day.missions.isEmpty ? "Nenhuma missa publicada para esta data." : "\(day.missions.count) missa(s) nesta data.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+                Spacer()
+            }
+
+            if day.missions.isEmpty {
+                EmptyState(title: "Sem escala nesta data", detail: "Toque em outro dia do calendário para consultar a escala publicada.")
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(day.missions) { mission in
+                        ScheduleMissionRow(
+                            mission: mission,
+                            mode: mode,
+                            onConfirm: mission.canConfirm && mission.scheduleId != nil ? {
+                                onConfirm(mission)
+                            } : nil,
+                            onRequestSubstitution: mission.canRequestSubstitution && mission.scheduleId != nil ? {
+                                onRequestSubstitution(mission)
+                            } : nil
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -2342,19 +2405,33 @@ struct CalendarMonthGrid: View {
                     Button {
                         onSelect(day)
                     } label: {
+                        let isSelected = selectedDay.id == day.id
+                        let hasMission = !day.missions.isEmpty
+
                         VStack(spacing: 3) {
                             Text("\(day.dayNumber)")
-                                .font(.system(size: 16, weight: selectedDay.id == day.id ? .bold : .medium))
+                                .font(.system(size: 16, weight: isSelected ? .bold : .medium))
                             Circle()
-                                .fill(day.missions.isEmpty ? Color.clear : MESCColor.gold)
+                                .fill(hasMission ? (isSelected ? Color.white : MESCColor.gold) : Color.clear)
                                 .frame(width: 5, height: 5)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 42)
-                        .foregroundStyle(selectedDay.id == day.id ? .white : MESCColor.textPrimary)
+                        .foregroundStyle(isSelected ? .white : MESCColor.textPrimary)
                         .background {
+                            ZStack {
+                                if hasMission && !isSelected {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(.ultraThinMaterial)
+                                }
+
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(isSelected ? MESCColor.primaryWine : (hasMission ? MESCColor.gold.opacity(0.10) : Color.clear))
+                            }
+                        }
+                        .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(selectedDay.id == day.id ? MESCColor.primaryWine : Color.clear)
+                                .stroke(isSelected ? MESCColor.gold.opacity(0.34) : (hasMission ? MESCColor.gold.opacity(0.18) : MESCColor.separator.opacity(0.18)), lineWidth: 1)
                         }
                     }
                     .buttonStyle(.plain)
@@ -2378,33 +2455,18 @@ struct FormationScreen: View {
     var body: some View {
         MESCScrollScreen(title: "Formação", subtitle: "Trilhas e aulas") {
             if let overview = appModel.formationOverview {
-                GlassPanel(spacing: 16) {
-                    SectionTitle(title: "Seu progresso", symbol: "graduationcap")
-                    HStack(spacing: 12) {
-                        StatusPill(title: "\(overview.summary.completedLessons)/\(overview.summary.totalLessons) aulas", symbol: "checkmark.seal", tint: MESCColor.accent)
-                        StatusPill(title: "\(overview.summary.percentageCompleted)% concluído", symbol: "chart.line.uptrend.xyaxis", tint: MESCColor.gold)
-                    }
-                    ProgressView(value: Double(overview.summary.percentageCompleted), total: 100)
-                        .tint(MESCColor.accent)
-                }
+                FormationOverviewPanel(
+                    overview: overview,
+                    isLoadingLesson: appModel.isLoadingFormationLesson,
+                    onOpenLesson: openLesson
+                )
 
-                if let next = overview.tracks.compactMap(\.nextLesson).first {
-                    GlassPanel(spacing: 14) {
-                        SectionTitle(title: "Continuar aprendendo", symbol: "play.circle")
-                        Text(next.title)
-                            .font(MESCFont.cardTitle)
-                        Text("Aula \(next.lessonNumber)\(next.estimatedDuration.map { " - \($0) min" } ?? "")")
-                            .font(MESCFont.body)
-                            .foregroundStyle(MESCColor.textSecondary)
-                        MESCPrimaryButton(
-                            title: appModel.isLoadingFormationLesson ? "Abrindo..." : "Abrir aula",
-                            symbol: "play.fill"
-                        ) {
-                            openLesson(next)
-                        }
-                        .disabled(appModel.isLoadingFormationLesson)
-                    }
-                }
+                FormationActionStrip(
+                    videoCount: appModel.formationVideoLessons.count,
+                    canManageFormation: appModel.canManageFormation,
+                    onOpenVideos: { isVideoLibraryPresented = true },
+                    onOpenStudio: { isStudioPresented = true }
+                )
 
                 ForEach(overview.tracks) { track in
                     FormationTrackPanel(track: track, onOpenLesson: openLesson)
@@ -2421,30 +2483,6 @@ struct FormationScreen: View {
                     .font(MESCFont.caption)
                     .foregroundStyle(message.contains("sucesso") ? MESCColor.accent : MESCColor.primaryWine)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-
-            GlassPanel(spacing: 14) {
-                SectionTitle(title: "Biblioteca de vídeos", symbol: "play.rectangle")
-                Text(videoLibraryDescription)
-                    .font(MESCFont.body)
-                    .foregroundStyle(MESCColor.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                MESCSecondaryButton(title: "Ver vídeos", symbol: "video") {
-                    isVideoLibraryPresented = true
-                }
-            }
-
-            if appModel.canManageFormation {
-                GlassPanel(spacing: 14) {
-                    SectionTitle(title: "Área do coordenador", symbol: "plus.rectangle.on.folder")
-                    Text("Crie aulas, publique conteúdo e vincule vídeos diretamente pelo app.")
-                        .font(MESCFont.body)
-                        .foregroundStyle(MESCColor.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    MESCPrimaryButton(title: "Abrir estúdio de formação", symbol: "square.and.pencil") {
-                        isStudioPresented = true
-                    }
-                }
             }
         }
         .sheet(isPresented: $isLessonPresented, onDismiss: {
@@ -2463,14 +2501,6 @@ struct FormationScreen: View {
         }
     }
 
-    private var videoLibraryDescription: String {
-        let count = appModel.formationVideoLessons.count
-        if count == 0 {
-            return "Nenhum vídeo publicado nas aulas carregadas até agora."
-        }
-        return count == 1 ? "1 aula com vídeo disponível." : "\(count) aulas com vídeo disponíveis."
-    }
-
     private func openLesson(_ lesson: MobileFormationLessonDTO) {
         Task {
             let didOpen = await appModel.openFormationLesson(lesson)
@@ -2478,6 +2508,123 @@ struct FormationScreen: View {
                 isLessonPresented = true
             }
         }
+    }
+}
+
+struct FormationOverviewPanel: View {
+    let overview: MobileFormationOverviewDTO
+    let isLoadingLesson: Bool
+    let onOpenLesson: (MobileFormationLessonDTO) -> Void
+
+    private var nextLesson: MobileFormationLessonDTO? {
+        overview.tracks.compactMap(\.nextLesson).first
+    }
+
+    var body: some View {
+        GlassPanel(spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: "graduationcap", tint: MESCColor.gold)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Formação contínua")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.accent)
+                    Text("\(overview.summary.percentageCompleted)% concluído")
+                        .font(MESCFont.title2)
+                        .foregroundStyle(MESCColor.textPrimary)
+                    Text("\(overview.summary.completedLessons) de \(overview.summary.totalLessons) aulas concluídas")
+                        .font(MESCFont.body)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+                Spacer()
+            }
+
+            ProgressView(value: Double(overview.summary.percentageCompleted), total: 100)
+                .tint(MESCColor.accent)
+
+            HStack(spacing: 10) {
+                StatusPill(title: "\(overview.summary.totalTracks) trilhas", symbol: "map", tint: MESCColor.accent)
+                StatusPill(title: "\(overview.summary.totalModules) módulos", symbol: "folder", tint: MESCColor.gold)
+                StatusPill(title: "\(overview.summary.totalLessons) aulas", symbol: "book.closed", tint: MESCColor.primaryWine)
+            }
+
+            if let nextLesson {
+                Divider().opacity(0.35)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionTitle(title: "Próxima aula", symbol: "play.circle")
+                    Text(nextLesson.title)
+                        .font(MESCFont.cardTitle)
+                        .foregroundStyle(MESCColor.textPrimary)
+                    Text("Aula \(nextLesson.lessonNumber)\(nextLesson.estimatedDuration.map { " - \($0) min" } ?? "")")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    MESCPrimaryButton(
+                        title: isLoadingLesson ? "Abrindo..." : "Continuar",
+                        symbol: "play.fill"
+                    ) {
+                        onOpenLesson(nextLesson)
+                    }
+                    .disabled(isLoadingLesson)
+                }
+            }
+        }
+    }
+}
+
+struct FormationActionStrip: View {
+    let videoCount: Int
+    let canManageFormation: Bool
+    let onOpenVideos: () -> Void
+    let onOpenStudio: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            FormationActionButton(
+                title: videoCount == 1 ? "1 vídeo" : "\(videoCount) vídeos",
+                subtitle: "Biblioteca",
+                symbol: "play.rectangle",
+                tint: MESCColor.accent,
+                action: onOpenVideos
+            )
+
+            if canManageFormation {
+                FormationActionButton(
+                    title: "Estúdio",
+                    subtitle: "Coordenação",
+                    symbol: "square.and.pencil",
+                    tint: MESCColor.gold,
+                    action: onOpenStudio
+                )
+            }
+        }
+    }
+}
+
+struct FormationActionButton: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                SymbolTile(symbol: symbol, tint: tint)
+                Text(title)
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Text(subtitle)
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .mescGlass(cornerRadius: 20, intensity: .floating)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -3369,6 +3516,72 @@ struct SectionTitle: View {
     }
 }
 
+struct MESCGlassSegmentedControl<Option: Identifiable & Hashable>: View {
+    let options: [Option]
+    @Binding var selection: Option
+    let title: (Option) -> String
+    let symbol: (Option) -> String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(options) { option in
+                let isSelected = selection == option
+
+                Button {
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.86)) {
+                        selection = option
+                    }
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: symbol(option))
+                            .font(.system(size: 17, weight: .semibold))
+                        Text(title(option))
+                            .font(MESCFont.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.70)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 58)
+                    .foregroundStyle(isSelected ? MESCColor.accent : MESCColor.textSecondary)
+                    .background {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(isSelected ? MESCColor.gold.opacity(0.14) : Color.clear)
+                            .background(isSelected ? .thinMaterial : .ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(isSelected ? MESCColor.gold.opacity(0.32) : MESCColor.separator.opacity(0.26), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title(option))
+            }
+        }
+        .padding(6)
+        .mescGlass(cornerRadius: 22, intensity: .floating)
+    }
+}
+
+struct MESCIconButton: View {
+    let symbol: String
+    let accessibilityLabel: String
+    var isDisabled = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(isDisabled ? MESCColor.textSecondary.opacity(0.45) : MESCColor.accent)
+                .frame(width: 42, height: 42)
+                .mescGlass(cornerRadius: 14)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 struct SymbolTile: View {
     let symbol: String
     let tint: Color
@@ -3522,56 +3735,54 @@ struct ScheduleMissionRow: View {
     var onRequestSubstitution: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 4) {
                 Text(mission.time)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(MESCColor.accent)
-                Spacer()
-                Text(mission.community)
-                    .font(MESCFont.caption)
-                    .foregroundStyle(MESCColor.textSecondary)
+                Image(systemName: mission.isCurrentUser ? "person.crop.circle.badge.checkmark" : "calendar")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(mission.isCurrentUser ? MESCColor.gold : MESCColor.textSecondary)
             }
+            .frame(width: 54)
 
-            Text(mission.title)
-                .font(MESCFont.cardTitle)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(mission.title)
+                        .font(MESCFont.cardTitle)
+                        .foregroundStyle(MESCColor.textPrimary)
+                    Spacer()
+                    Text(mission.community)
+                        .font(MESCFont.caption2)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .lineLimit(1)
+                }
 
-            if mode == .full {
-                Text(mission.ministers.joined(separator: " | "))
+                Text(mode == .full ? mission.ministers.joined(separator: " • ") : mission.role)
                     .font(MESCFont.body)
                     .foregroundStyle(MESCColor.textSecondary)
-            } else {
-                Text(mission.role)
-                    .font(MESCFont.body)
-                    .foregroundStyle(MESCColor.textSecondary)
-            }
+                    .fixedSize(horizontal: false, vertical: true)
 
-            if mission.isCurrentUser {
-                HStack(spacing: 8) {
+                if mission.isCurrentUser {
                     Label(confirmationLabel, systemImage: confirmationSymbol)
                         .font(MESCFont.caption)
                         .foregroundStyle(confirmationTint)
-                    Spacer()
-                }
 
-                if onConfirm != nil || onRequestSubstitution != nil {
-                    HStack(spacing: 10) {
-                        if let onConfirm {
-                            MESCPrimaryButton(title: "Confirmar", symbol: "checkmark.circle", action: onConfirm)
-                        }
-                        if let onRequestSubstitution {
-                            MESCSecondaryButton(title: "Trocar", symbol: "arrow.triangle.2.circlepath", action: onRequestSubstitution)
+                    if onConfirm != nil || onRequestSubstitution != nil {
+                        HStack(spacing: 10) {
+                            if let onConfirm {
+                                MESCPrimaryButton(title: "Confirmar", symbol: "checkmark.circle", action: onConfirm)
+                            }
+                            if let onRequestSubstitution {
+                                MESCSecondaryButton(title: "Trocar", symbol: "arrow.triangle.2.circlepath", action: onRequestSubstitution)
+                            }
                         }
                     }
                 }
             }
         }
         .padding(14)
-        .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(MESCColor.gold.opacity(0.14), lineWidth: 1)
-        )
+        .mescGlass(cornerRadius: 18)
     }
 
     private var confirmationLabel: String {
