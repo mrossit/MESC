@@ -16,6 +16,8 @@ final class AppViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        MESCNativeTabBarStyler.apply()
+
         let rootView = MESCNativeRootView()
         let hostingController = UIHostingController(rootView: rootView)
         hostingController.view.backgroundColor = .clear
@@ -36,6 +38,57 @@ final class AppViewController: UIViewController {
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         traitCollection.userInterfaceStyle == .dark ? .lightContent : .darkContent
+    }
+}
+
+enum MESCNativeTabBarStyler {
+    static func apply() {
+        let selectedColor = UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(hex: 0xC5A059) : UIColor(hex: 0x722F37)
+        }
+        let normalColor = UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(hex: 0xA8A8A8) : UIColor(hex: 0x727272)
+        }
+
+        UITabBar.appearance().isTranslucent = true
+        UITabBar.appearance().tintColor = selectedColor
+        UITabBar.appearance().unselectedItemTintColor = normalColor
+
+        guard #unavailable(iOS 26.0) else { return }
+
+        let appearance = UITabBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.backgroundColor = UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(hex: 0x1C1C1E, alpha: 0.54)
+                : UIColor(hex: 0xFFFFFF, alpha: 0.38)
+        }
+        appearance.shadowColor = UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(hex: 0xC5A059, alpha: 0.16)
+                : UIColor(hex: 0xC5A059, alpha: 0.22)
+        }
+
+        configure(appearance.stackedLayoutAppearance, selectedColor: selectedColor, normalColor: normalColor)
+        configure(appearance.inlineLayoutAppearance, selectedColor: selectedColor, normalColor: normalColor)
+        configure(appearance.compactInlineLayoutAppearance, selectedColor: selectedColor, normalColor: normalColor)
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
+    private static func configure(_ itemAppearance: UITabBarItemAppearance, selectedColor: UIColor, normalColor: UIColor) {
+        itemAppearance.normal.iconColor = normalColor
+        itemAppearance.normal.titleTextAttributes = [
+            .foregroundColor: normalColor,
+            .font: UIFont.systemFont(ofSize: 11, weight: .medium)
+        ]
+        itemAppearance.selected.iconColor = selectedColor
+        itemAppearance.selected.titleTextAttributes = [
+            .foregroundColor: selectedColor,
+            .font: UIFont.systemFont(ofSize: 11, weight: .semibold)
+        ]
     }
 }
 
@@ -1373,22 +1426,24 @@ struct MESCNativeRootView: View {
     }
 
     private var authenticatedShell: some View {
-        ZStack {
-            MESCBackground()
-
-            currentScreen
+        TabView(selection: $selectedTab) {
+            ForEach(MESCTab.allCases) { tab in
+                MESCNativeTabPage {
+                    screen(for: tab)
+                }
+                .tag(tab)
+                .tabItem {
+                    Label(tab.title, systemImage: tab.symbol)
+                }
+            }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            MESCGlassTabBar(selectedTab: $selectedTab)
-                .padding(.horizontal, 14)
-                .padding(.top, 6)
-                .padding(.bottom, 8)
-        }
+        .background(MESCBackground())
+        .tint(MESCColor.accent)
     }
 
     @ViewBuilder
-    private var currentScreen: some View {
-        switch selectedTab {
+    private func screen(for tab: MESCTab) -> some View {
+        switch tab {
         case .mission:
             MissionScreen()
         case .schedules:
@@ -1399,6 +1454,17 @@ struct MESCNativeRootView: View {
             ProfileScreen()
         case .settings:
             SettingsScreen()
+        }
+    }
+}
+
+struct MESCNativeTabPage<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+            content
         }
     }
 }
@@ -1430,61 +1496,6 @@ enum MESCTab: String, CaseIterable, Identifiable {
         case .profile: return "person"
         case .settings: return "gearshape"
         }
-    }
-}
-
-struct MESCGlassTabBar: View {
-    @Binding var selectedTab: MESCTab
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(MESCTab.allCases) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 20, weight: .semibold))
-                        Text(tab.title)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .foregroundStyle(selectedTab == tab ? MESCColor.accent : MESCColor.textSecondary)
-                    .background {
-                        if selectedTab == tab {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(MESCColor.gold.opacity(0.13))
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color.white.opacity(0.26),
-                                                    Color.white.opacity(0.05),
-                                                    MESCColor.gold.opacity(0.10)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(MESCColor.gold.opacity(0.28), lineWidth: 1)
-                                )
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title)
-            }
-        }
-        .padding(8)
-        .mescGlass(cornerRadius: 28, intensity: .floating)
     }
 }
 
@@ -3299,6 +3310,8 @@ struct MESCScrollScreen<Content: View>: View {
                         .frame(width: 44, height: 44)
                         .mescGlass(cornerRadius: 16)
                 }
+                .padding(16)
+                .mescGlass(cornerRadius: 24, intensity: .floating)
                 .padding(.top, 20)
 
                 content
