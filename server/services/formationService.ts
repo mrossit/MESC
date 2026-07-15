@@ -305,7 +305,11 @@ const parseProgressMeta = (
 
 const toBool = (value: unknown, fallback = false) => {
   if (value === null || value === undefined) return fallback;
-  return value === true || value === 1 || value === "1" || value === "true";
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "1" || normalized === "true";
+  }
+  return value === true || value === 1;
 };
 
 const buildLessonProgressView = (
@@ -323,7 +327,7 @@ const buildLessonProgressView = (
   }
 
   const meta = parseProgressMeta(progressRow);
-  const isCompleted = Boolean(progressRow.isCompleted);
+  const isCompleted = toBool(progressRow.isCompleted);
   const timeSpent = progressRow.timeSpent ?? 0;
 
   let progressPercentage = meta.progressPercentage ?? 0;
@@ -515,8 +519,8 @@ export async function getFormationOverview(userId?: string): Promise<FormationOv
     return {
       ...track,
       orderIndex: track.orderIndex ?? 0,
-      isActive: Boolean(track.isActive ?? true),
-      isRequired: Boolean(track.isRequired ?? true),
+      isActive: toBool(track.isActive, true),
+      isRequired: toBool(track.isRequired, true),
       modules: modulesForTrack,
       stats: {
         totalModules,
@@ -936,7 +940,8 @@ export async function upsertLessonProgressEntry(params: {
     }
   }
 
-  const finalIsCompleted = Boolean(isCompleted ?? existing?.isCompleted ?? false);
+  const finalIsCompleted =
+    typeof isCompleted === "boolean" ? isCompleted : toBool(existing?.isCompleted);
   if (finalIsCompleted) {
     meta.progressPercentage = 100;
   }
