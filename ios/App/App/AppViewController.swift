@@ -118,6 +118,7 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var isSavingQuestionnaire = false
     @Published var isLoadingFormationLesson = false
     @Published var isCompletingFormationLesson = false
+    @Published var completingFormationSectionId: String?
     @Published var isLoadingFormationStudio = false
     @Published var isSavingFormationContent = false
     @Published var questionnaireMessage: String?
@@ -799,6 +800,69 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         isCompletingFormationLesson = false
+        return false
+    }
+
+    func completeFormationLessonSection(sectionId: String) async -> Bool {
+        guard let detail = formationLessonDetail else {
+            formationMessage = "Abra uma aula antes de concluir."
+            return false
+        }
+
+        guard detail.progress.completedSections?.contains(sectionId) != true else {
+            formationMessage = "Seção já concluída."
+            return true
+        }
+
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        completingFormationSectionId = sectionId
+        formationMessage = nil
+
+        do {
+            let response = try await client.completeFormationLessonSection(
+                lessonId: detail.lesson.id,
+                sectionId: sectionId,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId,
+                idempotencyKey: UUID().uuidString
+            )
+            formationLessonDetail = detail.withProgress(response.progress)
+            try await loadFormationOverview(accessToken: accessToken)
+            formationMessage = response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída."
+            completingFormationSectionId = nil
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let accessToken = sessionStore.accessToken {
+                do {
+                    let response = try await client.completeFormationLessonSection(
+                        lessonId: detail.lesson.id,
+                        sectionId: sectionId,
+                        accessToken: accessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId,
+                        idempotencyKey: UUID().uuidString
+                    )
+                    formationLessonDetail = detail.withProgress(response.progress)
+                    try await loadFormationOverview(accessToken: accessToken)
+                    formationMessage = response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída."
+                    completingFormationSectionId = nil
+                    return true
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        completingFormationSectionId = nil
         return false
     }
 
@@ -2757,7 +2821,14 @@ struct FormationLessonSheet: View {
                         }
 
                         ForEach(detail.sections) { section in
-                            FormationLessonSectionCard(section: section)
+                            FormationLessonSectionCard(
+                                section: section,
+                                isCompleted: detail.progress.completedSections?.contains(section.id) == true || detail.progress.status == "completed",
+                                isCompleting: appModel.completingFormationSectionId == section.id,
+                                isLessonCompleted: detail.progress.status == "completed"
+                            ) {
+                                Task { await appModel.completeFormationLessonSection(sectionId: section.id) }
+                            }
                         }
 
                         if detail.sections.isEmpty {
@@ -3213,10 +3284,22 @@ struct FormationAdminLessonListRow: View {
 
 struct FormationLessonSectionCard: View {
     let section: MobileFormationLessonSectionDTO
+    let isCompleted: Bool
+    let isCompleting: Bool
+    let isLessonCompleted: Bool
+    let onComplete: () -> Void
 
     var body: some View {
         GlassPanel(spacing: 10) {
-            SectionTitle(title: section.title, symbol: sectionSymbol)
+            HStack(alignment: .top, spacing: 10) {
+                SectionTitle(title: section.title, symbol: isCompleted ? "checkmark.seal.fill" : sectionSymbol)
+                Spacer(minLength: 8)
+                if isCompleted {
+                    Label("Concluída", systemImage: "checkmark.circle.fill")
+                        .font(MESCFont.caption2.weight(.semibold))
+                        .foregroundStyle(MESCColor.accent)
+                }
+            }
 
             if let content = section.content, !content.isEmpty {
                 Text(content.mescPlainText)
@@ -3242,6 +3325,19 @@ struct FormationLessonSectionCard: View {
             }
             .font(MESCFont.caption)
             .foregroundStyle(MESCColor.accent)
+
+            if !isCompleted {
+                Button(action: onComplete) {
+                    Label(isCompleting ? "Concluindo..." : "Marcar seção como concluída", systemImage: isCompleting ? "hourglass" : "checkmark.circle")
+                        .font(MESCFont.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(MESCColor.surface.opacity(0.58), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(MESCColor.accent)
+                .disabled(isCompleting || isLessonCompleted)
+            }
         }
     }
 
@@ -4963,6 +5059,24 @@ final class MESCMobileAPIClient {
     ) async throws -> MobileFormationLessonCompleteResponseDTO {
         try await authenticatedPost(
             "formation/lessons/\(lessonId)/complete",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: EmptyRequestBody()
+        )
+    }
+
+    func completeFormationLessonSection(
+        lessonId: String,
+        sectionId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileFormationLessonCompleteResponseDTO {
+        try await authenticatedPost(
+            "formation/lessons/\(lessonId)/sections/\(sectionId)/complete",
             accessToken: accessToken,
             communityId: communityId,
             deviceId: deviceId,

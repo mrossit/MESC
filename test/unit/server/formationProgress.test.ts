@@ -148,4 +148,41 @@ describe("formation progress", () => {
     expect(lesson.progress.status).toBe("completed");
     expect(lesson.progress.progressPercentage).toBe(100);
   });
+
+  it("marks a valid lesson section as partial progress", async () => {
+    dbMock.execute
+      .mockResolvedValueOnce({ rows: [{ id: "section-1" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ count: "2" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const { markLessonSectionCompleted } = await import("../../../server/services/formationService");
+    const progress = await markLessonSectionCompleted({
+      userId: "user-1",
+      lessonId: "lesson-altar",
+      sectionId: "section-1",
+    });
+
+    expect(progress).toMatchObject({
+      status: "in_progress",
+      progressPercentage: 50,
+      timeSpent: 1,
+      completedSections: ["section-1"],
+    });
+    expect(dbMock.execute).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not write progress when the section does not belong to the lesson", async () => {
+    dbMock.execute.mockResolvedValueOnce({ rows: [] });
+
+    const { markLessonSectionCompleted } = await import("../../../server/services/formationService");
+    const progress = await markLessonSectionCompleted({
+      userId: "user-1",
+      lessonId: "lesson-altar",
+      sectionId: "section-outside-lesson",
+    });
+
+    expect(progress).toBeNull();
+    expect(dbMock.execute).toHaveBeenCalledTimes(1);
+  });
 });

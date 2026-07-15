@@ -43,6 +43,7 @@ import {
   getFormationOverview,
   getLessonDetail,
   markLessonCompleted,
+  markLessonSectionCompleted,
   updateFormationAdminLesson,
 } from "../services/formationService";
 import { sendPushNotificationToUsers } from "../utils/pushNotifications";
@@ -1945,6 +1946,61 @@ router.post("/formation/lessons/:lessonId/complete", authenticateToken, async (r
   } catch (error) {
     await releaseMobileIdempotencyQuietly(idempotencyRecordId);
     return handleMobileError(res, error, "Erro ao concluir aula de formacao");
+  }
+});
+
+router.post("/formation/lessons/:lessonId/sections/:sectionId/complete", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const body = {
+      lessonId: req.params.lessonId,
+      sectionId: req.params.sectionId,
+    };
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const progress = await markLessonSectionCompleted({
+      userId: user.id,
+      lessonId: req.params.lessonId,
+      sectionId: req.params.sectionId,
+    });
+
+    if (!progress) {
+      throw new MobileHttpError(404, "Secao de formacao nao encontrada para esta aula");
+    }
+
+    const responseBody = {
+      success: true,
+      progress,
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao concluir secao de formacao");
   }
 });
 

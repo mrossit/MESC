@@ -31,6 +31,8 @@ describe("mobileClient contract", () => {
       .toBe("/formation/track%2Fwith%20slash/module%2Fwith%20slash/3");
     expect(mobileEndpoints.completeFormationLesson("lesson/with slash"))
       .toBe("/formation/lessons/lesson%2Fwith%20slash/complete");
+    expect(mobileEndpoints.completeFormationLessonSection("lesson/with slash", "section/with slash"))
+      .toBe("/formation/lessons/lesson%2Fwith%20slash/sections/section%2Fwith%20slash/complete");
     expect(mobileEndpoints.formationAdminStudio()).toBe("/formation/admin/studio");
     expect(mobileEndpoints.formationAdminLessons()).toBe("/formation/admin/lessons");
     expect(mobileEndpoints.formationAdminLesson("lesson/with slash"))
@@ -294,6 +296,9 @@ describe("mobileClient contract", () => {
     await client.createFormationAdminSection("lesson-2", { title: "Novo conteúdo", content: "Texto" }, {
       idempotencyKey: "44444444-4444-4444-8444-444444444444",
     });
+    await client.completeFormationLessonSection("lesson-2", "section-1", {
+      idempotencyKey: "55555555-5555-4555-8555-555555555555",
+    });
 
     expect(requests[0].input).toBe("https://example.test/api/mobile/v1/formation/overview");
     expect(requests[0].init.headers).toMatchObject({
@@ -353,6 +358,16 @@ describe("mobileClient contract", () => {
       "X-Community-Id": "community-1",
       "X-Device-Id": "ios-device-1",
       [MOBILE_IDEMPOTENCY_HEADER]: "44444444-4444-4444-8444-444444444444",
+      "Content-Type": "application/json",
+    });
+
+    expect(requests[7].input).toBe("https://example.test/api/mobile/v1/formation/lessons/lesson-2/sections/section-1/complete");
+    expect(requests[7].init.method).toBe("POST");
+    expect(requests[7].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+      [MOBILE_IDEMPOTENCY_HEADER]: "55555555-5555-4555-8555-555555555555",
       "Content-Type": "application/json",
     });
   });

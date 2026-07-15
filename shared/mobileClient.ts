@@ -398,6 +398,11 @@ export interface MobileFormationLessonCompleteResponse {
   progress: MobileFormationProgress;
 }
 
+export interface MobileFormationSectionCompleteResponse {
+  success: true;
+  progress: MobileFormationProgress;
+}
+
 export interface MobileFormationAdminLesson {
   id: string;
   moduleId: string;
@@ -1075,6 +1080,8 @@ export const mobileEndpoints = {
   formationLesson: (trackId: string, moduleId: string, lessonNumber: number | string) =>
     `/formation/${encodePathSegment(trackId)}/${encodePathSegment(moduleId)}/${encodePathSegment(String(lessonNumber))}`,
   completeFormationLesson: (lessonId: string) => `/formation/lessons/${encodePathSegment(lessonId)}/complete`,
+  completeFormationLessonSection: (lessonId: string, sectionId: string) =>
+    `/formation/lessons/${encodePathSegment(lessonId)}/sections/${encodePathSegment(sectionId)}/complete`,
   formationAdminStudio: () => "/formation/admin/studio",
   formationAdminLessons: () => "/formation/admin/lessons",
   formationAdminLesson: (lessonId: string) => `/formation/admin/lessons/${encodePathSegment(lessonId)}`,
@@ -1368,6 +1375,19 @@ export class MescMobileApiClient {
     return this.request<MobileFormationLessonCompleteResponse>({
       method: "POST",
       path: mobileEndpoints.completeFormationLesson(lessonId),
+      body: {},
+      ...options,
+    });
+  }
+
+  async completeFormationLessonSection(
+    lessonId: string,
+    sectionId: string,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileFormationSectionCompleteResponse>({
+      method: "POST",
+      path: mobileEndpoints.completeFormationLessonSection(lessonId, sectionId),
       body: {},
       ...options,
     });

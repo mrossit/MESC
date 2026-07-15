@@ -725,16 +725,32 @@ async function countLessonSections(lessonId: string): Promise<number> {
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
   `);
-  const row = parseRows<{ count: number }>(result)[0];
-  return row?.count ?? 0;
+  const row = parseRows<{ count: number | string }>(result)[0];
+  return Number(row?.count ?? 0);
+}
+
+async function lessonSectionExists(lessonId: string, sectionId: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT id
+    FROM formation_lesson_sections
+    WHERE lesson_id = ${lessonId}
+      AND id = ${sectionId}
+    LIMIT 1
+  `);
+  return parseRows<{ id: string }>(result).length > 0;
 }
 
 export async function markLessonSectionCompleted(params: {
   userId: string;
   lessonId: string;
   sectionId: string;
-}): Promise<LessonProgressView> {
+}): Promise<LessonProgressView | null> {
   const { userId, lessonId, sectionId } = params;
+  const sectionBelongsToLesson = await lessonSectionExists(lessonId, sectionId);
+  if (!sectionBelongsToLesson) {
+    return null;
+  }
+
   const existing = await ensureLessonProgressRecord(userId, lessonId);
   const meta = parseProgressMeta(existing);
 
