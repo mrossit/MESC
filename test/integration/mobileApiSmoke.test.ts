@@ -399,6 +399,9 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
       },
     });
 
+    const notificationsBeforeReminder = await client.listNotifications({ limit: 5 });
+    const unreadCountBeforeReminder = notificationsBeforeReminder.unreadCount;
+
     const reminderIdempotencyKey = createMobileIdempotencyKey(randomUUID);
     const questionnaireReminder = await substituteClient.sendAdminQuestionnaireReminders(
       MOBILE_P0_DEMO_IDS.questionnaireA,
@@ -428,7 +431,7 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     )).resolves.toEqual(questionnaireReminder);
 
     const notificationsAfterReminder = await client.listNotifications({ limit: 5 });
-    expect(notificationsAfterReminder.unreadCount).toBe(1);
+    expect(notificationsAfterReminder.unreadCount).toBe(unreadCountBeforeReminder + 1);
     const reminderNotification = notificationsAfterReminder.notifications.find((notification) =>
       notification.id === questionnaireReminder.reminder.recipients[0].notificationId
     );
