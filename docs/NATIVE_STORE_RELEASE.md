@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.7`
-- iOS native build number: `50458`
+- iOS native build number: `50459`
 - Android version code: `50418`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
@@ -69,6 +69,7 @@ Configuracao inicial de loja:
 - iOS native formation studio candidate: build `5.4.7 (50456)` validado, exportado e enviado ao App Store Connect em 09/07/2026, delivery UUID `1b7234cb-11ea-4bf0-8d20-2c550f034fb7`; adiciona estudio nativo de formacao para coordenadores/gestores criarem aulas, publicar conteudos com video/documento, notificar ministros da comunidade e expor contratos mobile admin idempotentes.
 - iOS native tab shell candidate: build `5.4.7 (50457)` validado, exportado e enviado ao App Store Connect em 10/07/2026, delivery UUID `25b391e9-8c8e-473c-a14e-51484bc0fdf1`; substitui a tab bar customizada por `TabView`/`UITabBar` nativos, preserva Liquid Glass nativo no iOS 26+ e aplica blur material como fallback em versoes anteriores.
 - iOS native schedule/formation UX candidate: build `5.4.7 (50458)` validado, exportado e enviado ao App Store Connect em 10/07/2026, delivery UUID `af791c98-9344-4525-ab73-578cf7bc2a5b`; refina Escalas com seletor glass, resumo mensal, calendario mais legivel e lista diaria limpa, e reorganiza Formacao com painel unico de progresso/proxima aula, biblioteca de videos e acesso ao estudio.
+- iOS native formation progress candidate: build `5.4.7 (50459)` validado, exportado, enviado e processado pelo App Store Connect em 14/07/2026; corrige a interpretacao de progresso persistido, permite concluir cada secao de uma aula no cliente nativo e atualiza o progresso percentual imediatamente. Build ID `b91e469c-1412-44ab-87ee-48517b48d120`, estado `VALID` e elegivel para testes internos no TestFlight.
 - App Store version: `5.4.3` em `PREPARE_FOR_SUBMISSION`, build `50414` selecionada para loja, release `AFTER_APPROVAL`.
 - App Store metadata pt-BR: nome, subtitulo, descricao, palavras-chave, texto promocional, URLs de marketing/suporte e privacy policy preenchidos em 18/06/2026.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
