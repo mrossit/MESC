@@ -8,6 +8,8 @@ import UserNotifications
 extension Notification.Name {
     static let mescRemoteNotificationDeviceToken = Notification.Name("MESCRemoteNotificationDeviceToken")
     static let mescRemoteNotificationRegistrationFailed = Notification.Name("MESCRemoteNotificationRegistrationFailed")
+    static let mescRemoteNotificationOpened = Notification.Name("MESCRemoteNotificationOpened")
+    static let mescRemoteNotificationDeepLinkStorageKey = "mesc.native.pendingPushDeepLink"
 }
 
 final class AppViewController: UIViewController {
@@ -94,7 +96,7 @@ enum MESCNativeTabBarStyler {
 
 @MainActor
 final class MESCNativeAppModel: ObservableObject {
-    enum SessionState {
+    enum SessionState: Equatable {
         case checking
         case unauthenticated
         case authenticated
@@ -130,6 +132,15 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var pushPermissionMessage: String?
     @Published var currentDevice: MobileDeviceDTO?
     @Published var notificationPreferences = MESCNotificationPreference.defaults
+    @Published var notifications: [MobileNotificationDTO] = []
+    @Published var unreadNotificationsCount = 0
+    @Published var isLoadingNotifications = false
+    @Published var isMarkingAllNotificationsRead = false
+    @Published var markingNotificationId: String?
+    @Published var notificationMessage: String?
+    @Published var isNotificationCenterPresented = false
+    @Published var pendingNotificationDeepLink: String?
+    @Published var isQuestionnairePresentationRequested = false
     @Published var biometricAvailable = false
     @Published var biometricEnabled = false
     @Published var biometricTypeLabel = "Face ID ou Touch ID"
@@ -153,6 +164,22 @@ final class MESCNativeAppModel: ObservableObject {
                 }
             }
         )
+        notificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .mescRemoteNotificationOpened,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let deepLink = notification.object as? String, deepLink.hasPrefix("/") else { return }
+                Task { @MainActor [weak self] in
+                    self?.pendingNotificationDeepLink = deepLink
+                }
+            }
+        )
+
+        if let deepLink = UserDefaults.standard.string(forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey), deepLink.hasPrefix("/") {
+            pendingNotificationDeepLink = deepLink
+        }
         notificationObservers.append(
             NotificationCenter.default.addObserver(
                 forName: .mescRemoteNotificationRegistrationFailed,
@@ -394,6 +421,13 @@ final class MESCNativeAppModel: ObservableObject {
         scheduleActionMessage = nil
         settingsMessage = nil
         currentDevice = nil
+        notifications = []
+        unreadNotificationsCount = 0
+        notificationMessage = nil
+        isNotificationCenterPresented = false
+        isQuestionnairePresentationRequested = false
+        pendingNotificationDeepLink = nil
+        UserDefaults.standard.removeObject(forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey)
         errorMessage = nil
         isUsingFallbackData = false
         selectedMonth = Self.currentMonthString()
@@ -575,6 +609,125 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         isSavingQuestionnaire = false
+        return false
+    }
+
+    func loadNotifications() async {
+        guard let accessToken = sessionStore.accessToken else {
+            return
+        }
+
+        isLoadingNotifications = true
+        notificationMessage = nil
+
+        do {
+            try await loadNotifications(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await loadNotifications(accessToken: refreshedAccessToken)
+                } catch {
+                    notificationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                notificationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingNotifications = false
+    }
+
+    @discardableResult
+    func markNotificationRead(_ notification: MobileNotificationDTO) async -> Bool {
+        guard !notification.read else { return true }
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        markingNotificationId = notification.id
+        notificationMessage = nil
+
+        do {
+            let response = try await client.markNotificationRead(
+                notificationId: notification.id,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            applyNotificationRead(response.notification)
+            markingNotificationId = nil
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    let response = try await client.markNotificationRead(
+                        notificationId: notification.id,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                    applyNotificationRead(response.notification)
+                    markingNotificationId = nil
+                    return true
+                } catch {
+                    notificationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                notificationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        markingNotificationId = nil
+        return false
+    }
+
+    @discardableResult
+    func markAllNotificationsRead() async -> Bool {
+        guard unreadNotificationsCount > 0 else { return true }
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        isMarkingAllNotificationsRead = true
+        notificationMessage = nil
+
+        do {
+            _ = try await client.markAllNotificationsRead(
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            applyAllNotificationsRead()
+            isMarkingAllNotificationsRead = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    _ = try await client.markAllNotificationsRead(
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                    applyAllNotificationsRead()
+                    isMarkingAllNotificationsRead = false
+                    return true
+                } catch {
+                    notificationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                notificationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isMarkingAllNotificationsRead = false
         return false
     }
 
@@ -1017,6 +1170,45 @@ final class MESCNativeAppModel: ObservableObject {
                 throw error
             }
         }
+
+        do {
+            try await loadNotifications(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error) {
+                throw error
+            }
+        }
+    }
+
+    private func loadNotifications(accessToken: String) async throws {
+        let response = try await client.notifications(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId,
+            limit: 60
+        )
+        notifications = response.notifications
+        unreadNotificationsCount = response.unreadCount
+    }
+
+    private func applyNotificationRead(_ update: MobileNotificationReadDTO) {
+        guard let current = notifications.first(where: { $0.id == update.id }) else { return }
+
+        notifications = notifications.map { notification in
+            notification.id == update.id
+                ? notification.withRead(read: update.read, readAt: update.readAt)
+                : notification
+        }
+
+        if !current.read && update.read {
+            unreadNotificationsCount = max(0, unreadNotificationsCount - 1)
+        }
+    }
+
+    private func applyAllNotificationsRead() {
+        let readAt = ISO8601DateFormatter().string(from: Date())
+        notifications = notifications.map { $0.withRead(read: true, readAt: $0.readAt ?? readAt) }
+        unreadNotificationsCount = 0
     }
 
     private func loadCurrentQuestionnaire(accessToken: String) async throws {
@@ -1486,6 +1678,18 @@ struct MESCNativeRootView: View {
             guard phase == .active else { return }
             Task { await appModel.refreshNativeNotificationState() }
         }
+        .onChange(of: appModel.pendingNotificationDeepLink) { _ in
+            routePendingNotificationIfPossible()
+        }
+        .onChange(of: appModel.sessionState) { _ in
+            routePendingNotificationIfPossible()
+        }
+        .sheet(isPresented: $appModel.isNotificationCenterPresented) {
+            MESCNotificationCenterSheet { deepLink in
+                openNotification(deepLink)
+            }
+            .environmentObject(appModel)
+        }
         .tint(MESCColor.primaryRed)
     }
 
@@ -1518,6 +1722,38 @@ struct MESCNativeRootView: View {
             ProfileScreen()
         case .settings:
             SettingsScreen()
+        }
+    }
+
+    private func routePendingNotificationIfPossible() {
+        guard appModel.sessionState == .authenticated,
+              let deepLink = appModel.pendingNotificationDeepLink
+        else {
+            return
+        }
+
+        appModel.pendingNotificationDeepLink = nil
+        UserDefaults.standard.removeObject(forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey)
+        openNotification(deepLink)
+    }
+
+    private func openNotification(_ deepLink: String) {
+        appModel.isNotificationCenterPresented = false
+
+        switch MESCNotificationDestination.resolve(deepLink) {
+        case .questionnaire:
+            selectedTab = .mission
+            appModel.isQuestionnairePresentationRequested = true
+        case .schedules:
+            selectedTab = .schedules
+        case .formation:
+            selectedTab = .formation
+        case .profile:
+            selectedTab = .profile
+        case .settings:
+            selectedTab = .settings
+        case .mission, .communication:
+            selectedTab = .mission
         }
     }
 }
@@ -1560,6 +1796,40 @@ enum MESCTab: String, CaseIterable, Identifiable {
         case .profile: return "person"
         case .settings: return "gearshape"
         }
+    }
+}
+
+private enum MESCNotificationDestination {
+    case mission
+    case questionnaire
+    case schedules
+    case formation
+    case profile
+    case settings
+    case communication
+
+    static func resolve(_ deepLink: String) -> MESCNotificationDestination {
+        let path = deepLink.split(separator: "?", maxSplits: 1).first.map(String.init) ?? deepLink
+
+        if path == "/questionnaire" || path.hasPrefix("/questionnaires") {
+            return .questionnaire
+        }
+        if path == "/formation" || path.hasPrefix("/formation/") {
+            return .formation
+        }
+        if path == "/schedules" || path.hasPrefix("/schedules/") || path.hasPrefix("/substitutions") {
+            return .schedules
+        }
+        if path == "/profile" {
+            return .profile
+        }
+        if path == "/settings" {
+            return .settings
+        }
+        if path == "/communication" || path == "/notifications" || path == "/notices" {
+            return .communication
+        }
+        return .mission
     }
 }
 
@@ -1880,6 +2150,12 @@ struct MissionScreen: View {
             SubstitutionRequestSheet(target: target)
                 .environmentObject(appModel)
         }
+        .onAppear {
+            presentQuestionnaireIfRequested()
+        }
+        .onChange(of: appModel.isQuestionnairePresentationRequested) { _ in
+            presentQuestionnaireIfRequested()
+        }
     }
 
     private var questionnaireStatus: String {
@@ -1888,8 +2164,14 @@ struct MissionScreen: View {
     }
 
     private var noticesStatus: String {
-        let count = appModel.missionHome?.notices.filter { !$0.read }.count ?? 0
+        let count = appModel.unreadNotificationsCount
         return count == 1 ? "1 aviso" : "\(count) avisos"
+    }
+
+    private func presentQuestionnaireIfRequested() {
+        guard appModel.isQuestionnairePresentationRequested else { return }
+        appModel.isQuestionnairePresentationRequested = false
+        isQuestionnairePresented = true
     }
 }
 
@@ -3528,6 +3810,7 @@ struct SettingsScreen: View {
 }
 
 struct MESCScrollScreen<Content: View>: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
     let title: String
     let subtitle: String
     @ViewBuilder let content: Content
@@ -3547,6 +3830,10 @@ struct MESCScrollScreen<Content: View>: View {
 
                     Spacer()
 
+                    MESCNotificationBell(unreadCount: appModel.unreadNotificationsCount) {
+                        appModel.isNotificationCenterPresented = true
+                    }
+
                     Image(systemName: "cross.case.fill")
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(MESCColor.gold)
@@ -3562,6 +3849,209 @@ struct MESCScrollScreen<Content: View>: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 28)
         }
+    }
+}
+
+struct MESCNotificationBell: View {
+    let unreadCount: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: unreadCount > 0 ? "bell.badge.fill" : "bell")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MESCColor.accent)
+                    .frame(width: 42, height: 42)
+                    .mescGlass(cornerRadius: 14)
+
+                if unreadCount > 0 {
+                    Text(unreadCount > 9 ? "9+" : "\(unreadCount)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 17, minHeight: 17)
+                        .padding(.horizontal, unreadCount > 9 ? 2 : 0)
+                        .background(MESCColor.primaryWine, in: Capsule())
+                        .overlay(Capsule().stroke(MESCColor.surface.opacity(0.9), lineWidth: 1))
+                        .offset(x: 5, y: -5)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(unreadCount == 0 ? "Notificações" : "Notificações, \(unreadCount) não lidas")
+    }
+}
+
+struct MESCNotificationCenterSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let onOpenDeepLink: (String) -> Void
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+
+                    if appModel.isLoadingNotifications && appModel.notifications.isEmpty {
+                        ProgressView()
+                            .tint(MESCColor.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 44)
+                    } else if appModel.notifications.isEmpty {
+                        GlassPanel(spacing: 10) {
+                            VStack(spacing: 10) {
+                                Image(systemName: "bell.slash")
+                                    .font(.system(size: 28, weight: .semibold))
+                                    .foregroundStyle(MESCColor.gold)
+                                Text("Nenhum aviso por enquanto")
+                                    .font(MESCFont.body.weight(.semibold))
+                                Text("Questionários, escalas, substituições e formações aparecerão aqui.")
+                                    .font(MESCFont.caption)
+                                    .foregroundStyle(MESCColor.textSecondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                        }
+                    } else {
+                        if appModel.unreadNotificationsCount > 0 {
+                            MESCSecondaryButton(
+                                title: appModel.isMarkingAllNotificationsRead ? "Marcando..." : "Marcar todas como lidas",
+                                symbol: "checkmark.circle"
+                            ) {
+                                Task { await appModel.markAllNotificationsRead() }
+                            }
+                            .disabled(appModel.isMarkingAllNotificationsRead)
+                        }
+
+                        if let message = appModel.notificationMessage {
+                            Label(message, systemImage: "exclamationmark.triangle")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.primaryWine)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 4)
+                        }
+
+                        ForEach(appModel.notifications) { notification in
+                            Button {
+                                Task {
+                                    _ = await appModel.markNotificationRead(notification)
+                                    dismiss()
+                                    onOpenDeepLink(notification.deepLink)
+                                }
+                            } label: {
+                                MESCNotificationRow(
+                                    notification: notification,
+                                    isMarkingRead: appModel.markingNotificationId == notification.id
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(appModel.markingNotificationId == notification.id)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+        .task {
+            await appModel.loadNotifications()
+        }
+        .refreshable {
+            await appModel.loadNotifications()
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Central")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.accent)
+                Text("Notificações")
+                    .font(MESCFont.screenTitle)
+                    .foregroundStyle(MESCColor.textPrimary)
+            }
+
+            Spacer()
+
+            MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar notificações") {
+                dismiss()
+            }
+        }
+        .padding(16)
+        .mescGlass(cornerRadius: 24, intensity: .floating)
+    }
+}
+
+struct MESCNotificationRow: View {
+    let notification: MobileNotificationDTO
+    let isMarkingRead: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            SymbolTile(symbol: symbol, tint: tint)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(notification.title)
+                    .font(MESCFont.body.weight(notification.read ? .medium : .bold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                    .multilineTextAlignment(.leading)
+                Text(notification.message)
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let createdAt = notification.createdAt {
+                    Text(MESCNativeAppModel.compactDateTimeLabel(createdAt))
+                        .font(MESCFont.caption2)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            if isMarkingRead {
+                ProgressView()
+                    .tint(MESCColor.accent)
+            } else if !notification.read {
+                Circle()
+                    .fill(MESCColor.gold)
+                    .frame(width: 9, height: 9)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .mescGlass(cornerRadius: 18)
+        .opacity(notification.read ? 0.78 : 1)
+    }
+
+    private var symbol: String {
+        switch notification.type {
+        case "schedule":
+            return "calendar"
+        case "substitution":
+            return "arrow.triangle.2.circlepath"
+        case "formation":
+            return "graduationcap"
+        case "questionnaire":
+            return "list.clipboard"
+        case "announcement":
+            return "megaphone"
+        default:
+            return "bell"
+        }
+    }
+
+    private var tint: Color {
+        if notification.priority == "high" {
+            return MESCColor.primaryWine
+        }
+        return notification.read ? MESCColor.textSecondary : MESCColor.accent
     }
 }
 
@@ -4592,6 +5082,55 @@ struct MobileNoticeDTO: Codable, Identifiable {
     let createdAt: String?
 }
 
+struct MobileNotificationDTO: Codable, Identifiable {
+    let id: String
+    let type: String
+    let eventKey: String?
+    let title: String
+    let message: String
+    let priority: String?
+    let read: Bool
+    let readAt: String?
+    let deepLink: String
+    let createdAt: String?
+
+    func withRead(read: Bool, readAt: String?) -> MobileNotificationDTO {
+        MobileNotificationDTO(
+            id: id,
+            type: type,
+            eventKey: eventKey,
+            title: title,
+            message: message,
+            priority: priority,
+            read: read,
+            readAt: readAt,
+            deepLink: deepLink,
+            createdAt: createdAt
+        )
+    }
+}
+
+struct MobileNotificationsResponseDTO: Codable {
+    let success: Bool
+    let notifications: [MobileNotificationDTO]
+    let unreadCount: Int
+}
+
+struct MobileNotificationReadDTO: Codable {
+    let id: String
+    let read: Bool
+    let readAt: String?
+}
+
+struct MobileNotificationReadResponseDTO: Codable {
+    let success: Bool
+    let notification: MobileNotificationReadDTO
+}
+
+struct MobileNotificationReadAllResponseDTO: Codable {
+    let success: Bool
+}
+
 struct MobileSyncDTO: Codable {
     let serverTime: String
     let cacheMaxAgeSeconds: Int
@@ -5165,6 +5704,48 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func notifications(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        limit: Int
+    ) async throws -> MobileNotificationsResponseDTO {
+        try await get(
+            "notifications",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            queryItems: [URLQueryItem(name: "limit", value: String(limit))]
+        )
+    }
+
+    func markNotificationRead(
+        notificationId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileNotificationReadResponseDTO {
+        try await authenticatedPatch(
+            "notifications/\(notificationId)/read",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func markAllNotificationsRead(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileNotificationReadAllResponseDTO {
+        try await authenticatedPatch(
+            "notifications/read-all",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
     func updateCurrentDevice(
         accessToken: String,
         communityId: String?,
@@ -5266,6 +5847,22 @@ final class MESCMobileAPIClient {
             request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
         }
         request.httpBody = try encoder.encode(body)
+        return try await send(request)
+    }
+
+    private func authenticatedPatch<Response: Decodable>(
+        _ path: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> Response {
+        var request = try makeRequest(path: path)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
         return try await send(request)
     }
 
