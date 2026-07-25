@@ -10,7 +10,7 @@ Este documento prepara o empacotamento nativo do MESC para App Store e Google Pl
 - App name na App Store: `MESC São Judas Tadeu`
 - App id / bundle id / application id: `app.saojudastadeu.mesc`
 - Version: `5.4.7`
-- iOS native build number: `50460`
+- iOS native build number: `50461`
 - Android version code: `50418`
 - Web assets: `dist/public`
 - API de producao no build mobile: `https://saojudastadeu.app`
@@ -71,10 +71,11 @@ Configuracao inicial de loja:
 - iOS native schedule/formation UX candidate: build `5.4.7 (50458)` validado, exportado e enviado ao App Store Connect em 10/07/2026, delivery UUID `af791c98-9344-4525-ab73-578cf7bc2a5b`; refina Escalas com seletor glass, resumo mensal, calendario mais legivel e lista diaria limpa, e reorganiza Formacao com painel unico de progresso/proxima aula, biblioteca de videos e acesso ao estudio.
 - iOS native formation progress candidate: build `5.4.7 (50459)` validado, exportado, enviado e processado pelo App Store Connect em 14/07/2026; corrige a interpretacao de progresso persistido, permite concluir cada secao de uma aula no cliente nativo e atualiza o progresso percentual imediatamente. Build ID `b91e469c-1412-44ab-87ee-48517b48d120`, estado `VALID` e elegivel para testes internos no TestFlight.
 - iOS native notification center candidate: build `5.4.7 (50460)` validado, exportado, enviado e processado pelo App Store Connect em 25/07/2026; adiciona central nativa de avisos, badge de nao lidas, leitura individual/em lote e roteamento interno para toques em push. Delivery/build ID `f425528a-cecd-4dfe-a22f-f72dec7dfb98`, estado `VALID` e elegivel para testes internos no TestFlight.
+- iOS native substitution center candidate: build `5.4.7 (50461)` preparado apos merge do PR `#52`; adiciona central SwiftUI para ver pedidos abertos, acompanhar os proprios pedidos, assumir uma escala com confirmacao e abrir a tela diretamente por notificacao de substituicao.
 - App Store version: `5.4.3` em `PREPARE_FOR_SUBMISSION`, build `50414` selecionada para loja, release `AFTER_APPROVAL`.
 - App Store metadata pt-BR: nome, subtitulo, descricao, palavras-chave, texto promocional, URLs de marketing/suporte e privacy policy preenchidos em 18/06/2026.
 - Dados staging: Supabase `mesc-staging` recebeu a escala oficial de junho/2026 com 321 linhas, 26 datas e 5 vagas `VACANTE`; foram criados 10 usuarios placeholder apenas para staging para validar ministros presentes na planilha e ausentes em `users`.
-- TestFlight: build `5.4.7 (50460)` enviado ao App Store Connect contra `https://saojudastadeu.app`, processado como `VALID` e elegivel para testes internos. A API da Apple recusou associacao manual ao grupo interno `MESC Interno` (`ENTITY_UNPROCESSABLE`) em tentativa anterior, pois builds internos nao sao adicionados por esse relacionamento; validar a disponibilidade diretamente no TestFlight/App Store Connect.
+- TestFlight: build `5.4.7 (50460)` enviado ao App Store Connect contra `https://saojudastadeu.app`, processado como `VALID` e elegivel para testes internos. O build `50461` sucedera essa versao apos processamento. A API da Apple recusou associacao manual ao grupo interno `MESC Interno` (`ENTITY_UNPROCESSABLE`) em tentativa anterior, pois builds internos nao sao adicionados por esse relacionamento; validar a disponibilidade diretamente no TestFlight/App Store Connect.
 - Apple Developer: capability `PUSH_NOTIFICATIONS` esta habilitada para o Bundle ID `app.saojudastadeu.mesc`. O bloqueio de export por falta de `aps-environment` no perfil App Store foi resolvido em 06/07/2026 com o perfil `MESC App Store Push 2026-07-06T14-37-32`; o IPA `5.4.7 (50460)` foi assinado com `aps-environment=production`.
 - DNS nativo: `saojudastadeu.app` e `www.saojudastadeu.app` resolvem para a Vercel (`76.76.21.21`) e a home nativa responde `200`.
 - Supabase nativo: `mesc-native-staging` recebeu `0009_native_mass_configuration_baseline.sql` e seed idempotente de horarios/eventos em 2026-06-24; `0010_native_adoration_draws_baseline.sql` esta versionada para a base de sorteio de adoracao usada pelo algoritmo; a prontidao de escala da API retorna `massConfig.configuredSlots=12` para julho/2026 na comunidade demo Matriz.
