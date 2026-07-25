@@ -1,13 +1,19 @@
 import UIKit
 import Capacitor
+import UserNotifications
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        UNUserNotificationCenter.current().delegate = self
+
+        if let userInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
+            publishNotificationDeepLink(from: userInfo)
+        }
+
         return true
     }
 
@@ -56,6 +62,50 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
         NotificationCenter.default.post(name: .mescRemoteNotificationRegistrationFailed, object: error.localizedDescription)
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        publishNotificationDeepLink(from: response.notification.request.content.userInfo)
+        completionHandler()
+    }
+
+    private func publishNotificationDeepLink(from userInfo: [AnyHashable: Any]) {
+        guard let deepLink = notificationDeepLink(from: userInfo) else { return }
+
+        UserDefaults.standard.set(deepLink, forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey)
+        NotificationCenter.default.post(name: .mescRemoteNotificationOpened, object: deepLink)
+    }
+
+    private func notificationDeepLink(from userInfo: [AnyHashable: Any]) -> String? {
+        let keys = ["url", "deepLink", "actionUrl"]
+        for key in keys {
+            if let value = userInfo[key] as? String, value.hasPrefix("/") {
+                return value
+            }
+        }
+
+        for key in ["data", "payload"] {
+            guard let data = userInfo[key] as? [AnyHashable: Any] else { continue }
+            for nestedKey in keys {
+                if let value = data[nestedKey] as? String, value.hasPrefix("/") {
+                    return value
+                }
+            }
+        }
+
+        return nil
     }
 
 }
