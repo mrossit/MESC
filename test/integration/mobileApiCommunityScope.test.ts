@@ -138,6 +138,26 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
   });
 
+  it("keeps substitution requests scoped to the active community", async () => {
+    const allowed = await mobileGet("/substitutions", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+    });
+
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.community.id).toBe(MOBILE_P0_DEMO_IDS.communityA);
+    const visibleIds = allowed.body.substitutions.map((substitution: { id: string }) => substitution.id);
+    expect(visibleIds).toContain(MOBILE_P0_DEMO_IDS.substitutionA);
+    expect(visibleIds).not.toContain(MOBILE_P0_DEMO_IDS.substitutionB);
+
+    const forbidden = await mobileGet("/substitutions", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      communityId: MOBILE_P0_DEMO_IDS.communityB,
+    });
+
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
+  });
+
   it("prevents a community coordinator from reading another community", async () => {
     const allowed = await mobileGet("/admin/ministers", {
       userId: MOBILE_P0_DEMO_IDS.coordinatorA,

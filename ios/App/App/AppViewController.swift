@@ -127,6 +127,10 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var formationMessage: String?
     @Published var scheduleActionMessage: String?
     @Published var isMutatingSchedule = false
+    @Published var substitutions: [MobileSubstitutionDTO] = []
+    @Published var isLoadingSubstitutions = false
+    @Published var substitutionMessage: String?
+    @Published var isSubstitutionCenterPresentationRequested = false
     @Published var isUsingFallbackData = false
     @Published var pushAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published var pushPermissionMessage: String?
@@ -425,6 +429,9 @@ final class MESCNativeAppModel: ObservableObject {
         unreadNotificationsCount = 0
         notificationMessage = nil
         isNotificationCenterPresented = false
+        substitutions = []
+        substitutionMessage = nil
+        isSubstitutionCenterPresentationRequested = false
         isQuestionnairePresentationRequested = false
         pendingNotificationDeepLink = nil
         UserDefaults.standard.removeObject(forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey)
@@ -746,7 +753,7 @@ final class MESCNativeAppModel: ObservableObject {
     }
 
     func requestSubstitution(scheduleId: String, reason: String?) async -> Bool {
-        await mutateSchedule(messageOnSuccess: "Pedido de substituição publicado.") { accessToken in
+        let requested = await mutateSchedule(messageOnSuccess: "Pedido de substituição publicado.") { accessToken in
             _ = try await self.client.requestSubstitution(
                 scheduleId: scheduleId,
                 accessToken: accessToken,
@@ -756,6 +763,56 @@ final class MESCNativeAppModel: ObservableObject {
                 reason: reason
             )
         }
+
+        if requested {
+            await loadSubstitutions()
+        }
+
+        return requested
+    }
+
+    func loadSubstitutions() async {
+        guard let accessToken = sessionStore.accessToken else { return }
+
+        isLoadingSubstitutions = true
+        substitutionMessage = nil
+
+        do {
+            try await loadSubstitutions(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await loadSubstitutions(accessToken: refreshedAccessToken)
+                } catch {
+                    substitutionMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                substitutionMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingSubstitutions = false
+    }
+
+    func claimSubstitution(id: String, message: String?) async -> Bool {
+        let claimed = await mutateSchedule(messageOnSuccess: "Substituição confirmada. A escala foi atualizada.") { accessToken in
+            _ = try await self.client.claimSubstitution(
+                substitutionId: id,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: UUID().uuidString,
+                message: message
+            )
+        }
+
+        if claimed {
+            await loadSubstitutions()
+        }
+
+        return claimed
     }
 
     func createOfficialScheduleExport() throws -> URL {
@@ -1189,6 +1246,15 @@ final class MESCNativeAppModel: ObservableObject {
         )
         notifications = response.notifications
         unreadNotificationsCount = response.unreadCount
+    }
+
+    private func loadSubstitutions(accessToken: String) async throws {
+        let response = try await client.substitutions(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId
+        )
+        substitutions = response.substitutions
     }
 
     private func applyNotificationRead(_ update: MobileNotificationReadDTO) {
@@ -1746,6 +1812,9 @@ struct MESCNativeRootView: View {
             appModel.isQuestionnairePresentationRequested = true
         case .schedules:
             selectedTab = .schedules
+        case .substitutions:
+            selectedTab = .schedules
+            appModel.isSubstitutionCenterPresentationRequested = true
         case .formation:
             selectedTab = .formation
         case .profile:
@@ -1803,6 +1872,7 @@ private enum MESCNotificationDestination {
     case mission
     case questionnaire
     case schedules
+    case substitutions
     case formation
     case profile
     case settings
@@ -1817,7 +1887,10 @@ private enum MESCNotificationDestination {
         if path == "/formation" || path.hasPrefix("/formation/") {
             return .formation
         }
-        if path == "/schedules" || path.hasPrefix("/schedules/") || path.hasPrefix("/substitutions") {
+        if path == "/schedules/substitutions" || path.hasPrefix("/substitutions") {
+            return .substitutions
+        }
+        if path == "/schedules" || path.hasPrefix("/schedules/") {
             return .schedules
         }
         if path == "/profile" {
@@ -2398,6 +2471,383 @@ struct SubstitutionRequestSheet: View {
     }
 }
 
+struct SubstitutionCenterLink: View {
+    let openCount: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                SymbolTile(symbol: "arrow.triangle.2.circlepath", tint: MESCColor.gold)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Trocas e substituições")
+                        .font(MESCFont.cardTitle)
+                        .foregroundStyle(MESCColor.textPrimary)
+                    Text(openCount == 0 ? "Acompanhe seus pedidos ou ofereça ajuda." : String(openCount) + " pedido(s) aberto(s) para você ajudar.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 8)
+
+                if openCount > 0 {
+                    Text("\(openCount)")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 25, minHeight: 25)
+                        .background(MESCColor.primaryWine, in: Circle())
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(MESCColor.accent)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .mescGlass(cornerRadius: 20)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Trocas e substituições")
+    }
+}
+
+struct SubstitutionCenterSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var substitutionToClaim: MobileSubstitutionDTO?
+
+    private var currentUserId: String {
+        appModel.user?.id ?? ""
+    }
+
+    private var openRequests: [MobileSubstitutionDTO] {
+        appModel.substitutions.filter(canClaim)
+    }
+
+    private var myRequests: [MobileSubstitutionDTO] {
+        appModel.substitutions.filter { $0.requesterId == currentUserId }
+    }
+
+    private var acceptedRequests: [MobileSubstitutionDTO] {
+        appModel.substitutions.filter {
+            $0.substituteId == currentUserId && $0.requesterId != currentUserId
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+
+                    if appModel.isLoadingSubstitutions && appModel.substitutions.isEmpty {
+                        ProgressView()
+                            .tint(MESCColor.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 48)
+                    } else {
+                        if let message = appModel.substitutionMessage {
+                            Label(message, systemImage: "exclamationmark.triangle")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.primaryWine)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 4)
+                        }
+
+                        if !openRequests.isEmpty {
+                            SectionTitle(title: "Pedidos abertos", symbol: "person.2.badge.gearshape")
+                                .padding(.horizontal, 4)
+
+                            ForEach(openRequests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: false,
+                                    canClaim: true
+                                ) {
+                                    substitutionToClaim = substitution
+                                }
+                            }
+                        }
+
+                        if !myRequests.isEmpty {
+                            SectionTitle(title: "Meus pedidos", symbol: "clock.arrow.circlepath")
+                                .padding(.horizontal, 4)
+
+                            ForEach(myRequests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: true,
+                                    canClaim: false
+                                )
+                            }
+                        }
+
+                        if !acceptedRequests.isEmpty {
+                            SectionTitle(title: "Escalas que assumi", symbol: "checkmark.circle")
+                                .padding(.horizontal, 4)
+
+                            ForEach(acceptedRequests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: false,
+                                    canClaim: false
+                                )
+                            }
+                        }
+
+                        if appModel.substitutions.isEmpty {
+                            GlassPanel(spacing: 10) {
+                                EmptyState(
+                                    title: "Nenhuma substituição por enquanto",
+                                    detail: "Quando um ministro pedir ajuda na sua comunidade, o pedido aparecerá aqui."
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+        .task {
+            await appModel.loadSubstitutions()
+        }
+        .refreshable {
+            await appModel.loadSubstitutions()
+        }
+        .sheet(item: $substitutionToClaim) { substitution in
+            SubstitutionClaimSheet(substitution: substitution)
+                .environmentObject(appModel)
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Escalas")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.accent)
+                Text("Trocas e substituições")
+                    .font(MESCFont.screenTitle)
+                    .foregroundStyle(MESCColor.textPrimary)
+            }
+
+            Spacer()
+
+            MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar substituições") {
+                dismiss()
+            }
+        }
+        .padding(16)
+        .mescGlass(cornerRadius: 24, intensity: .floating)
+    }
+
+    private func canClaim(_ substitution: MobileSubstitutionDTO) -> Bool {
+        let isOpen = substitution.status == "available" || (substitution.status == "pending" && substitution.substituteId == nil)
+        return isOpen && substitution.requesterId != currentUserId
+    }
+}
+
+struct SubstitutionRow: View {
+    let substitution: MobileSubstitutionDTO
+    let isOwnRequest: Bool
+    let canClaim: Bool
+    var onClaim: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: "arrow.triangle.2.circlepath", tint: urgencyTint)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(primaryTitle)
+                        .font(MESCFont.cardTitle)
+                        .foregroundStyle(MESCColor.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(MESCNativeAppModel.scheduleDateTitle(date: substitution.schedule.date)) às \(MESCNativeAppModel.timeLabel(substitution.schedule.time))")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+
+                Text(statusTitle)
+                    .font(MESCFont.caption2.weight(.bold))
+                    .foregroundStyle(statusTint)
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Label(scheduleDetail, systemImage: "mappin.and.ellipse")
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let reason = nonEmpty(substitution.reason) {
+                Label(reason, systemImage: "text.bubble")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let response = nonEmpty(substitution.responseMessage) {
+                Label(response, systemImage: "checkmark.message")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if canClaim, let onClaim {
+                MESCPrimaryButton(title: "Assumir esta escala", symbol: "checkmark.circle", action: onClaim)
+            } else if isOwnRequest && substitution.status == "available" {
+                Label("Aguardando um ministro assumir esta escala.", systemImage: "clock")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.gold)
+            } else if let substitute = substitution.substitute {
+                Label("Assumida por \(substitute.name)", systemImage: "person.crop.circle.badge.checkmark")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.accent)
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .mescGlass(cornerRadius: 20)
+    }
+
+    private var primaryTitle: String {
+        if isOwnRequest {
+            return "Seu pedido de substituição"
+        }
+        return "Pedido de \(substitution.requester?.name ?? "ministro da comunidade")"
+    }
+
+    private var scheduleDetail: String {
+        let type = MESCNativeAppModel.scheduleTitle(type: substitution.schedule.type)
+        if let location = nonEmpty(substitution.schedule.location) {
+            return "\(type) • \(location)"
+        }
+        return type
+    }
+
+    private var statusTitle: String {
+        switch substitution.status {
+        case "available": return "Disponível"
+        case "pending": return "Em análise"
+        case "approved": return "Confirmada"
+        case "rejected": return "Não aprovada"
+        case "cancelled": return "Cancelada"
+        default: return substitution.status.capitalized
+        }
+    }
+
+    private var urgencyTint: Color {
+        switch substitution.urgency {
+        case "critical", "high": return MESCColor.primaryWine
+        case "medium": return MESCColor.gold
+        default: return MESCColor.accent
+        }
+    }
+
+    private var statusTint: Color {
+        switch substitution.status {
+        case "approved": return MESCColor.accent
+        case "available": return urgencyTint
+        case "rejected", "cancelled": return MESCColor.primaryWine
+        default: return MESCColor.textSecondary
+        }
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+}
+
+struct SubstitutionClaimSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let substitution: MobileSubstitutionDTO
+    @State private var message = ""
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            VStack(alignment: .leading, spacing: 18) {
+                GlassPanel(spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        SymbolTile(symbol: "checkmark.circle", tint: MESCColor.accent)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Assumir substituição")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.accent)
+                            Text(MESCNativeAppModel.scheduleDateTitle(date: substitution.schedule.date))
+                                .font(MESCFont.title2)
+                            Text("às \(MESCNativeAppModel.timeLabel(substitution.schedule.time))")
+                                .font(MESCFont.body)
+                                .foregroundStyle(MESCColor.textSecondary)
+                        }
+                        Spacer()
+                        MESCIconButton(symbol: "xmark", accessibilityLabel: "Cancelar aceite") {
+                            dismiss()
+                        }
+                    }
+                }
+
+                GlassPanel(spacing: 10) {
+                    SectionTitle(title: "Confirmação", symbol: "person.2")
+                    Text("Você assumirá esta escala em nome de \(substitution.requester?.name ?? "um ministro da comunidade"). A atualização será registrada para a coordenação.")
+                        .font(MESCFont.body)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    TextField("Mensagem opcional", text: $message)
+                        .font(MESCFont.body)
+                        .padding(14)
+                        .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(MESCColor.separator, lineWidth: 1)
+                        )
+                }
+
+                if let statusMessage = appModel.scheduleActionMessage {
+                    Label(statusMessage, systemImage: statusMessage.contains("confirmada") ? "checkmark.seal" : "info.circle")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(statusMessage.contains("confirmada") ? MESCColor.accent : MESCColor.primaryWine)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                MESCPrimaryButton(
+                    title: appModel.isMutatingSchedule ? "Confirmando..." : "Confirmar substituição",
+                    symbol: "checkmark.circle.fill"
+                ) {
+                    Task {
+                        let didClaim = await appModel.claimSubstitution(
+                            id: substitution.id,
+                            message: message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : message
+                        )
+                        if didClaim {
+                            dismiss()
+                        }
+                    }
+                }
+                .disabled(appModel.isMutatingSchedule)
+
+                Spacer()
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+        }
+    }
+}
+
 struct QuestionnaireQuestionCard: View {
     let question: MobileQuestionnaireQuestionDTO
     @Binding var draft: QuestionnaireDraftAnswer
@@ -2567,6 +3017,7 @@ struct SchedulesScreen: View {
     @State private var mode: ScheduleMode = .mine
     @State private var selectedDayNumber = Calendar.current.component(.day, from: Date())
     @State private var substitutionTarget: SubstitutionTarget?
+    @State private var isSubstitutionCenterPresented = false
     @State private var shareFile: ShareFile?
 
     var body: some View {
@@ -2587,6 +3038,12 @@ struct SchedulesScreen: View {
                 title: { $0.rawValue },
                 symbol: { $0.symbol }
             )
+
+            SubstitutionCenterLink(
+                openCount: appModel.substitutions.filter { $0.status == "available" && $0.requesterId != appModel.user?.id }.count
+            ) {
+                isSubstitutionCenterPresented = true
+            }
 
             GlassPanel(spacing: 14) {
                 HStack(alignment: .center, spacing: 12) {
@@ -2660,8 +3117,22 @@ struct SchedulesScreen: View {
             SubstitutionRequestSheet(target: target)
                 .environmentObject(appModel)
         }
+        .sheet(isPresented: $isSubstitutionCenterPresented) {
+            SubstitutionCenterSheet()
+                .environmentObject(appModel)
+        }
         .sheet(item: $shareFile) { file in
             ActivityView(activityItems: [file.url])
+        }
+        .task {
+            await appModel.loadSubstitutions()
+            presentSubstitutionCenterIfRequested()
+        }
+        .onAppear {
+            presentSubstitutionCenterIfRequested()
+        }
+        .onChange(of: appModel.isSubstitutionCenterPresentationRequested) { _ in
+            presentSubstitutionCenterIfRequested()
         }
         .onChange(of: mode) { _ in
             selectedDayNumber = suggestedDayNumber(from: appModel.scheduleDays(for: mode))
@@ -2676,6 +3147,12 @@ struct SchedulesScreen: View {
             return firstWithMission.dayNumber
         }
         return days.first?.dayNumber ?? Calendar.current.component(.day, from: Date())
+    }
+
+    private func presentSubstitutionCenterIfRequested() {
+        guard appModel.isSubstitutionCenterPresentationRequested else { return }
+        appModel.isSubstitutionCenterPresentationRequested = false
+        isSubstitutionCenterPresented = true
     }
 }
 
@@ -5254,6 +5731,49 @@ struct MobileSubstitutionCreateResponseDTO: Codable {
     let success: Bool
 }
 
+struct MobileSubstitutionUserDTO: Codable, Identifiable {
+    let id: String
+    let name: String
+    let email: String
+    let photoUrl: String?
+}
+
+struct MobileSubstitutionScheduleDTO: Codable, Identifiable {
+    let id: String
+    let date: String
+    let time: String
+    let type: String
+    let location: String?
+    let deepLink: String
+}
+
+struct MobileSubstitutionDTO: Codable, Identifiable {
+    let id: String
+    let scheduleId: String
+    let requesterId: String
+    let substituteId: String?
+    let status: String
+    let reason: String?
+    let urgency: String
+    let responseMessage: String?
+    let schedule: MobileSubstitutionScheduleDTO
+    let requester: MobileSubstitutionUserDTO?
+    let substitute: MobileSubstitutionUserDTO?
+    let deepLink: String
+    let createdAt: String?
+    let updatedAt: String?
+}
+
+struct MobileSubstitutionsResponseDTO: Codable {
+    let success: Bool
+    let substitutions: [MobileSubstitutionDTO]
+}
+
+struct MobileSubstitutionClaimResponseDTO: Codable {
+    let success: Bool
+    let substitution: MobileSubstitutionDTO
+}
+
 struct MobileDeviceResponseDTO: Codable {
     let success: Bool
     let device: MobileDeviceDTO
@@ -5691,6 +6211,37 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func substitutions(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileSubstitutionsResponseDTO {
+        try await get(
+            "substitutions",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func claimSubstitution(
+        substitutionId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        message: String?
+    ) async throws -> MobileSubstitutionClaimResponseDTO {
+        try await authenticatedPost(
+            "substitutions/\(substitutionId)/claim",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: SubstitutionClaimRequestBody(message: message)
+        )
+    }
+
     func currentDevice(
         accessToken: String,
         communityId: String?,
@@ -5940,6 +6491,10 @@ private struct ScheduleConfirmRequestBody: Encodable {
 private struct SubstitutionCreateRequestBody: Encodable {
     let scheduleId: String
     let reason: String?
+}
+
+private struct SubstitutionClaimRequestBody: Encodable {
+    let message: String?
 }
 
 struct FormationAdminLessonRequestBody: Encodable {

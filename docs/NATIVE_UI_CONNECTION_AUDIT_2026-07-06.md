@@ -20,6 +20,6 @@ Data: 2026-07-06
 - Formacao autoral: o app nativo ainda nao tem contrato mobile para criar/editar trilhas, modulos, aulas, secoes, videos e quizzes; por ora o coordenador abre o estudio web atual.
 - Perfil: falta edicao nativa completa, foto por camera/fotos e saneamento de cadastro ministerial.
 - Escalas: exportacao nativa cobre HTML compartilhavel; PDF/Excel oficiais ainda dependem de contrato/exportador dedicado no backend mobile.
-- Substituicoes: o ministro ja consegue pedir troca; falta tela nativa completa para ver pedidos abertos e aceitar substituicoes de outros ministros.
+- Substituicoes: central nativa carrega pedidos abertos da comunidade, acompanha os pedidos do ministro e permite assumir uma escala com confirmacao, idempotencia e atualizacao imediata da escala.
 - Coordenador: painel nativo de escala, questionario, respostas e algoritmo ainda precisa ser trazido do contrato mobile admin para SwiftUI.
 - Android: a paridade Jetpack Compose ainda nao foi iniciada neste corte.
