@@ -917,6 +917,17 @@ export interface MobileProfileResponse {
   profile: MobileProfile;
 }
 
+export interface MobileProfilePhotoUploadPayload {
+  imageBase64: string;
+  contentType: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif";
+}
+
+export interface MobileProfilePhotoResponse {
+  success: true;
+  photoUrl: string | null;
+  updatedAt: string;
+}
+
 export interface MobileDeviceUpdatePayload {
   deviceId?: string;
   platform?: MobilePlatform;
@@ -1069,6 +1080,7 @@ export const mobileEndpoints = {
   revokeDevice: (id: string) => `/devices/${encodePathSegment(id)}`,
   account: () => "/account",
   profile: () => "/profile",
+  profilePhoto: () => "/profile/photo",
   notifications: (input: { limit?: number } = {}) =>
     withQuery("/notifications", { limit: input.limit }),
   readAllNotifications: () => "/notifications/read-all",
@@ -1507,6 +1519,30 @@ export class MescMobileApiClient {
       path: mobileEndpoints.profile(),
       body: payload,
       ...options,
+      idempotencyKey: options.idempotencyKey ?? createMobileIdempotencyKey(),
+    });
+  }
+
+  async uploadProfilePhoto(
+    payload: MobileProfilePhotoUploadPayload,
+    options: MobileClientRequestOptions = {},
+  ) {
+    return this.request<MobileProfilePhotoResponse>({
+      method: "POST",
+      path: mobileEndpoints.profilePhoto(),
+      body: payload,
+      ...options,
+      idempotencyKey: options.idempotencyKey ?? createMobileIdempotencyKey(),
+    });
+  }
+
+  async removeProfilePhoto(options: MobileClientRequestOptions = {}) {
+    return this.request<MobileProfilePhotoResponse>({
+      method: "DELETE",
+      path: mobileEndpoints.profilePhoto(),
+      body: {},
+      ...options,
+      idempotencyKey: options.idempotencyKey ?? createMobileIdempotencyKey(),
     });
   }
 

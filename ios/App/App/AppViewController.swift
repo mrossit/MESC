@@ -110,6 +110,8 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var user: MobileUserDTO?
+    @Published var profile: MobileProfileDTO?
+    @Published var profileImage: UIImage?
     @Published var activeCommunity: MobileCommunityDTO?
     @Published var missionHome: MobileMissionHomeDTO?
     @Published var scheduleMonth: MobileScheduleMonthDTO?
@@ -131,6 +133,9 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var isLoadingSubstitutions = false
     @Published var substitutionMessage: String?
     @Published var isSubstitutionCenterPresentationRequested = false
+    @Published var isSavingProfile = false
+    @Published var isUpdatingProfilePhoto = false
+    @Published var profileMessage: String?
     @Published var isUsingFallbackData = false
     @Published var pushAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published var pushPermissionMessage: String?
@@ -413,6 +418,8 @@ final class MESCNativeAppModel: ObservableObject {
     func signOut() {
         sessionStore.clearTokens()
         user = nil
+        profile = nil
+        profileImage = nil
         activeCommunity = nil
         missionHome = nil
         scheduleMonth = nil
@@ -432,6 +439,7 @@ final class MESCNativeAppModel: ObservableObject {
         substitutions = []
         substitutionMessage = nil
         isSubstitutionCenterPresentationRequested = false
+        profileMessage = nil
         isQuestionnairePresentationRequested = false
         pendingNotificationDeepLink = nil
         UserDefaults.standard.removeObject(forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey)
@@ -813,6 +821,76 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         return claimed
+    }
+
+    @discardableResult
+    func saveProfile(
+        name: String,
+        phone: String,
+        whatsapp: String,
+        scheduleDisplayName: String,
+        ministryStartDate: Date?,
+        maritalStatus: String
+    ) async -> Bool {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedName.count >= 3 else {
+            profileMessage = "Informe seu nome completo para atualizar o cadastro."
+            return false
+        }
+
+        return await mutateProfile(messageOnSuccess: "Dados do perfil atualizados.") { accessToken, idempotencyKey in
+            _ = try await self.client.updateProfile(
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey,
+                body: ProfileUpdateRequestBody(
+                    name: trimmedName,
+                    phone: Self.optionalText(phone),
+                    whatsapp: Self.optionalText(whatsapp),
+                    scheduleDisplayName: Self.optionalText(scheduleDisplayName),
+                    ministryStartDate: ministryStartDate.map(Self.profileDateString),
+                    maritalStatus: Self.optionalText(maritalStatus)
+                )
+            )
+        }
+    }
+
+    @discardableResult
+    func uploadProfilePhoto(_ image: UIImage) async -> Bool {
+        guard let imageData = MESCProfileImageEncoder.jpegData(from: image) else {
+            profileMessage = "Não foi possível preparar esta foto. Tente outra imagem."
+            return false
+        }
+
+        isUpdatingProfilePhoto = true
+        let uploaded = await mutateProfile(messageOnSuccess: "Foto de perfil atualizada.") { accessToken, idempotencyKey in
+            _ = try await self.client.uploadProfilePhoto(
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey,
+                imageBase64: imageData.base64EncodedString(),
+                contentType: "image/jpeg"
+            )
+        }
+        isUpdatingProfilePhoto = false
+        return uploaded
+    }
+
+    @discardableResult
+    func removeProfilePhoto() async -> Bool {
+        isUpdatingProfilePhoto = true
+        let removed = await mutateProfile(messageOnSuccess: "Foto de perfil removida.") { accessToken, idempotencyKey in
+            _ = try await self.client.removeProfilePhoto(
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+        }
+        isUpdatingProfilePhoto = false
+        return removed
     }
 
     func createOfficialScheduleExport() throws -> URL {
@@ -1204,6 +1282,14 @@ final class MESCNativeAppModel: ObservableObject {
         isUsingFallbackData = false
 
         do {
+            try await loadProfile(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error) {
+                throw error
+            }
+        }
+
+        do {
             try await loadCurrentQuestionnaire(accessToken: accessToken)
         } catch {
             if Self.isAuthenticationFailure(error) {
@@ -1246,6 +1332,47 @@ final class MESCNativeAppModel: ObservableObject {
         )
         notifications = response.notifications
         unreadNotificationsCount = response.unreadCount
+    }
+
+    private func loadProfile(accessToken: String) async throws {
+        let response = try await client.profile(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId
+        )
+        applyProfile(response.profile)
+
+        guard response.profile.photoUrl != nil else {
+            profileImage = nil
+            return
+        }
+
+        do {
+            let data = try await client.profilePhoto(
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            profileImage = UIImage(data: data)
+        } catch {
+            if Self.isAuthenticationFailure(error) {
+                throw error
+            }
+            profileImage = nil
+        }
+    }
+
+    private func applyProfile(_ updatedProfile: MobileProfileDTO) {
+        profile = updatedProfile
+        user = MobileUserDTO(
+            id: updatedProfile.id,
+            email: updatedProfile.email,
+            name: updatedProfile.name,
+            role: updatedProfile.role,
+            homeCommunityId: updatedProfile.homeCommunityId,
+            requiresPasswordChange: updatedProfile.requiresPasswordChange,
+            photoUrl: updatedProfile.photoUrl
+        )
     }
 
     private func loadSubstitutions(accessToken: String) async throws {
@@ -1410,6 +1537,47 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         isMutatingSchedule = false
+        return false
+    }
+
+    private func mutateProfile(
+        messageOnSuccess: String,
+        operation: @escaping (String, String) async throws -> Void
+    ) async -> Bool {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        let idempotencyKey = UUID().uuidString
+        isSavingProfile = true
+        profileMessage = nil
+
+        do {
+            try await operation(accessToken, idempotencyKey)
+            try await loadProfile(accessToken: accessToken)
+            profileMessage = messageOnSuccess
+            isSavingProfile = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await operation(refreshedAccessToken, idempotencyKey)
+                    try await loadProfile(accessToken: refreshedAccessToken)
+                    profileMessage = messageOnSuccess
+                    isSavingProfile = false
+                    return true
+                } catch {
+                    profileMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                profileMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isSavingProfile = false
         return false
     }
 
@@ -1636,6 +1804,20 @@ final class MESCNativeAppModel: ObservableObject {
             .replacingOccurrences(of: "'", with: "&#39;")
     }
 
+    private static func optionalText(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func profileDateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
     private static func currentMonthString() -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -1716,6 +1898,30 @@ final class MESCNativeAppModel: ObservableObject {
     static func positionLabel(_ position: Int?) -> String {
         guard let position, position > 0 else { return "Ministro" }
         return "P\(position)"
+    }
+}
+
+private enum MESCProfileImageEncoder {
+    static func jpegData(from image: UIImage) -> Data? {
+        let maxDimension: CGFloat = 1_600
+        let originalSize = image.size
+        guard originalSize.width > 0, originalSize.height > 0 else { return nil }
+
+        let scale = min(1, maxDimension / max(originalSize.width, originalSize.height))
+        let targetSize = CGSize(width: originalSize.width * scale, height: originalSize.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let rendered = UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+
+        var quality: CGFloat = 0.84
+        var data = rendered.jpegData(compressionQuality: quality)
+        while let currentData = data, currentData.count > 4 * 1024 * 1024, quality > 0.48 {
+            quality -= 0.12
+            data = rendered.jpegData(compressionQuality: quality)
+        }
+        return data
     }
 }
 
@@ -4116,6 +4322,9 @@ struct FormationLessonSectionCard: View {
 
 struct ProfileScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
+    @State private var isProfileEditorPresented = false
+    @State private var photoSource: ProfilePhotoSource?
+    @State private var isRemovePhotoConfirmationPresented = false
 
     var body: some View {
         let name = appModel.user?.name ?? "Ministro"
@@ -4131,16 +4340,7 @@ struct ProfileScreen: View {
         MESCScrollScreen(title: "Perfil", subtitle: "Dados do ministro") {
             GlassPanel(spacing: 16) {
                 HStack(spacing: 14) {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [MESCColor.primaryWine, MESCColor.primaryRed],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 64, height: 64)
-                        .overlay(Text(initials.isEmpty ? "M" : initials).font(.system(size: 22, weight: .bold)).foregroundStyle(.white))
+                    ProfileAvatar(image: appModel.profileImage, initials: initials, size: 68)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(name)
@@ -4150,11 +4350,40 @@ struct ProfileScreen: View {
                             .foregroundStyle(MESCColor.textSecondary)
                     }
                     Spacer()
+
+                    Menu {
+                        Button("Tirar foto", systemImage: "camera") {
+                            photoSource = .camera
+                        }
+                        .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
+
+                        Button("Escolher da biblioteca", systemImage: "photo.on.rectangle") {
+                            photoSource = .library
+                        }
+
+                        if appModel.profileImage != nil || appModel.profile?.photoUrl != nil {
+                            Button("Remover foto", systemImage: "trash", role: .destructive) {
+                                isRemovePhotoConfirmationPresented = true
+                            }
+                        }
+                    } label: {
+                        Image(systemName: appModel.isUpdatingProfilePhoto ? "hourglass" : "camera.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 38, height: 38)
+                            .background(.thinMaterial, in: Circle())
+                    }
+                    .disabled(appModel.isUpdatingProfilePhoto)
                 }
 
                 ProfileInfoRow(title: "Email", value: email)
+                ProfileInfoRow(title: "Celular", value: appModel.profile?.phone ?? "Não informado")
+                ProfileInfoRow(title: "WhatsApp", value: appModel.profile?.whatsapp ?? "Não informado")
                 ProfileInfoRow(title: "Comunidade", value: appModel.activeCommunity?.name ?? "Não carregada")
                 ProfileInfoRow(title: "Paróquia", value: appModel.activeCommunity?.parishName ?? "São Judas Tadeu")
+
+                MESCSecondaryButton(title: "Editar dados", symbol: "square.and.pencil") {
+                    isProfileEditorPresented = true
+                }
             }
 
             GlassPanel(spacing: 14) {
@@ -4172,6 +4401,233 @@ struct ProfileScreen: View {
                     value: appModel.pushStatusText
                 )
             }
+
+            if let message = appModel.profileMessage {
+                Label(message, systemImage: message.contains("atualizada") || message.contains("atualizados") || message.contains("removida") ? "checkmark.seal" : "info.circle")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(message.contains("atualizada") || message.contains("atualizados") || message.contains("removida") ? MESCColor.accent : MESCColor.primaryWine)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .sheet(isPresented: $isProfileEditorPresented) {
+            ProfileEditorSheet(profile: appModel.profile)
+                .environmentObject(appModel)
+        }
+        .sheet(item: $photoSource) { source in
+            NativeProfileImagePicker(sourceType: source.sourceType) { image in
+                Task { await appModel.uploadProfilePhoto(image) }
+            }
+            .ignoresSafeArea()
+        }
+        .confirmationDialog(
+            "Remover foto de perfil?",
+            isPresented: $isRemovePhotoConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Remover foto", role: .destructive) {
+                Task { await appModel.removeProfilePhoto() }
+            }
+        } message: {
+            Text("A foto será removida deste cadastro e substituída pelas iniciais do nome.")
+        }
+    }
+}
+
+private enum ProfilePhotoSource: String, Identifiable {
+    case camera
+    case library
+
+    var id: String { rawValue }
+
+    var sourceType: UIImagePickerController.SourceType {
+        switch self {
+        case .camera:
+            return .camera
+        case .library:
+            return .photoLibrary
+        }
+    }
+}
+
+private struct ProfileAvatar: View {
+    let image: UIImage?
+    let initials: String
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [MESCColor.primaryWine, MESCColor.primaryRed],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        Text(initials.isEmpty ? "M" : initials)
+                            .font(.system(size: size * 0.33, weight: .bold))
+                            .foregroundStyle(.white)
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(MESCColor.gold.opacity(0.45), lineWidth: 1))
+    }
+}
+
+private struct ProfileEditorSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var phone: String
+    @State private var whatsapp: String
+    @State private var scheduleDisplayName: String
+    @State private var ministryStartDate: Date?
+    @State private var maritalStatus: String
+
+    init(profile: MobileProfileDTO?) {
+        _name = State(initialValue: profile?.name ?? "")
+        _phone = State(initialValue: profile?.phone ?? "")
+        _whatsapp = State(initialValue: profile?.whatsapp ?? "")
+        _scheduleDisplayName = State(initialValue: profile?.scheduleDisplayName ?? "")
+        _ministryStartDate = State(initialValue: Self.parseDate(profile?.ministryStartDate))
+        _maritalStatus = State(initialValue: profile?.maritalStatus ?? "")
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Identificação") {
+                    TextField("Nome completo", text: $name)
+                        .textContentType(.name)
+                        .textInputAutocapitalization(.words)
+                    TextField("Nome na escala", text: $scheduleDisplayName)
+                        .textInputAutocapitalization(.words)
+                }
+
+                Section("Contato") {
+                    TextField("Celular", text: $phone)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                    TextField("WhatsApp", text: $whatsapp)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                }
+
+                Section("Ministério") {
+                    DatePicker(
+                        "Início no ministério",
+                        selection: Binding(
+                            get: { ministryStartDate ?? Date() },
+                            set: { ministryStartDate = $0 }
+                        ),
+                        displayedComponents: .date
+                    )
+                    Picker("Estado civil", selection: $maritalStatus) {
+                        Text("Não informado").tag("")
+                        Text("Solteiro(a)").tag("Solteiro(a)")
+                        Text("Casado(a)").tag("Casado(a)")
+                        Text("Viúvo(a)").tag("Viúvo(a)")
+                        Text("Divorciado(a)").tag("Divorciado(a)")
+                    }
+                }
+
+                if let email = appModel.profile?.email ?? appModel.user?.email {
+                    Section("Conta") {
+                        HStack {
+                            Text("E-mail")
+                            Spacer()
+                            Text(email)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Editar perfil")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                        .disabled(appModel.isSavingProfile)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(appModel.isSavingProfile ? "Salvando..." : "Salvar") {
+                        Task {
+                            let saved = await appModel.saveProfile(
+                                name: name,
+                                phone: phone,
+                                whatsapp: whatsapp,
+                                scheduleDisplayName: scheduleDisplayName,
+                                ministryStartDate: ministryStartDate,
+                                maritalStatus: maritalStatus
+                            )
+                            if saved { dismiss() }
+                        }
+                    }
+                    .disabled(appModel.isSavingProfile || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
+                }
+            }
+        }
+    }
+
+    private static func parseDate(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+}
+
+private struct NativeProfileImagePicker: UIViewControllerRepresentable {
+    let sourceType: UIImagePickerController.SourceType
+    let onImagePicked: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType
+        picker.allowsEditing = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        private let parent: NativeProfileImagePicker
+
+        init(parent: NativeProfileImagePicker) {
+            self.parent = parent
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage
+            parent.dismiss()
+            if let image {
+                parent.onImagePicked(image)
+            }
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
         }
     }
 }
@@ -5774,6 +6230,41 @@ struct MobileSubstitutionClaimResponseDTO: Codable {
     let substitution: MobileSubstitutionDTO
 }
 
+struct MobileProfileResponseDTO: Codable {
+    let success: Bool
+    let profile: MobileProfileDTO
+}
+
+struct MobileProfilePhotoResponseDTO: Codable {
+    let success: Bool
+    let photoUrl: String?
+    let updatedAt: String
+}
+
+struct MobileProfileDTO: Codable, Identifiable {
+    let id: String
+    let email: String
+    let name: String
+    let phone: String?
+    let whatsapp: String?
+    let role: String
+    let status: String
+    let photoUrl: String?
+    let homeCommunityId: String
+    let scheduleDisplayName: String?
+    let ministryStartDate: String?
+    let maritalStatus: String?
+    let preferredPosition: Int?
+    let preferredPositions: [Int]
+    let avoidPositions: [Int]
+    let preferredTimes: [String]
+    let availableForSpecialEvents: Bool
+    let extraActivities: [String: JSONValue]
+    let requiresPasswordChange: Bool
+    let createdAt: String?
+    let updatedAt: String?
+}
+
 struct MobileDeviceResponseDTO: Codable {
     let success: Bool
     let device: MobileDeviceDTO
@@ -6242,6 +6733,85 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func profile(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileProfileResponseDTO {
+        try await get(
+            "profile",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func updateProfile(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        body: ProfileUpdateRequestBody
+    ) async throws -> MobileProfileResponseDTO {
+        try await authenticatedPatch(
+            "profile",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: body
+        )
+    }
+
+    func profilePhoto(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> Data {
+        var request = try makeRequest(path: "profile/photo")
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        return try await sendData(request)
+    }
+
+    func uploadProfilePhoto(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        imageBase64: String,
+        contentType: String
+    ) async throws -> MobileProfilePhotoResponseDTO {
+        try await authenticatedPost(
+            "profile/photo",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: ProfilePhotoUploadRequestBody(imageBase64: imageBase64, contentType: contentType)
+        )
+    }
+
+    func removeProfilePhoto(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileProfilePhotoResponseDTO {
+        try await authenticatedDelete(
+            "profile/photo",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: EmptyRequestBody()
+        )
+    }
+
     func currentDevice(
         accessToken: String,
         communityId: String?,
@@ -6417,6 +6987,48 @@ final class MESCMobileAPIClient {
         return try await send(request)
     }
 
+    private func authenticatedPatch<Response: Decodable, Body: Encodable>(
+        _ path: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        body: Body
+    ) async throws -> Response {
+        var request = try makeRequest(path: path)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        request.httpBody = try encoder.encode(body)
+        return try await send(request)
+    }
+
+    private func authenticatedDelete<Response: Decodable, Body: Encodable>(
+        _ path: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String,
+        body: Body
+    ) async throws -> Response {
+        var request = try makeRequest(path: path)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        request.httpBody = try encoder.encode(body)
+        return try await send(request)
+    }
+
     private func makeRequest(path: String, queryItems: [URLQueryItem] = []) throws -> URLRequest {
         let url = baseURL.appendingPathComponent(path)
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
@@ -6463,6 +7075,28 @@ final class MESCMobileAPIClient {
             throw MESCMobileAPIError.transport(error)
         }
     }
+
+    private func sendData(_ request: URLRequest) async throws -> Data {
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw MESCMobileAPIError.transport(URLError(.badServerResponse))
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                let message = (try? decoder.decode(MobileErrorBodyDTO.self, from: data).message)
+                    ?? (try? decoder.decode(MobileErrorBodyDTO.self, from: data).error)
+                    ?? "Erro \(http.statusCode) na API mobile."
+                throw MESCMobileAPIError.server(status: http.statusCode, message: message)
+            }
+
+            return data
+        } catch let error as MESCMobileAPIError {
+            throw error
+        } catch {
+            throw MESCMobileAPIError.transport(error)
+        }
+    }
 }
 
 private struct LoginRequestBody: Encodable {
@@ -6495,6 +7129,20 @@ private struct SubstitutionCreateRequestBody: Encodable {
 
 private struct SubstitutionClaimRequestBody: Encodable {
     let message: String?
+}
+
+struct ProfileUpdateRequestBody: Encodable {
+    let name: String
+    let phone: String?
+    let whatsapp: String?
+    let scheduleDisplayName: String?
+    let ministryStartDate: String?
+    let maritalStatus: String?
+}
+
+struct ProfilePhotoUploadRequestBody: Encodable {
+    let imageBase64: String
+    let contentType: String
 }
 
 struct FormationAdminLessonRequestBody: Encodable {

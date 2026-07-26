@@ -30,6 +30,10 @@
 	<string>https://saojudastadeu.app/api/mobile/v1</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID para entrar no MESC com seguranca neste aparelho.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Use a camera para atualizar sua foto de perfil no MESC.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Escolha uma foto da sua biblioteca para atualizar seu perfil no MESC.</string>
 	<key>UIRequiresFullScreen</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

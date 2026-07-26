@@ -304,6 +304,9 @@ paths:
                     $ref: "#/components/schemas/MobileProfile"
     patch:
       summary: Update editable mobile profile fields.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
       requestBody:
         required: true
         content:
@@ -360,6 +363,71 @@ paths:
                     type: boolean
                   profile:
                     $ref: "#/components/schemas/MobileProfile"
+        "400":
+          description: Invalid profile payload or missing/invalid Idempotency-Key.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /profile/photo:
+    get:
+      summary: Download the authenticated user's protected profile photo.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+      responses:
+        "200":
+          description: Profile photo binary, normalized as JPEG.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: The authenticated user has no profile photo.
+    post:
+      summary: Upload and normalize the authenticated user's profile photo.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageBase64, contentType]
+              properties:
+                imageBase64:
+                  type: string
+                  description: Raw base64 image bytes, without a data URL prefix. The decoded input is limited to 5MB.
+                contentType:
+                  type: string
+                  enum: [image/jpeg, image/png, image/webp, image/heic, image/heif]
+      responses:
+        "200":
+          description: Profile photo saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobileProfilePhotoMutation"
+        "400":
+          description: Invalid image or missing/invalid Idempotency-Key.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+    delete:
+      summary: Remove the authenticated user's profile photo.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      responses:
+        "200":
+          description: Profile photo removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobileProfilePhotoMutation"
+        "400":
+          description: Missing or invalid Idempotency-Key.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
   /notifications:
     get:
       summary: List recent notifications for the authenticated user.
@@ -1580,6 +1648,18 @@ components:
         updatedAt:
           type: string
           nullable: true
+    MobileProfilePhotoMutation:
+      type: object
+      required: [success, photoUrl, updatedAt]
+      properties:
+        success:
+          type: boolean
+        photoUrl:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
     MobileNotification:
       type: object
       required: [id, type, eventKey, title, message, priority, read, readAt, deepLink, createdAt]

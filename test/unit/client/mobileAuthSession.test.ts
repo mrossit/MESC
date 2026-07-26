@@ -450,6 +450,7 @@ describe("mobile auth session storage", () => {
         headers: expect.objectContaining({
           Authorization: "Bearer access-token-1",
           "Content-Type": "application/json",
+          "Idempotency-Key": expect.any(String),
           "X-Community-Id": "community-1",
           "X-Device-Id": "ios-device-1",
         }),

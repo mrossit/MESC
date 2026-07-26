@@ -26,6 +26,7 @@ describe("mobileClient contract", () => {
       .toBe("/notifications/notification%2Fwith%20slash/read");
     expect(mobileEndpoints.revokeDevice("device/with slash")).toBe("/devices/device%2Fwith%20slash");
     expect(mobileEndpoints.account()).toBe("/account");
+    expect(mobileEndpoints.profilePhoto()).toBe("/profile/photo");
     expect(mobileEndpoints.formationOverview()).toBe("/formation/overview");
     expect(mobileEndpoints.formationLesson("track/with slash", "module/with slash", 3))
       .toBe("/formation/track%2Fwith%20slash/module%2Fwith%20slash/3");
@@ -134,6 +135,43 @@ describe("mobileClient contract", () => {
       "X-Community-Id": "community-1",
       "X-Device-Id": "ios-device-1",
       [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  it("updates profile photos with native auth and idempotency", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      communityId: "community-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      fetch: async (input, init) => {
+        requests.push({ input, init });
+        return new Response(JSON.stringify({
+          success: true,
+          photoUrl: "/api/users/user-1/photo?v=1",
+          updatedAt: "2026-07-25T00:00:00.000Z",
+        }), { status: 200 });
+      },
+    });
+
+    await expect(client.uploadProfilePhoto(
+      { imageBase64: "aGVsbG8td29ybGQ=", contentType: "image/jpeg" },
+      { idempotencyKey: "33333333-3333-4333-8333-333333333333" },
+    )).resolves.toMatchObject({ photoUrl: "/api/users/user-1/photo?v=1" });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].input).toBe("https://example.test/api/mobile/v1/profile/photo");
+    expect(requests[0].init).toMatchObject({
+      method: "POST",
+      headers: expect.objectContaining({
+        Authorization: "Bearer access-token-1",
+        "X-Community-Id": "community-1",
+        "X-Device-Id": "ios-device-1",
+        [MOBILE_IDEMPOTENCY_HEADER]: "33333333-3333-4333-8333-333333333333",
+      }),
+      body: JSON.stringify({ imageBase64: "aGVsbG8td29ybGQ=", contentType: "image/jpeg" }),
     });
   });
 
