@@ -24,6 +24,13 @@ const DEFAULT_RESPONSES_FILE = "attached_assets/questionnaire_responses (1)_1759
 const DEFAULT_SCHEDULES_FILE = "attached_assets/schedules_1759268600377.json";
 const DEFAULT_MASS_TIMES_FILE = "attached_assets/mass_times_config (1)_1759268600376.json";
 const NATIVE_STAGING_PROJECT_REF = "sdochgpfjosmhrbztthr";
+const USER_RELATION_COLUMNS = new Set(["family_id", "spouse_minister_id"]);
+const USER_PHOTO_COLUMNS = new Set([
+  "photo_url",
+  "profile_image_url",
+  "image_data",
+  "image_content_type",
+]);
 
 const args = process.argv.slice(2);
 
@@ -203,10 +210,15 @@ async function getCommunity(sql: postgres.Sql, slug: string) {
   return rows[0];
 }
 
-function rowForTable(source: JsonRow, columns: Set<string>, overrides: JsonRow = {}) {
+function rowForTable(
+  source: JsonRow,
+  columns: Set<string>,
+  overrides: JsonRow = {},
+  excludedColumns = new Set<string>(),
+) {
   const row: JsonRow = {};
   for (const column of columns) {
-    if (source[column] !== undefined) row[column] = source[column];
+    if (!excludedColumns.has(column) && source[column] !== undefined) row[column] = source[column];
   }
   for (const [key, value] of Object.entries(overrides)) {
     if (columns.has(key)) row[key] = value;
@@ -234,10 +246,20 @@ function scheduleRows(assetRows: JsonRow[], columns: Set<string>, communityId: s
 }
 
 function userRows(assetRows: JsonRow[], columns: Set<string>, communityId: string) {
-  return assetRows.map((source) => rowForTable(source, columns, {
-    home_community_id: communityId,
-    role: normalizeRole(source.role),
-  }));
+  const excludedColumns = new Set(USER_RELATION_COLUMNS);
+  if (!hasFlag("include-photos")) {
+    for (const column of USER_PHOTO_COLUMNS) excludedColumns.add(column);
+  }
+
+  return assetRows.map((source) => rowForTable(
+    source,
+    columns,
+    {
+      home_community_id: communityId,
+      role: normalizeRole(source.role),
+    },
+    excludedColumns,
+  ));
 }
 
 function questionnaireRows(assetRows: JsonRow[], columns: Set<string>, communityId: string) {
@@ -310,6 +332,7 @@ async function main() {
   console.log("Native current data doctor");
   console.log(`Mode: ${write ? "APPLY" : "DRY-RUN"}`);
   console.log(`Community slug: ${communitySlug}`);
+  console.log(`Profile photos: ${hasFlag("include-photos") ? "included" : "excluded by default"}`);
   printAssetAudit(assets);
 
   if (!dbUrl) {

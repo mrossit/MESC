@@ -69,6 +69,10 @@ export default defineConfig({
     // Threads
     threads: true,
 
+    // Os testes de integração compartilham a base SQLite de demonstração.
+    // Executar arquivos em paralelo permitiria que um seed apagasse o estado do outro.
+    fileParallelism: false,
+
     // Isolate
     isolate: true,
   },

@@ -120,6 +120,7 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var formationLessonDetail: MobileFormationLessonDetailDTO?
     @Published var formationAdminStudio: MobileFormationAdminStudioDTO?
     @Published var isSavingQuestionnaire = false
+    @Published var isLoadingFormationOverview = false
     @Published var isLoadingFormationLesson = false
     @Published var isCompletingFormationLesson = false
     @Published var completingFormationSectionId: String?
@@ -1198,6 +1199,34 @@ final class MESCNativeAppModel: ObservableObject {
         }
     }
 
+    func refreshFormation() async {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isLoadingFormationOverview = true
+        formationMessage = nil
+
+        do {
+            try await loadFormationOverview(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await loadFormationOverview(accessToken: refreshedAccessToken)
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingFormationOverview = false
+    }
+
     func createFormationAdminLesson(_ payload: FormationAdminLessonRequestBody) async -> Bool {
         guard canManageFormation else {
             formationMessage = "Apenas gestores e coordenadores podem editar formação."
@@ -1303,6 +1332,7 @@ final class MESCNativeAppModel: ObservableObject {
             if Self.isAuthenticationFailure(error) {
                 throw error
             }
+            formationMessage = MESCMobileAPIClient.userMessage(for: error)
         }
 
         do {
@@ -2065,7 +2095,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .mission: return "cross.case"
+        case .mission: return "hands.sparkles"
         case .schedules: return "calendar"
         case .formation: return "book.closed"
         case .profile: return "person"
@@ -3482,8 +3512,8 @@ struct FormationScreen: View {
     @State private var isStudioPresented = false
 
     var body: some View {
-        MESCScrollScreen(title: "Formação", subtitle: "Trilhas e aulas") {
-            if let overview = appModel.formationOverview {
+        MESCScrollScreen(title: "Formação", subtitle: "Caminho de preparo e serviço") {
+            if let overview = appModel.formationOverview, overview.summary.totalLessons > 0 {
                 FormationOverviewPanel(
                     overview: overview,
                     isLoadingLesson: appModel.isLoadingFormationLesson,
@@ -3502,8 +3532,23 @@ struct FormationScreen: View {
                 }
             } else {
                 GlassPanel(spacing: 14) {
-                    SectionTitle(title: "Formação não carregada", symbol: "wifi.exclamationmark")
-                    EmptyState(title: "Não foi possível carregar as aulas", detail: "Toque em Atualizar nos Ajustes para sincronizar novamente.")
+                    SectionTitle(
+                        title: appModel.isLoadingFormationOverview ? "Carregando formação" : "Formação indisponível",
+                        symbol: appModel.isLoadingFormationOverview ? "book.pages" : "wifi.exclamationmark"
+                    )
+                    if appModel.isLoadingFormationOverview {
+                        ProgressView()
+                            .tint(MESCColor.accent)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        EmptyState(
+                            title: "As aulas ainda não apareceram",
+                            detail: "Atualize para buscar novamente as trilhas disponíveis."
+                        )
+                        MESCSecondaryButton(title: "Atualizar", symbol: "arrow.clockwise") {
+                            Task { await appModel.refreshFormation() }
+                        }
+                    }
                 }
             }
 
@@ -3527,6 +3572,10 @@ struct FormationScreen: View {
         .sheet(isPresented: $isStudioPresented) {
             FormationAdminStudioSheet()
                 .environmentObject(appModel)
+        }
+        .task {
+            guard appModel.formationOverview == nil, !appModel.isLoadingFormationOverview else { return }
+            await appModel.refreshFormation()
         }
     }
 
@@ -3682,7 +3731,7 @@ struct FormationTrackPanel: View {
                     .tint(MESCColor.accent)
             }
 
-            ForEach(track.modules.prefix(3)) { module in
+            ForEach(track.modules) { module in
                 FormationModuleRow(module: module, onOpenLesson: onOpenLesson)
             }
         }

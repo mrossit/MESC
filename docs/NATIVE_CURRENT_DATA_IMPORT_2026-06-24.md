@@ -52,6 +52,8 @@ Guardas existentes:
 - recusa host do banco atual/Replit, salvo `ALLOW_CURRENT_MESC_DB=true`;
 - recusa banco que nao pareca ser `sdochgpfjosmhrbztthr`, salvo `ALLOW_OTHER_NATIVE_DB=true`.
 
+Por padrao, fotos antigas e relacoes familiares/conjugais nao sao trazidas: elas podem conter blobs grandes ou referencias que nao fazem parte deste import. Para trazer tambem as fotos de perfil, use `--include-photos` depois de validar volume e qualidade dos arquivos.
+
 ---
 
 ## Assets Padrao
@@ -88,3 +90,14 @@ Dry-run local em 2026-06-24:
 - 0 escalas apontando para usuario ausente no export.
 
 Lacunas cadastrais dos ministros ativos devem ser usadas para decidir quais campos viram obrigatorios ou pendentes no app nativo antes de liberar o uso real.
+
+## Importacao Aplicada Em Staging Nativo
+
+Em 25/07/2026, os exports atuais foram incorporados ao Supabase `mesc-native-staging` com upsert idempotente e escopo na Comunidade Matriz:
+
+- 120 cadastros legados, sem blobs de foto e sem relacoes familiares/conjugais;
+- 2 questionarios historicos;
+- 107 respostas historicas;
+- 62 escalas historicas.
+
+Depois da aplicacao, as verificacoes de chaves estrangeiras entre respostas/escalas, usuarios e questionarios permaneceram sem referencias ausentes. Os dados demo continuam disponiveis para o smoke do TestFlight.
