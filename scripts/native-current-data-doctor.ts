@@ -1,8 +1,14 @@
 #!/usr/bin/env tsx
 import fs from "node:fs";
 import postgres from "postgres";
+import {
+  buildNativeFamilyImportPlan,
+  normalizeHistoricalNotification,
+  remapLegacyUserReferences,
+  type NativeCurrentDataRow,
+} from "./native-current-data-plan";
 
-type JsonRow = Record<string, unknown>;
+type JsonRow = NativeCurrentDataRow;
 
 type AssetBundle = {
   users: JsonRow[];
@@ -10,6 +16,8 @@ type AssetBundle = {
   responses: JsonRow[];
   schedules: JsonRow[];
   massTimes: JsonRow[];
+  notifications: JsonRow[];
+  familyRelationships: JsonRow[];
 };
 
 type TableSummary = {
@@ -23,6 +31,8 @@ const DEFAULT_QUESTIONNAIRES_FILE = "attached_assets/questionnaires (1)_17592686
 const DEFAULT_RESPONSES_FILE = "attached_assets/questionnaire_responses (1)_1759268600377.json";
 const DEFAULT_SCHEDULES_FILE = "attached_assets/schedules_1759268600377.json";
 const DEFAULT_MASS_TIMES_FILE = "attached_assets/mass_times_config (1)_1759268600376.json";
+const DEFAULT_NOTIFICATIONS_FILE = "attached_assets/notifications_1759268600377.json";
+const DEFAULT_FAMILY_RELATIONSHIPS_FILE = "attached_assets/family_relationships (1)_1759268600375.json";
 const NATIVE_STAGING_PROJECT_REF = "sdochgpfjosmhrbztthr";
 const USER_RELATION_COLUMNS = new Set(["family_id", "spouse_minister_id"]);
 const USER_PHOTO_COLUMNS = new Set([
@@ -86,6 +96,8 @@ function loadAssets(): AssetBundle {
     responses: readJsonRows(option("responses-file", DEFAULT_RESPONSES_FILE)),
     schedules: readJsonRows(option("schedules-file", DEFAULT_SCHEDULES_FILE)),
     massTimes: readJsonRows(option("mass-times-file", DEFAULT_MASS_TIMES_FILE)),
+    notifications: readJsonRows(option("notifications-file", DEFAULT_NOTIFICATIONS_FILE)),
+    familyRelationships: readJsonRows(option("family-relationships-file", DEFAULT_FAMILY_RELATIONSHIPS_FILE)),
   };
 }
 
@@ -138,6 +150,12 @@ function printAssetAudit(assets: AssetBundle) {
   const missingResponseQuestionnaires = assets.responses.filter((response) => !questionnaireIds.has(response.questionnaire_id));
   const missingScheduleUsers = [...scheduleUsers].filter((id) => !userIds.has(id));
   const scheduleDates = new Set(assets.schedules.map((schedule) => cleanDate(schedule.date)));
+  const notificationUsers = new Set(assets.notifications.map((notification) => notification.user_id));
+  const missingNotificationUsers = [...notificationUsers].filter((id) => !userIds.has(id));
+  const missingFamilyUsers = assets.familyRelationships.filter((relationship) =>
+    !userIds.has(relationship.user_id) || !userIds.has(relationship.related_user_id),
+  );
+  const familyPlan = buildNativeFamilyImportPlan(assets.familyRelationships);
 
   console.log("\nAssets atuais:");
   console.log(`- users=${users.length} active=${activeUsers.length} ministers=${ministers.length}`);
@@ -145,6 +163,8 @@ function printAssetAudit(assets: AssetBundle) {
   console.log(`- questionnaire_responses=${assets.responses.length} distinct_users=${responseUsers.size}`);
   console.log(`- schedules=${assets.schedules.length} distinct_dates=${scheduleDates.size}`);
   console.log(`- legacy_mass_times=${assets.massTimes.length}`);
+  console.log(`- historical_notifications=${assets.notifications.length}`);
+  console.log(`- family_relationships=${assets.familyRelationships.length} family_groups=${familyPlan.families.length}`);
 
   console.log("\nLacunas cadastrais em ministros ativos:");
   console.log(`- sem telefone=${countMissing(ministers, "phone")}`);
@@ -160,6 +180,8 @@ function printAssetAudit(assets: AssetBundle) {
   console.log(`- responses_missing_users=${missingResponseUsers.length}`);
   console.log(`- responses_missing_questionnaires=${missingResponseQuestionnaires.length}`);
   console.log(`- schedules_missing_users=${missingScheduleUsers.length}`);
+  console.log(`- notifications_missing_users=${missingNotificationUsers.length}`);
+  console.log(`- family_relationships_missing_users=${missingFamilyUsers.length}`);
 }
 
 async function tableExists(sql: postgres.Sql, tableName: string) {
@@ -226,10 +248,16 @@ function rowForTable(
   return row;
 }
 
-function scheduleRows(assetRows: JsonRow[], columns: Set<string>, communityId: string) {
+function scheduleRows(
+  assetRows: JsonRow[],
+  columns: Set<string>,
+  communityId: string,
+  userIds: ReadonlyMap<string, string>,
+) {
   const counters = new Map<string, number>();
 
-  return assetRows.map((source) => {
+  return assetRows.map((legacySource) => {
+    const source = remapLegacyUserReferences(legacySource, userIds);
     const date = cleanDate(source.date);
     const time = cleanTime(source.time);
     const key = `${date}|${time}`;
@@ -245,33 +273,83 @@ function scheduleRows(assetRows: JsonRow[], columns: Set<string>, communityId: s
   });
 }
 
-function userRows(assetRows: JsonRow[], columns: Set<string>, communityId: string) {
+function userRows(
+  assetRows: JsonRow[],
+  columns: Set<string>,
+  communityId: string,
+  userIds: ReadonlyMap<string, string>,
+) {
   const excludedColumns = new Set(USER_RELATION_COLUMNS);
   if (!hasFlag("include-photos")) {
     for (const column of USER_PHOTO_COLUMNS) excludedColumns.add(column);
   }
 
-  return assetRows.map((source) => rowForTable(
-    source,
+  return assetRows.map((legacySource) => rowForTable(
+    remapLegacyUserReferences(legacySource, userIds, { remapRowId: true }),
     columns,
     {
       home_community_id: communityId,
-      role: normalizeRole(source.role),
+      role: normalizeRole(legacySource.role),
     },
     excludedColumns,
   ));
 }
 
-function questionnaireRows(assetRows: JsonRow[], columns: Set<string>, communityId: string) {
-  return assetRows.map((source) => rowForTable(source, columns, {
+function questionnaireRows(
+  assetRows: JsonRow[],
+  columns: Set<string>,
+  communityId: string,
+  userIds: ReadonlyMap<string, string>,
+) {
+  return assetRows.map((legacySource) => rowForTable(remapLegacyUserReferences(legacySource, userIds), columns, {
     community_id: communityId,
   }));
 }
 
-function responseRows(assetRows: JsonRow[], columns: Set<string>, communityId: string) {
-  return assetRows.map((source) => rowForTable(source, columns, {
+function responseRows(
+  assetRows: JsonRow[],
+  columns: Set<string>,
+  communityId: string,
+  userIds: ReadonlyMap<string, string>,
+) {
+  return assetRows.map((legacySource) => rowForTable(remapLegacyUserReferences(legacySource, userIds), columns, {
     community_id: communityId,
   }));
+}
+
+function notificationRows(
+  assetRows: JsonRow[],
+  columns: Set<string>,
+  userIds: ReadonlyMap<string, string>,
+) {
+  return assetRows.map((legacySource) => rowForTable(
+    normalizeHistoricalNotification(remapLegacyUserReferences(legacySource, userIds)),
+    columns,
+  ));
+}
+
+function familyRows(assetRows: JsonRow[], columns: Set<string>) {
+  return assetRows.map((source) => rowForTable(source, columns));
+}
+
+async function resolveExistingUserIds(sql: postgres.Sql, assetUsers: JsonRow[]) {
+  const userIds = new Map<string, string>();
+
+  for (const user of assetUsers) {
+    const legacyId = asString(user.id);
+    const email = asString(user.email).toLowerCase();
+    if (!legacyId || !email) continue;
+
+    const rows = await sql<{ id: string }[]>`
+      SELECT id
+      FROM users
+      WHERE LOWER(TRIM(email)) = ${email}
+      LIMIT 1
+    `;
+    if (rows[0]?.id) userIds.set(legacyId, rows[0].id);
+  }
+
+  return userIds;
 }
 
 async function upsertRows(
@@ -333,6 +411,8 @@ async function main() {
   console.log(`Mode: ${write ? "APPLY" : "DRY-RUN"}`);
   console.log(`Community slug: ${communitySlug}`);
   console.log(`Profile photos: ${hasFlag("include-photos") ? "included" : "excluded by default"}`);
+  console.log(`Historical notifications: ${hasFlag("include-historical-notifications") ? "included as read" : "excluded by default"}`);
+  console.log(`Family links: ${hasFlag("include-family-links") ? "included with separate-service default" : "excluded by default"}`);
   printAssetAudit(assets);
 
   if (!dbUrl) {
@@ -345,28 +425,91 @@ async function main() {
 
   const sql = postgres(dbUrl, { max: 1, prepare: false });
   try {
-    for (const table of ["communities", "users", "questionnaires", "questionnaire_responses", "schedules"]) {
+    const requiredTables = ["communities", "users", "questionnaires", "questionnaire_responses", "schedules"];
+    if (hasFlag("include-historical-notifications")) requiredTables.push("notifications");
+    if (hasFlag("include-family-links")) requiredTables.push("families", "family_relationships");
+
+    for (const table of requiredTables) {
       if (!(await tableExists(sql, table))) throw new Error(`Tabela obrigatoria ausente: ${table}`);
     }
 
     const community = await getCommunity(sql, communitySlug);
+    const existingUserIds = await resolveExistingUserIds(sql, assets.users);
     const userColumns = await tableColumns(sql, "users");
     const questionnaireColumns = await tableColumns(sql, "questionnaires");
     const responseColumns = await tableColumns(sql, "questionnaire_responses");
     const scheduleColumns = await tableColumns(sql, "schedules");
+    const notificationColumns = hasFlag("include-historical-notifications")
+      ? await tableColumns(sql, "notifications")
+      : new Set<string>();
+    const familyColumns = hasFlag("include-family-links")
+      ? await tableColumns(sql, "families")
+      : new Set<string>();
+    const familyRelationshipColumns = hasFlag("include-family-links")
+      ? await tableColumns(sql, "family_relationships")
+      : new Set<string>();
 
-    const preparedUsers = userRows(assets.users, userColumns, community.id);
-    const preparedQuestionnaires = questionnaireRows(assets.questionnaires, questionnaireColumns, community.id);
-    const preparedResponses = responseRows(assets.responses, responseColumns, community.id);
-    const preparedSchedules = scheduleRows(assets.schedules, scheduleColumns, community.id);
+    const preparedUsers = userRows(assets.users, userColumns, community.id, existingUserIds);
+    const preparedQuestionnaires = questionnaireRows(
+      assets.questionnaires,
+      questionnaireColumns,
+      community.id,
+      existingUserIds,
+    );
+    const preparedResponses = responseRows(assets.responses, responseColumns, community.id, existingUserIds);
+    const preparedSchedules = scheduleRows(assets.schedules, scheduleColumns, community.id, existingUserIds);
+    const preparedNotifications = hasFlag("include-historical-notifications")
+      ? notificationRows(assets.notifications, notificationColumns, existingUserIds)
+      : [];
+    const familyPlan = hasFlag("include-family-links")
+      ? buildNativeFamilyImportPlan(assets.familyRelationships)
+      : null;
+    const preparedFamilies = familyPlan ? familyRows(familyPlan.families, familyColumns) : [];
+    const preparedFamilyRelationships = familyPlan
+      ? familyRows(
+        familyPlan.relationshipRows.map((row) => remapLegacyUserReferences(row, existingUserIds)),
+        familyRelationshipColumns,
+      )
+      : [];
+    const preparedFamilyLinks = familyPlan
+      ? familyRows(
+        familyPlan.userLinks.map((row) => remapLegacyUserReferences(row, existingUserIds, { remapRowId: true })),
+        userColumns,
+      )
+      : [];
 
     console.log(`\nBanco alvo: ${community.name} (${community.slug})`);
-    const summaries = {
+    console.log(`- identidades legadas reconciliadas por email=${existingUserIds.size}/${assets.users.length}`);
+    const summaries: Record<string, TableSummary> = {
       users: await importTable(sql, "users", preparedUsers, undefined, write, ["id", "email", "created_at"]),
       questionnaires: await importTable(sql, "questionnaires", preparedQuestionnaires, community.id, write, ["id", "created_at"]),
       questionnaireResponses: await importTable(sql, "questionnaire_responses", preparedResponses, community.id, write, ["id", "created_at"]),
       schedules: await importTable(sql, "schedules", preparedSchedules, community.id, write, ["id", "created_at"]),
     };
+
+    if (familyPlan) {
+      summaries.families = await importTable(sql, "families", preparedFamilies, undefined, write, ["id", "created_at"]);
+      summaries.userFamilyLinks = await importTable(sql, "users", preparedFamilyLinks, undefined, write, ["id", "email", "created_at"]);
+      summaries.familyRelationships = await importTable(
+        sql,
+        "family_relationships",
+        preparedFamilyRelationships,
+        undefined,
+        write,
+        ["id", "created_at"],
+      );
+    }
+
+    if (hasFlag("include-historical-notifications")) {
+      summaries.historicalNotifications = await importTable(
+        sql,
+        "notifications",
+        preparedNotifications,
+        undefined,
+        write,
+        ["id", "created_at"],
+      );
+    }
 
     console.log("\nResumo do banco:");
     for (const [name, summary] of Object.entries(summaries)) {
