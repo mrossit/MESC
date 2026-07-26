@@ -94,8 +94,17 @@ async function main() {
   console.log("Aplicando/confirmando migrations mobile idempotentes...");
   run("npm", ["run", "db:migrate:mobile"], process.env);
 
+  console.log("Fechando o Data API e habilitando RLS nas tabelas nativas...");
+  run("npm", ["run", "db:migrate:native-rls"], {
+    ...process.env,
+    CONFIRM_NATIVE_RLS_HARDENING: "true",
+  });
+
   console.log("Validando fundacao mobile...");
   run("npm", ["run", "db:validate:mobile"], process.env);
+
+  console.log("Validando hardening RLS...");
+  run("npm", ["run", "db:validate:native-rls"], process.env);
 
   console.log("Bootstrap do banco nativo concluido.");
 }
