@@ -78,6 +78,51 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     };
   }
 
+  async function mobilePatch(path: string, input: {
+    userId: string;
+    communityId?: string;
+    idempotencyKey?: string;
+    body?: unknown;
+  }) {
+    const response = await fetch(`${baseUrl}/api/mobile/v1${path}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${tokenFor(input.userId)}`,
+        "Content-Type": "application/json",
+        ...(input.communityId ? { "X-Community-Id": input.communityId } : {}),
+        ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
+      },
+      body: JSON.stringify(input.body ?? {}),
+    });
+
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  }
+
+  async function mobileDelete(path: string, input: {
+    userId: string;
+    communityId?: string;
+    idempotencyKey?: string;
+  }) {
+    const response = await fetch(`${baseUrl}/api/mobile/v1${path}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${tokenFor(input.userId)}`,
+        "Content-Type": "application/json",
+        ...(input.communityId ? { "X-Community-Id": input.communityId } : {}),
+        ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
+      },
+      body: "{}",
+    });
+
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  }
+
   beforeAll(async () => {
     process.env.JWT_SECRET = "mobile-api-community-scope-test-secret";
     await seedMobileP0Demo();
@@ -371,5 +416,68 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     const visibleSubstitutionIds = response.body.substitutions.map((substitution: { id: string }) => substitution.id);
     expect(visibleSubstitutionIds).toContain(scopedSubstitutionA);
     expect(visibleSubstitutionIds).not.toContain(scopedSubstitutionB);
+  });
+
+  it("updates the minister profile and photo idempotently within the active community", async () => {
+    const profilePayload = {
+      phone: "11988887777",
+      whatsapp: "11988887777",
+      scheduleDisplayName: "Ministro A",
+    };
+    const idempotencyKey = "81818181-8181-4818-8818-818181818181";
+
+    const updated = await mobilePatch("/profile", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      idempotencyKey,
+      body: profilePayload,
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.profile.phone).toBe(profilePayload.phone);
+    expect(updated.body.profile.whatsapp).toBe(profilePayload.whatsapp);
+
+    const replay = await mobilePatch("/profile", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      idempotencyKey,
+      body: profilePayload,
+    });
+    expect(replay.status).toBe(200);
+    expect(replay.body).toEqual(updated.body);
+
+    const forbidden = await mobilePatch("/profile", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      communityId: MOBILE_P0_DEMO_IDS.communityB,
+      idempotencyKey: "82828282-8282-4828-8828-828282828282",
+      body: profilePayload,
+    });
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
+
+    const photoPayload = {
+      imageBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9J6R8AAAAASUVORK5CYII=",
+      contentType: "image/png",
+    };
+    const photoKey = "83838383-8383-4838-8838-838383838383";
+    const uploaded = await mobilePost("/profile/photo", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      idempotencyKey: photoKey,
+      body: photoPayload,
+    });
+    expect(uploaded.status).toBe(200);
+    expect(uploaded.body.photoUrl).toContain(`/api/users/${MOBILE_P0_DEMO_IDS.ministerA}/photo`);
+
+    const photoReplay = await mobilePost("/profile/photo", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      idempotencyKey: photoKey,
+      body: photoPayload,
+    });
+    expect(photoReplay.status).toBe(200);
+    expect(photoReplay.body).toEqual(uploaded.body);
+
+    const removed = await mobileDelete("/profile/photo", {
+      userId: MOBILE_P0_DEMO_IDS.ministerA,
+      idempotencyKey: "84848484-8484-4848-8848-848484848484",
+    });
+    expect(removed.status).toBe(200);
+    expect(removed.body.photoUrl).toBeNull();
   });
 });

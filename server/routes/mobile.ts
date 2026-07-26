@@ -1,5 +1,6 @@
 import { Router, type Response } from "express";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { z } from "zod";
 import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import {
@@ -268,6 +269,13 @@ const profileUpdateSchema = z.object({
     helpOtherPastorals: z.boolean().optional(),
     festiveEvents: z.boolean().optional(),
   }).optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: "Informe ao menos um campo para atualizar",
+});
+
+const profilePhotoUploadSchema = z.object({
+  imageBase64: z.string().min(16).max(7_000_000),
+  contentType: z.enum(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]),
 });
 
 const mobilePlatformSchema = z.enum(["ios", "android"]).optional();
@@ -1427,6 +1435,8 @@ router.get("/profile", authenticateToken, async (req: AuthRequest, res) => {
 });
 
 router.patch("/profile", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
   try {
     const authUser = req.user;
     if (!authUser) {
@@ -1434,6 +1444,19 @@ router.patch("/profile", authenticateToken, async (req: AuthRequest, res) => {
     }
 
     const parsed = profileUpdateSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: authUser.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
     const updateData: Partial<typeof users.$inferInsert> = {};
 
     if (parsed.name !== undefined) updateData.name = parsed.name.trim();
@@ -1507,15 +1530,194 @@ router.patch("/profile", authenticateToken, async (req: AuthRequest, res) => {
 
     await logActivity(authUser.id, "update_profile", {
       source: "mobile-v1",
+      communityId: activeCommunity.id,
       changedFields: Object.keys(parsed),
     }, req);
 
-    res.json({
+    const responseBody = {
       success: true,
       profile: toMobileProfile(updated),
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
     });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
   } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
     return handleMobileError(res, error, "Erro ao atualizar perfil");
+  }
+});
+
+router.get("/profile/photo", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const authUser = req.user;
+    if (!authUser) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const [user] = await db
+      .select({
+        imageData: users.imageData,
+        imageContentType: users.imageContentType,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, authUser.id))
+      .limit(1);
+
+    if (!user?.imageData) {
+      throw new MobileHttpError(404, "Foto de perfil nao encontrada");
+    }
+
+    const imageBuffer = Buffer.from(user.imageData, "base64");
+    res.set({
+      "Content-Type": user.imageContentType || "image/jpeg",
+      "Content-Length": String(imageBuffer.length),
+      "Cache-Control": "private, max-age=300",
+      "Last-Modified": new Date(user.updatedAt ?? Date.now()).toUTCString(),
+    });
+    res.send(imageBuffer);
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar foto de perfil");
+  }
+});
+
+router.post("/profile/photo", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const authUser = req.user;
+    if (!authUser) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const parsed = profilePhotoUploadSchema.parse(req.body ?? {});
+    const imageBuffer = Buffer.from(parsed.imageBase64, "base64");
+    if (imageBuffer.length === 0 || imageBuffer.length > 5 * 1024 * 1024) {
+      throw new MobileHttpError(400, "A imagem deve ter no maximo 5MB");
+    }
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: authUser.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    let processedImage: Buffer;
+    try {
+      processedImage = await sharp(imageBuffer, { failOn: "none" })
+        .rotate()
+        .resize(600, 600, { fit: "cover", position: "centre", withoutEnlargement: true })
+        .jpeg({ quality: 84, mozjpeg: true })
+        .toBuffer();
+    } catch {
+      throw new MobileHttpError(400, "Arquivo de imagem invalido ou corrompido");
+    }
+
+    const updatedAt = new Date();
+    const photoUrl = `/api/users/${authUser.id}/photo?v=${updatedAt.getTime()}`;
+    await db
+      .update(users)
+      .set({
+        photoUrl,
+        imageData: processedImage.toString("base64"),
+        imageContentType: "image/jpeg",
+        updatedAt,
+      })
+      .where(eq(users.id, authUser.id));
+
+    await logActivity(authUser.id, "update_profile", {
+      source: "mobile-v1",
+      communityId: activeCommunity.id,
+      changedFields: ["photoUrl"],
+    }, req);
+
+    const responseBody = {
+      success: true,
+      photoUrl,
+      updatedAt: updatedAt.toISOString(),
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao atualizar foto de perfil");
+  }
+});
+
+router.delete("/profile/photo", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const authUser = req.user;
+    if (!authUser) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: authUser.id,
+      communityId: activeCommunity.id,
+      body: {},
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const updatedAt = new Date();
+    await db
+      .update(users)
+      .set({
+        photoUrl: null,
+        imageData: null,
+        imageContentType: null,
+        updatedAt,
+      })
+      .where(eq(users.id, authUser.id));
+
+    await logActivity(authUser.id, "update_profile", {
+      source: "mobile-v1",
+      communityId: activeCommunity.id,
+      changedFields: ["photoUrl"],
+    }, req);
+
+    const responseBody = {
+      success: true,
+      photoUrl: null,
+      updatedAt: updatedAt.toISOString(),
+    };
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao remover foto de perfil");
   }
 });
 

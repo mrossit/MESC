@@ -71,6 +71,9 @@ describe("mobile OpenAPI contract", () => {
       { path: "/formation/admin/lessons/{lessonId}", method: "patch" },
       { path: "/formation/admin/lessons/{lessonId}/sections", method: "post" },
       { path: "/admin/schedules/publish", method: "post" },
+      { path: "/profile", method: "patch" },
+      { path: "/profile/photo", method: "post" },
+      { path: "/profile/photo", method: "delete" },
     ];
 
     for (const mutation of criticalMutations) {
