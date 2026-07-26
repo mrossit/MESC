@@ -27,6 +27,7 @@
     "db:validate:native-rls": "tsx scripts/validate-native-rls-hardening.ts",
     "db:validate:native-schedule": "tsx scripts/validate-native-schedule-readiness.ts",
     "db:doctor:native-current-data": "tsx scripts/native-current-data-doctor.ts",
+    "db:export:current-mesc": "tsx scripts/export-current-mesc-for-native.ts",
     "db:seed:test": "NODE_ENV=development tsx test/fixtures/seedTestData.ts",
     "db:seed:mobile-demo": "tsx scripts/seed-mobile-p0-demo.ts",
     "test": "vitest",
