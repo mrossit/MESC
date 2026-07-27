@@ -2095,7 +2095,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .mission: return "hands.sparkles"
+        case .mission: return "cross"
         case .schedules: return "calendar"
         case .formation: return "book.closed"
         case .profile: return "person"
