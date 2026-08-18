@@ -5,7 +5,7 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import type { ActionPerformed, PushNotificationSchema } from "@capacitor/push-notifications";
 import { useLocation } from "wouter";
 import { isNativeRuntime } from "@/lib/api-url";
-import { ensureNativePushChannel } from "@/hooks/usePushNotifications";
+import { canUseNativePushRegistration, ensureNativePushChannel } from "@/hooks/usePushNotifications";
 
 function isNativePushRuntime() {
   if (typeof window === "undefined" || !isNativeRuntime()) return false;
@@ -48,6 +48,7 @@ export function useNativePushNotificationBridge() {
 
     async function setupBridge() {
       try {
+        if (!(await canUseNativePushRegistration())) return;
         await ensureNativePushChannel();
 
         receivedHandle = await PushNotifications.addListener("pushNotificationReceived", (notification) => {

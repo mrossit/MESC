@@ -639,9 +639,11 @@ export default function Settings() {
                                 ? 'Receba avisos do app no aparelho sobre escalas, questionários e substituições'
                                 : 'Receba notificações no navegador sobre suas escalas'}
                             </p>
-                            {pushStatus === 'missing-key' && !nativeNotificationSurface && (
+                            {pushStatus === 'missing-key' && (
                               <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
-                                Notificações push indisponíveis neste ambiente
+                                {nativeNotificationSurface
+                                  ? 'Notificações do aparelho aguardam a configuração do serviço de mensagens.'
+                                  : 'Notificações push indisponíveis neste ambiente'}
                               </p>
                             )}
                             {pushPermission === 'denied' && (
@@ -654,7 +656,7 @@ export default function Settings() {
                             id="push"
                             checked={pushSubscribed}
                             onCheckedChange={handlePushNotificationToggle}
-                            disabled={pushBusy || pushStatus === 'no-support' || (!pushIsNative && (pushStatus === 'missing-key' || pushStatus === 'errored'))}
+                            disabled={pushBusy || pushStatus === 'no-support' || pushStatus === 'missing-key' || (!pushIsNative && pushStatus === 'errored')}
                           />
                         </div>
 
