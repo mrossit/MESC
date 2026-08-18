@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,6 +33,13 @@ export const NATIVE_PUSH_CHANNEL_ID = "mesc_general";
 const NATIVE_PUSH_REGISTRATION_TIMEOUT_MS = 20000;
 
 let nativeFirstLaunchSetupPromise: Promise<void> | null = null;
+let androidPushConfigurationPromise: Promise<boolean> | null = null;
+
+interface MescNativeCapabilitiesPlugin {
+  get(): Promise<{ firebasePushConfigured?: boolean }>;
+}
+
+const MescNativeCapabilities = registerPlugin<MescNativeCapabilitiesPlugin>("MescNativeCapabilities");
 
 function urlBase64ToUint8Array(base64String: string) {
   if (typeof window === "undefined") {
@@ -63,6 +70,21 @@ function isNativePushRuntime() {
   return platform === "ios" || platform === "android";
 }
 
+export async function canUseNativePushRegistration(): Promise<boolean> {
+  if (!isNativePushRuntime()) return false;
+  if (Capacitor.getPlatform() !== "android") return true;
+
+  if (!Capacitor.isPluginAvailable("MescNativeCapabilities")) return false;
+
+  if (!androidPushConfigurationPromise) {
+    androidPushConfigurationPromise = MescNativeCapabilities.get()
+      .then(({ firebasePushConfigured }) => firebasePushConfigured === true)
+      .catch(() => false);
+  }
+
+  return androidPushConfigurationPromise;
+}
+
 function getNativePushProvider(): "apns" | "fcm" | null {
   const platform = Capacitor.getPlatform();
   if (platform === "ios") return "apns";
@@ -72,6 +94,7 @@ function getNativePushProvider(): "apns" | "fcm" | null {
 
 export async function ensureNativePushChannel() {
   if (!isNativePushRuntime() || Capacitor.getPlatform() !== "android") return;
+  if (!(await canUseNativePushRegistration())) return;
 
   await PushNotifications.createChannel({
     id: NATIVE_PUSH_CHANNEL_ID,
@@ -223,6 +246,14 @@ export function usePushNotifications(): PushNotificationsState {
     let cancelled = false;
     async function setupNativePush() {
       try {
+        if (!(await canUseNativePushRegistration())) {
+          if (!cancelled) {
+            setStatus("missing-key");
+            setIsSubscribed(false);
+          }
+          return;
+        }
+
         setStatus("ready");
         await ensureNativePushChannel();
 
@@ -365,6 +396,12 @@ export function usePushNotifications(): PushNotificationsState {
     setError(null);
 
     if (isNative) {
+      if (!(await canUseNativePushRegistration())) {
+        setStatus("missing-key");
+        setError("Notificações Android serão habilitadas quando a configuração Firebase do app estiver concluída.");
+        return;
+      }
+
       const provider = getNativePushProvider();
       if (!provider) {
         setError("Notificações nativas não estão disponíveis neste aparelho.");
@@ -459,9 +496,11 @@ export function usePushNotifications(): PushNotificationsState {
         setIsBusy(true);
         const provider = getNativePushProvider();
         const storedToken = readStoredNativePushToken();
-        await PushNotifications.unregister().catch((unregisterError) => {
-          console.warn("[Push] Native unregister failed:", unregisterError);
-        });
+        if (await canUseNativePushRegistration()) {
+          await PushNotifications.unregister().catch((unregisterError) => {
+            console.warn("[Push] Native unregister failed:", unregisterError);
+          });
+        }
 
         if (provider && storedToken) {
           await syncNativePushDevice(storedToken, provider, false);
