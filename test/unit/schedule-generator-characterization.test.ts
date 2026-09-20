@@ -45,6 +45,7 @@ const ids: FixtureIds = {
 const originalEnv = process.env.USE_DATABASE_MASS_CONFIG;
 const FIXTURE_TS = '2026-01-15T12:00:00.000Z';
 const sqlite = new Database('local.db');
+let historicalFairnessQueryFailed = false;
 
 function makeId(label: string): string {
   return `char-${label}-${uuidv4()}`;
@@ -248,12 +249,17 @@ beforeAll(() => {
   process.env.USE_DATABASE_MASS_CONFIG = 'false';
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    if (args[0] === '[HISTORICAL] Error loading historical counts:') {
+      historicalFairnessQueryFailed = true;
+    }
+  });
   vi.spyOn(console, 'time').mockImplementation(() => undefined);
   vi.spyOn(console, 'timeEnd').mockImplementation(() => undefined);
 });
 
 beforeEach(async () => {
+  historicalFairnessQueryFailed = false;
   await cleanupFixtures();
 });
 
@@ -323,6 +329,7 @@ describe('scheduleGenerator real characterization', () => {
       expect(new Set(schedule.ministers.map((minister) => minister.id)).size)
         .toBe(schedule.ministers.length);
     }
+    expect(historicalFairnessQueryFailed).toBe(false);
   });
 
   it('keeps generation scoped to the requested community', async () => {

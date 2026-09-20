@@ -676,7 +676,10 @@ export class ScheduleGenerator {
         const rows = await this.db
           .select({
             ministerId: schedules.ministerId,
-            cnt: sql<number>`COUNT(*)::int`,
+            // Keep this aggregate portable. The native release smoke suite uses
+            // SQLite while production uses Postgres; a Postgres-only cast here
+            // silently disabled the historical fairness signal in SQLite.
+            cnt: sql<number>`COUNT(*)`,
           })
           .from(schedules)
           .where(

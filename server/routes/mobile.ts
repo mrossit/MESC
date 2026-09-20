@@ -1017,7 +1017,10 @@ router.get("/app/config", (req, res) => {
       biometrics: true,
       pushRegistration: true,
       refreshTokenRotation: true,
-      coordinatorMobile: false,
+      // Coordinator P0 is now implemented by the native iOS client and backed
+      // by the scoped admin routes below. Keep the public contract honest so
+      // clients do not hide an available role-based workflow.
+      coordinatorMobile: true,
     },
     links: {
       privacy: "/privacy-policy",

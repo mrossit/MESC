@@ -119,6 +119,11 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var formationOverview: MobileFormationOverviewDTO?
     @Published var formationLessonDetail: MobileFormationLessonDetailDTO?
     @Published var formationAdminStudio: MobileFormationAdminStudioDTO?
+    @Published var coordinatorHome: MobileCoordinatorCommunityHomeDTO?
+    @Published var coordinatorReadiness: MobileCoordinatorScheduleReadinessDTO?
+    @Published var coordinatorMinisters: [MobileCoordinatorMinisterDTO] = []
+    @Published var coordinatorQuestionnaireResponses: MobileCoordinatorQuestionnaireResponsesDTO?
+    @Published var coordinatorSchedulePreview: MobileCoordinatorSchedulePreviewDTO?
     @Published var isSavingQuestionnaire = false
     @Published var isLoadingFormationOverview = false
     @Published var isLoadingFormationLesson = false
@@ -126,8 +131,13 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var completingFormationSectionId: String?
     @Published var isLoadingFormationStudio = false
     @Published var isSavingFormationContent = false
+    @Published var isLoadingCoordinator = false
+    @Published var isLoadingCoordinatorQuestionnaire = false
+    @Published var isGeneratingCoordinatorPreview = false
+    @Published var isPublishingCoordinatorSchedule = false
     @Published var questionnaireMessage: String?
     @Published var formationMessage: String?
+    @Published var coordinatorMessage: String?
     @Published var scheduleActionMessage: String?
     @Published var isMutatingSchedule = false
     @Published var substitutions: [MobileSubstitutionDTO] = []
@@ -298,6 +308,10 @@ final class MESCNativeAppModel: ObservableObject {
     }
 
     var canManageFormation: Bool {
+        canManageCommunity
+    }
+
+    var canManageCommunity: Bool {
         let role = user?.role.lowercased() ?? ""
         return role == "gestor" || role == "reitor" || role == "coordenador" || role.hasPrefix("coordenador_")
     }
@@ -428,8 +442,14 @@ final class MESCNativeAppModel: ObservableObject {
         formationOverview = nil
         formationLessonDetail = nil
         formationAdminStudio = nil
+        coordinatorHome = nil
+        coordinatorReadiness = nil
+        coordinatorMinisters = []
+        coordinatorQuestionnaireResponses = nil
+        coordinatorSchedulePreview = nil
         questionnaireMessage = nil
         formationMessage = nil
+        coordinatorMessage = nil
         scheduleActionMessage = nil
         settingsMessage = nil
         currentDevice = nil
@@ -1283,6 +1303,204 @@ final class MESCNativeAppModel: ObservableObject {
         return false
     }
 
+    func refreshCoordinator() async {
+        guard canManageCommunity else {
+            coordinatorMessage = "Acesso restrito à coordenação."
+            return
+        }
+
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isLoadingCoordinator = true
+        coordinatorMessage = nil
+
+        do {
+            try await loadCoordinatorPayloads(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await loadCoordinatorPayloads(accessToken: refreshedAccessToken)
+                } catch {
+                    coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingCoordinator = false
+    }
+
+    func loadCoordinatorQuestionnaireResponses() async {
+        guard let questionnaireId = coordinatorHome?.questionnaire?.id else {
+            coordinatorMessage = "Não há questionário publicado para esta comunidade neste mês."
+            return
+        }
+
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isLoadingCoordinatorQuestionnaire = true
+        coordinatorMessage = nil
+
+        do {
+            coordinatorQuestionnaireResponses = try await client.coordinatorQuestionnaireResponses(
+                questionnaireId: questionnaireId,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    coordinatorQuestionnaireResponses = try await client.coordinatorQuestionnaireResponses(
+                        questionnaireId: questionnaireId,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                } catch {
+                    coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingCoordinatorQuestionnaire = false
+    }
+
+    func generateCoordinatorSchedulePreview() async {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isGeneratingCoordinatorPreview = true
+        coordinatorMessage = nil
+        let idempotencyKey = UUID().uuidString
+
+        do {
+            coordinatorSchedulePreview = try await client.coordinatorSchedulePreview(
+                month: selectedMonth,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    coordinatorSchedulePreview = try await client.coordinatorSchedulePreview(
+                        month: selectedMonth,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId,
+                        idempotencyKey: idempotencyKey
+                    )
+                } catch {
+                    coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isGeneratingCoordinatorPreview = false
+    }
+
+    func publishCoordinatorSchedule(replaceExisting: Bool) async -> Bool {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        isPublishingCoordinatorSchedule = true
+        coordinatorMessage = nil
+        let idempotencyKey = UUID().uuidString
+
+        do {
+            let response = try await client.publishCoordinatorSchedule(
+                month: selectedMonth,
+                replaceExisting: replaceExisting,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+            coordinatorMessage = "Escala publicada: \(response.summary.publishedAssignments) escalações e \(response.summary.notificationsQueued) aviso(s) preparados."
+            coordinatorSchedulePreview = response.asPreview
+            try? await loadHomeAndSchedules()
+            await refreshCoordinator()
+            isPublishingCoordinatorSchedule = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    let response = try await client.publishCoordinatorSchedule(
+                        month: selectedMonth,
+                        replaceExisting: replaceExisting,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId,
+                        idempotencyKey: idempotencyKey
+                    )
+                    coordinatorMessage = "Escala publicada: \(response.summary.publishedAssignments) escalações e \(response.summary.notificationsQueued) aviso(s) preparados."
+                    coordinatorSchedulePreview = response.asPreview
+                    try? await loadHomeAndSchedules()
+                    await refreshCoordinator()
+                    isPublishingCoordinatorSchedule = false
+                    return true
+                } catch {
+                    coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isPublishingCoordinatorSchedule = false
+        return false
+    }
+
+    private func loadCoordinatorPayloads(accessToken: String) async throws {
+        async let home = client.coordinatorCommunityHome(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId,
+            month: selectedMonth
+        )
+        async let readiness = client.coordinatorScheduleReadiness(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId,
+            month: selectedMonth
+        )
+        async let ministers = client.coordinatorMinisters(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId
+        )
+
+        let (homePayload, readinessPayload, ministersPayload) = try await (home, readiness, ministers)
+        coordinatorHome = homePayload
+        coordinatorReadiness = readinessPayload
+        coordinatorMinisters = ministersPayload.ministers
+    }
+
     private func loadHomeAndSchedules() async throws {
         guard let accessToken = sessionStore.accessToken else {
             throw MESCMobileAPIError.unauthenticated
@@ -1872,7 +2090,7 @@ final class MESCNativeAppModel: ObservableObject {
         return formatter.date(from: "\(month)-01")
     }
 
-    private static func monthLabel(from month: String) -> String {
+    static func monthLabel(from month: String) -> String {
         guard let date = monthStartDate(from: month) else { return month }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "pt_BR")
@@ -1997,7 +2215,7 @@ struct MESCNativeRootView: View {
 
     private var authenticatedShell: some View {
         TabView(selection: $selectedTab) {
-            ForEach(MESCTab.allCases) { tab in
+            ForEach(availableTabs) { tab in
                 MESCNativeTabPage {
                     screen(for: tab)
                 }
@@ -2011,11 +2229,21 @@ struct MESCNativeRootView: View {
         .tint(MESCColor.accent)
     }
 
+    private var availableTabs: [MESCTab] {
+        var tabs: [MESCTab] = [.mission, .schedules, .formation, .profile, .settings]
+        if appModel.canManageCommunity {
+            tabs.insert(.coordination, at: 1)
+        }
+        return tabs
+    }
+
     @ViewBuilder
     private func screen(for tab: MESCTab) -> some View {
         switch tab {
         case .mission:
             MissionScreen()
+        case .coordination:
+            CoordinatorScreen()
         case .schedules:
             SchedulesScreen()
         case .formation:
@@ -2076,6 +2304,7 @@ struct MESCNativeTabPage<Content: View>: View {
 
 enum MESCTab: String, CaseIterable, Identifiable {
     case mission
+    case coordination
     case schedules
     case formation
     case profile
@@ -2086,6 +2315,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .mission: return "Missão"
+        case .coordination: return "Coordenação"
         case .schedules: return "Escalas"
         case .formation: return "Formação"
         case .profile: return "Perfil"
@@ -2096,6 +2326,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .mission: return "cross"
+        case .coordination: return "person.3"
         case .schedules: return "calendar"
         case .formation: return "book.closed"
         case .profile: return "person"
@@ -4369,6 +4600,419 @@ struct FormationLessonSectionCard: View {
     }
 }
 
+struct CoordinatorScreen: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @State private var replaceExisting = false
+    @State private var showPublishConfirmation = false
+
+    var body: some View {
+        MESCScrollScreen(
+            title: "Coordenação",
+            subtitle: appModel.activeCommunity?.name ?? "Comunidade"
+        ) {
+            if appModel.isLoadingCoordinator && appModel.coordinatorHome == nil {
+                ProgressView("Carregando a comunidade...")
+                    .tint(MESCColor.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 42)
+            }
+
+            if let home = appModel.coordinatorHome {
+                communitySummary(home)
+                questionnairePanel(home)
+                readinessPanel
+                coveragePanel(home)
+                substitutionsPanel(home)
+                ministersPanel
+            } else if !appModel.isLoadingCoordinator {
+                EmptyState(
+                    title: "Painel indisponível",
+                    detail: "Atualize para consultar as pendências e a cobertura da comunidade."
+                )
+            }
+
+            if let message = appModel.coordinatorMessage {
+                Label(message, systemImage: "info.circle")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.primaryWine)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(14)
+                    .mescGlass(cornerRadius: 16)
+            }
+        }
+        .task {
+            await appModel.refreshCoordinator()
+        }
+        .alert("Publicar escala?", isPresented: $showPublishConfirmation) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Publicar", role: .destructive) {
+                Task {
+                    _ = await appModel.publishCoordinatorSchedule(replaceExisting: replaceExisting)
+                }
+            }
+        } message: {
+            Text(replaceExisting
+                ? "A escala existente deste mês será substituída. A ação será registrada e os ministros receberão um aviso."
+                : "A escala será publicada para os ministros da comunidade e a ação será registrada.")
+        }
+    }
+
+    private func communitySummary(_ home: MobileCoordinatorCommunityHomeDTO) -> some View {
+        GlassPanel(spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: "person.3.fill", tint: MESCColor.accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(home.community.name)
+                        .font(MESCFont.cardTitle)
+                    Text("Visão de \(MESCNativeAppModel.monthLabel(from: home.month))")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+                Spacer()
+                MESCIconButton(symbol: "arrow.clockwise", accessibilityLabel: "Atualizar painel", isDisabled: appModel.isLoadingCoordinator) {
+                    Task { await appModel.refreshCoordinator() }
+                }
+            }
+
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
+                spacing: 10
+            ) {
+                CoordinatorMetricTile(title: "Ministros", value: home.metrics.activeMinisters, symbol: "person.2", tint: MESCColor.accent)
+                CoordinatorMetricTile(title: "Escalações", value: home.metrics.publishedAssignments, symbol: "calendar", tint: MESCColor.gold)
+                CoordinatorMetricTile(title: "Trocas", value: home.metrics.pendingSubstitutions, symbol: "arrow.triangle.2.circlepath", tint: home.metrics.pendingSubstitutions > 0 ? MESCColor.primaryWine : MESCColor.textSecondary)
+                CoordinatorMetricTile(title: "Cadastros", value: home.metrics.profileBlocked + home.metrics.profileNeedsAttention, symbol: "person.text.rectangle", tint: home.metrics.profileBlocked > 0 ? MESCColor.primaryWine : MESCColor.gold)
+            }
+        }
+    }
+
+    private func questionnairePanel(_ home: MobileCoordinatorCommunityHomeDTO) -> some View {
+        GlassPanel(spacing: 13) {
+            SectionTitle(title: "Questionário", symbol: "list.clipboard")
+
+            if let questionnaire = home.questionnaire {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(questionnaire.title)
+                            .font(MESCFont.body.weight(.semibold))
+                        Text("\(questionnaire.responses) de \(questionnaire.target) respostas, \(questionnaire.responseRate)% concluído")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    Spacer()
+                    Text("\(questionnaire.pending) pend.")
+                        .font(MESCFont.caption.weight(.semibold))
+                        .foregroundStyle(questionnaire.pending > 0 ? MESCColor.primaryWine : MESCColor.accent)
+                }
+
+                ProgressView(value: Double(questionnaire.responseRate), total: 100)
+                    .tint(questionnaire.pending > 0 ? MESCColor.gold : MESCColor.accent)
+
+                MESCSecondaryButton(
+                    title: appModel.isLoadingCoordinatorQuestionnaire ? "Carregando..." : "Ver respostas",
+                    symbol: "person.2"
+                ) {
+                    Task { await appModel.loadCoordinatorQuestionnaireResponses() }
+                }
+                .disabled(appModel.isLoadingCoordinatorQuestionnaire)
+
+                if let responses = appModel.coordinatorQuestionnaireResponses {
+                    VStack(spacing: 8) {
+                        ForEach(responses.ministers) { minister in
+                            CoordinatorQuestionnaireResponseRow(minister: minister)
+                        }
+                    }
+                }
+            } else {
+                EmptyState(title: "Sem questionário ativo", detail: "Quando a coordenação publicar um questionário, as respostas aparecerão aqui.")
+            }
+        }
+    }
+
+    private var readinessPanel: some View {
+        GlassPanel(spacing: 13) {
+            SectionTitle(title: "Escala do mês", symbol: "calendar.badge.clock")
+
+            if let readiness = appModel.coordinatorReadiness {
+                HStack(spacing: 10) {
+                    StatusPill(title: "\(readiness.massConfig.configuredSlots) horários", symbol: "clock", tint: MESCColor.accent)
+                    StatusPill(title: "\(readiness.existingSchedules.total) registros", symbol: "list.bullet", tint: MESCColor.gold)
+                }
+
+                readinessMessages(readiness)
+
+                if readiness.existingSchedules.total > 0 {
+                    Toggle("Substituir escala já existente", isOn: $replaceExisting)
+                        .font(MESCFont.caption)
+                        .tint(MESCColor.primaryWine)
+                }
+
+                HStack(spacing: 10) {
+                    MESCSecondaryButton(
+                        title: appModel.isGeneratingCoordinatorPreview ? "Gerando..." : "Gerar prévia",
+                        symbol: "wand.and.stars"
+                    ) {
+                        Task { await appModel.generateCoordinatorSchedulePreview() }
+                    }
+                    .disabled(!readiness.readiness.canPreview || appModel.isGeneratingCoordinatorPreview)
+
+                    MESCPrimaryButton(
+                        title: appModel.isPublishingCoordinatorSchedule ? "Publicando..." : "Publicar",
+                        symbol: "paperplane.fill"
+                    ) {
+                        showPublishConfirmation = true
+                    }
+                    .disabled(!readiness.readiness.canPublish || appModel.isPublishingCoordinatorSchedule)
+                }
+
+                if let preview = appModel.coordinatorSchedulePreview {
+                    Divider().overlay(MESCColor.separator)
+                    HStack {
+                        Text("Prévia: \(preview.summary.totalAssignments) escalações")
+                            .font(MESCFont.caption.weight(.semibold))
+                        Spacer()
+                        Text("\(preview.summary.totalVacancies) vagas")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(preview.summary.totalVacancies > 0 ? MESCColor.primaryWine : MESCColor.accent)
+                    }
+                    ForEach(Array(preview.schedules.prefix(6))) { item in
+                        CoordinatorSchedulePreviewRow(item: item)
+                    }
+                }
+            } else {
+                ProgressView().tint(MESCColor.accent)
+            }
+        }
+    }
+
+    private func readinessMessages(_ readiness: MobileCoordinatorScheduleReadinessDTO) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(readiness.readiness.blockers, id: \.self) { item in
+                Label(item, systemImage: "xmark.octagon.fill")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.primaryWine)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(readiness.readiness.publishBlockers, id: \.self) { item in
+                Label(item, systemImage: "exclamationmark.triangle.fill")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.gold)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(readiness.readiness.warnings, id: \.self) { item in
+                Label(item, systemImage: "info.circle")
+                    .font(MESCFont.caption2)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func coveragePanel(_ home: MobileCoordinatorCommunityHomeDTO) -> some View {
+        GlassPanel(spacing: 12) {
+            SectionTitle(title: "Cobertura", symbol: "checklist")
+            if home.coverage.isEmpty {
+                EmptyState(title: "Sem escala publicada", detail: "A cobertura aparecerá após a publicação da escala.")
+            } else {
+                ForEach(Array(home.coverage.prefix(8))) { coverage in
+                    CoordinatorCoverageRow(coverage: coverage)
+                }
+            }
+        }
+    }
+
+    private func substitutionsPanel(_ home: MobileCoordinatorCommunityHomeDTO) -> some View {
+        GlassPanel(spacing: 12) {
+            SectionTitle(title: "Substituições", symbol: "arrow.triangle.2.circlepath")
+            if home.substitutions.isEmpty {
+                Text("Nenhuma troca pendente nesta comunidade.")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+            } else {
+                ForEach(home.substitutions) { substitution in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(MESCNativeAppModel.scheduleDateTitle(date: substitution.schedule.date))
+                            .font(MESCFont.body.weight(.semibold))
+                        Text("\(MESCNativeAppModel.timeLabel(substitution.schedule.time)) • \(substitution.requester?.name ?? "Ministro")")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .mescGlass(cornerRadius: 16)
+                }
+            }
+        }
+    }
+
+    private var ministersPanel: some View {
+        GlassPanel(spacing: 12) {
+            SectionTitle(title: "Diretório", symbol: "person.text.rectangle")
+            if appModel.coordinatorMinisters.isEmpty {
+                Text("Nenhum ministro ativo encontrado para esta comunidade.")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+            } else {
+                ForEach(Array(appModel.coordinatorMinisters.prefix(10))) { minister in
+                    CoordinatorMinisterRow(minister: minister)
+                }
+            }
+        }
+    }
+}
+
+struct CoordinatorMetricTile: View {
+    let title: String
+    let value: Int
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Image(systemName: symbol)
+                .foregroundStyle(tint)
+            Text("\(value)")
+                .font(.system(size: 23, weight: .bold, design: .rounded))
+                .foregroundStyle(MESCColor.textPrimary)
+            Text(title)
+                .font(MESCFont.caption2)
+                .foregroundStyle(MESCColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .mescGlass(cornerRadius: 16)
+    }
+}
+
+struct CoordinatorQuestionnaireResponseRow: View {
+    let minister: MobileCoordinatorQuestionnaireTargetDTO
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: minister.responded ? "checkmark.circle.fill" : "clock")
+                .foregroundStyle(minister.responded ? MESCColor.accent : MESCColor.gold)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(minister.displayName)
+                    .font(MESCFont.caption.weight(.semibold))
+                Text(minister.responded ? (minister.availability ?? "Resposta recebida") : "Aguardando resposta")
+                    .font(MESCFont.caption2)
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+            Spacer()
+            Text(readinessText)
+                .font(MESCFont.caption2.weight(.semibold))
+                .foregroundStyle(readinessTint)
+        }
+        .padding(11)
+        .mescGlass(cornerRadius: 14)
+    }
+
+    private var readinessText: String {
+        switch minister.dataQuality.status {
+        case "ready": return "Pronto"
+        case "blocked": return "Bloqueado"
+        default: return "Revisar"
+        }
+    }
+
+    private var readinessTint: Color {
+        switch minister.dataQuality.status {
+        case "ready": return MESCColor.accent
+        case "blocked": return MESCColor.primaryWine
+        default: return MESCColor.gold
+        }
+    }
+}
+
+struct CoordinatorCoverageRow: View {
+    let coverage: MobileCoordinatorCoverageDTO
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SymbolTile(symbol: coverage.vacancies > 0 ? "exclamationmark.triangle" : "checkmark.seal", tint: coverage.vacancies > 0 ? MESCColor.primaryWine : MESCColor.accent)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(MESCNativeAppModel.scheduleDateTitle(date: coverage.date)) • \(MESCNativeAppModel.timeLabel(coverage.time))")
+                    .font(MESCFont.caption.weight(.semibold))
+                Text(coverage.location ?? coverage.type.capitalized)
+                    .font(MESCFont.caption2)
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+            Spacer()
+            Text(coverage.vacancies > 0 ? "\(coverage.vacancies) vaga(s)" : "\(coverage.assigned) escalado(s)")
+                .font(MESCFont.caption2.weight(.semibold))
+                .foregroundStyle(coverage.vacancies > 0 ? MESCColor.primaryWine : MESCColor.accent)
+        }
+        .padding(11)
+        .mescGlass(cornerRadius: 16)
+    }
+}
+
+struct CoordinatorSchedulePreviewRow: View {
+    let item: MobileCoordinatorSchedulePreviewItemDTO
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(MESCNativeAppModel.timeLabel(item.time))
+                .font(MESCFont.caption.weight(.bold))
+                .foregroundStyle(MESCColor.accent)
+                .frame(width: 45, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.displayName)
+                    .font(MESCFont.caption.weight(.semibold))
+                Text(item.date.map(MESCNativeAppModel.scheduleDateTitle(date:)) ?? "Data a confirmar")
+                    .font(MESCFont.caption2)
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+            Spacer()
+            Text(item.vacancies > 0 ? "\(item.vacancies) vaga(s)" : "Coberta")
+                .font(MESCFont.caption2.weight(.semibold))
+                .foregroundStyle(item.vacancies > 0 ? MESCColor.primaryWine : MESCColor.accent)
+        }
+        .padding(11)
+        .mescGlass(cornerRadius: 14)
+    }
+}
+
+struct CoordinatorMinisterRow: View {
+    let minister: MobileCoordinatorMinisterDTO
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SymbolTile(symbol: "person.fill", tint: readinessTint)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(minister.displayName)
+                    .font(MESCFont.caption.weight(.semibold))
+                Text(minister.preferredTimes.isEmpty ? "Sem horários preferenciais" : minister.preferredTimes.joined(separator: " • "))
+                    .font(MESCFont.caption2)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Text(readinessText)
+                .font(MESCFont.caption2.weight(.semibold))
+                .foregroundStyle(readinessTint)
+        }
+        .padding(11)
+        .mescGlass(cornerRadius: 14)
+    }
+
+    private var readinessText: String {
+        switch minister.dataQuality.status {
+        case "ready": return "Pronto"
+        case "blocked": return "Bloqueado"
+        default: return "Revisar"
+        }
+    }
+
+    private var readinessTint: Color {
+        switch minister.dataQuality.status {
+        case "ready": return MESCColor.accent
+        case "blocked": return MESCColor.primaryWine
+        default: return MESCColor.gold
+        }
+    }
+}
+
 struct ProfileScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @State private var isProfileEditorPresented = false
@@ -6518,6 +7162,230 @@ struct MobileFormationAdminLessonResponseDTO: Codable {
     let sections: [MobileFormationLessonSectionDTO]
 }
 
+struct MobileCoordinatorDataQualityDTO: Codable {
+    let status: String
+    let score: Int?
+}
+
+struct MobileCoordinatorCommunityMetricsDTO: Codable {
+    let activeMinisters: Int
+    let publishedAssignments: Int
+    let pendingSubstitutions: Int
+    let questionnaireResponses: Int
+    let questionnairePending: Int?
+    let questionnaireTarget: Int?
+    let profileReady: Int
+    let profileNeedsAttention: Int
+    let profileBlocked: Int
+}
+
+struct MobileCoordinatorQuestionnaireSummaryDTO: Codable, Identifiable {
+    let id: String
+    let title: String
+    let month: Int
+    let year: Int
+    let responses: Int
+    let pending: Int
+    let target: Int
+    let responseRate: Int
+    let deepLink: String
+}
+
+struct MobileCoordinatorCoverageDTO: Codable, Identifiable {
+    var id: String { "\(date)|\(time)|\(type)|\(location ?? "")" }
+    let date: String
+    let time: String
+    let type: String
+    let location: String?
+    let assigned: Int
+    let vacancies: Int
+    let scheduleIds: [String]
+    let status: String
+}
+
+struct MobileCoordinatorCommunityHomeDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let month: String
+    let metrics: MobileCoordinatorCommunityMetricsDTO
+    let questionnaire: MobileCoordinatorQuestionnaireSummaryDTO?
+    let coverage: [MobileCoordinatorCoverageDTO]
+    let substitutions: [MobileSubstitutionDTO]
+}
+
+struct MobileCoordinatorScheduleReadinessStateDTO: Codable {
+    let canPreview: Bool
+    let canPublish: Bool
+    let blockers: [String]
+    let publishBlockers: [String]
+    let warnings: [String]
+}
+
+struct MobileCoordinatorReadinessMinistersDTO: Codable {
+    let active: Int
+    let ready: Int
+    let needsAttention: Int
+    let blocked: Int
+}
+
+struct MobileCoordinatorReadinessQuestionnaireDTO: Codable {
+    let id: String
+    let title: String
+    let month: Int
+    let year: Int
+    let status: String
+    let deadline: String?
+    let targetCount: Int
+    let responseCount: Int
+    let pendingCount: Int
+    let responseRate: Int
+}
+
+struct MobileCoordinatorMassConfigDTO: Codable {
+    let configuredSlots: Int
+}
+
+struct MobileCoordinatorExistingSchedulesDTO: Codable {
+    let total: Int
+    let draft: Int
+    let scheduled: Int
+    let published: Int
+    let completed: Int
+}
+
+struct MobileCoordinatorScheduleReadinessDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let month: String
+    let readiness: MobileCoordinatorScheduleReadinessStateDTO
+    let ministers: MobileCoordinatorReadinessMinistersDTO
+    let questionnaire: MobileCoordinatorReadinessQuestionnaireDTO?
+    let massConfig: MobileCoordinatorMassConfigDTO
+    let existingSchedules: MobileCoordinatorExistingSchedulesDTO
+}
+
+struct MobileCoordinatorMinisterDTO: Codable, Identifiable {
+    let id: String
+    let name: String
+    let displayName: String
+    let role: String
+    let status: String
+    let phone: String?
+    let whatsapp: String?
+    let preferredPosition: Int?
+    let preferredPositions: [Int]
+    let preferredTimes: [String]
+    let dataQuality: MobileCoordinatorDataQualityDTO
+}
+
+struct MobileCoordinatorMinistersResponseDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let ministers: [MobileCoordinatorMinisterDTO]
+}
+
+struct MobileCoordinatorQuestionnaireTargetDTO: Codable, Identifiable {
+    let id: String
+    let name: String
+    let displayName: String
+    let responded: Bool
+    let respondedAt: String?
+    let availability: String?
+    let dataQuality: MobileCoordinatorDataQualityDTO
+}
+
+struct MobileCoordinatorQuestionnaireResponseSummaryDTO: Codable {
+    let targetCount: Int
+    let respondedCount: Int
+    let pendingCount: Int
+    let responseRate: Int
+}
+
+struct MobileCoordinatorQuestionnaireResponsesQuestionnaireDTO: Codable {
+    let id: String
+    let title: String
+    let month: Int
+    let year: Int
+    let status: String
+    let deadline: String?
+}
+
+struct MobileCoordinatorQuestionnaireResponsesDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let questionnaire: MobileCoordinatorQuestionnaireResponsesQuestionnaireDTO
+    let summary: MobileCoordinatorQuestionnaireResponseSummaryDTO
+    let ministers: [MobileCoordinatorQuestionnaireTargetDTO]
+}
+
+struct MobileCoordinatorSchedulePreviewSummaryDTO: Codable {
+    let totalMasses: Int
+    let totalAssignments: Int
+    let totalVacancies: Int
+    let averageConfidence: Double
+    let lowConfidenceMasses: Int
+}
+
+struct MobileCoordinatorSchedulePreviewItemDTO: Codable, Identifiable {
+    var id: String { "\(date ?? "")|\(time)|\(displayName)|\(location ?? "")" }
+    let date: String?
+    let time: String
+    let type: String
+    let displayName: String
+    let location: String?
+    let requiredMinisters: Int
+    let assignedMinisters: Int
+    let vacancies: Int
+    let confidence: Double
+    let status: String
+}
+
+struct MobileCoordinatorSchedulePreviewDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let month: String
+    let generatedAt: String
+    let summary: MobileCoordinatorSchedulePreviewSummaryDTO
+    let schedules: [MobileCoordinatorSchedulePreviewItemDTO]
+}
+
+struct MobileCoordinatorSchedulePublishSummaryDTO: Codable {
+    let totalMasses: Int
+    let totalAssignments: Int
+    let totalVacancies: Int
+    let averageConfidence: Double
+    let lowConfidenceMasses: Int
+    let publishedAssignments: Int
+    let notificationsQueued: Int
+    let replacedSchedules: Int
+}
+
+struct MobileCoordinatorSchedulePublishDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let month: String
+    let publishedAt: String
+    let summary: MobileCoordinatorSchedulePublishSummaryDTO
+    let schedules: [MobileCoordinatorSchedulePreviewItemDTO]
+
+    var asPreview: MobileCoordinatorSchedulePreviewDTO {
+        MobileCoordinatorSchedulePreviewDTO(
+            success: success,
+            community: community,
+            month: month,
+            generatedAt: publishedAt,
+            summary: MobileCoordinatorSchedulePreviewSummaryDTO(
+                totalMasses: summary.totalMasses,
+                totalAssignments: summary.totalAssignments,
+                totalVacancies: summary.totalVacancies,
+                averageConfidence: summary.averageConfidence,
+                lowConfidenceMasses: summary.lowConfidenceMasses
+            ),
+            schedules: schedules
+        )
+    }
+}
+
 final class MESCMobileAPIClient {
     private let baseURL: URL
     private let decoder: JSONDecoder
@@ -6584,6 +7452,98 @@ final class MESCMobileAPIClient {
             communityId: communityId,
             deviceId: deviceId,
             queryItems: [URLQueryItem(name: "month", value: month)]
+        )
+    }
+
+    func coordinatorCommunityHome(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        month: String
+    ) async throws -> MobileCoordinatorCommunityHomeDTO {
+        try await get(
+            "admin/community/home",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            queryItems: [URLQueryItem(name: "month", value: month)]
+        )
+    }
+
+    func coordinatorScheduleReadiness(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        month: String
+    ) async throws -> MobileCoordinatorScheduleReadinessDTO {
+        try await get(
+            "admin/schedules/readiness",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            queryItems: [URLQueryItem(name: "month", value: month)]
+        )
+    }
+
+    func coordinatorMinisters(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileCoordinatorMinistersResponseDTO {
+        try await get(
+            "admin/ministers",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func coordinatorQuestionnaireResponses(
+        questionnaireId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileCoordinatorQuestionnaireResponsesDTO {
+        try await get(
+            "admin/questionnaires/\(questionnaireId)/responses",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func coordinatorSchedulePreview(
+        month: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileCoordinatorSchedulePreviewDTO {
+        try await authenticatedPost(
+            "admin/schedules/generate-preview",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: CoordinatorSchedulePreviewRequestBody(month: month)
+        )
+    }
+
+    func publishCoordinatorSchedule(
+        month: String,
+        replaceExisting: Bool,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileCoordinatorSchedulePublishDTO {
+        try await authenticatedPost(
+            "admin/schedules/publish",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: CoordinatorSchedulePublishRequestBody(month: month, replaceExisting: replaceExisting)
         )
     }
 
@@ -7204,6 +8164,15 @@ struct FormationAdminLessonRequestBody: Encodable {
     let sectionTitle: String?
     let sectionContent: String?
     let videoUrl: String?
+}
+
+private struct CoordinatorSchedulePreviewRequestBody: Encodable {
+    let month: String
+}
+
+private struct CoordinatorSchedulePublishRequestBody: Encodable {
+    let month: String
+    let replaceExisting: Bool
 }
 
 private struct DeviceUpdateRequestBody: Encodable {
