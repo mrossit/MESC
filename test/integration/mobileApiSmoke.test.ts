@@ -69,6 +69,21 @@ describeWithLocalDatabase("mobile API MVP smoke flow", () => {
     vi.useRealTimers();
   });
 
+  it("advertises the released coordinator workflow to native clients", async () => {
+    const response = await fetch(`${baseUrl}/api/mobile/v1/app/config?platform=ios`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      apiVersion: "mobile-v1",
+      platform: "ios",
+      featureFlags: {
+        biometrics: true,
+        pushRegistration: true,
+        coordinatorMobile: true,
+      },
+    });
+  });
+
   it("runs login, refresh, mission, notifications, questionnaire, confirmation and substitution", async () => {
     const ministerDeviceId = `mobile-smoke-ios-device-${randomUUID()}`;
     const substituteDeviceId = `mobile-smoke-substitute-ios-device-${randomUUID()}`;
