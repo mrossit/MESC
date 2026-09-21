@@ -45,6 +45,12 @@ const NEVER_IMPORT_COLUMNS = new Set([
   "auth_key",
   "push_token",
   "device_id",
+  // Legacy PWA telemetry and soft-delete markers are not part of the native schema.
+  "last_seen",
+  "avatar_url",
+  "last_seen_schedules",
+  "deleted_at",
+  "is_deleted",
 ]);
 
 const BATCH_SIZE = 100;
