@@ -183,6 +183,76 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     expect(forbidden.body.message).toBe("Comunidade fora do escopo do usuario");
   });
 
+  it("lets P1 or P2 edit only their published mass without crossing community scope", async () => {
+    const editablePositionId = "18181818-1818-4818-8818-181818181818";
+    const now = new Date("2026-06-21T12:00:00.000Z");
+
+    await db.delete(schedules).where(eq(schedules.id, editablePositionId));
+    await db.insert(schedules).values({
+      id: editablePositionId,
+      communityId: MOBILE_P0_DEMO_IDS.communityA,
+      date: "2026-07-05",
+      time: "08:00",
+      type: "missa",
+      location: "Igreja Matriz",
+      ministerId: null,
+      position: 3,
+      status: "published",
+      createdAt: now,
+    });
+
+    try {
+      const month = await mobileGet(`/schedules/month?month=${MOBILE_P0_DEMO_MONTH}`, {
+        userId: MOBILE_P0_DEMO_IDS.ministerA,
+      });
+      const editableAssignment = month.body.publicSchedule.assignments.find((assignment: { scheduleId: string }) =>
+        assignment.scheduleId === editablePositionId
+      );
+      expect(editableAssignment).toMatchObject({ canEditMass: true });
+
+      const editor = await mobileGet(`/schedules/${editablePositionId}/editor`, {
+        userId: MOBILE_P0_DEMO_IDS.ministerA,
+      });
+      expect(editor.status).toBe(200);
+      expect(editor.body.mass.assignments.map((assignment: { id: string }) => assignment.id))
+        .toContain(editablePositionId);
+      expect(editor.body.ministers.map((minister: { id: string }) => minister.id))
+        .toContain(MOBILE_P0_DEMO_IDS.coordinatorA);
+
+      const updateKey = "a4a4a4a4-a4a4-44a4-84a4-a4a4a4a4a4a4";
+      const updated = await mobilePatch(`/schedules/${editablePositionId}`, {
+        userId: MOBILE_P0_DEMO_IDS.ministerA,
+        idempotencyKey: updateKey,
+        body: { ministerId: MOBILE_P0_DEMO_IDS.coordinatorA },
+      });
+      expect(updated.status).toBe(200);
+      expect(updated.body.assignment).toMatchObject({
+        id: editablePositionId,
+        ministerId: MOBILE_P0_DEMO_IDS.coordinatorA,
+        scheduleDisplayName: "Clara Coord.",
+      });
+
+      const replayed = await mobilePatch(`/schedules/${editablePositionId}`, {
+        userId: MOBILE_P0_DEMO_IDS.ministerA,
+        idempotencyKey: updateKey,
+        body: { ministerId: MOBILE_P0_DEMO_IDS.coordinatorA },
+      });
+      expect(replayed.status).toBe(200);
+      expect(replayed.body).toEqual(updated.body);
+
+      const crossCommunity = await mobilePatch(`/schedules/${editablePositionId}`, {
+        userId: MOBILE_P0_DEMO_IDS.ministerA,
+        communityId: MOBILE_P0_DEMO_IDS.communityB,
+        idempotencyKey: "b4b4b4b4-b4b4-44b4-84b4-b4b4b4b4b4b4",
+        body: { ministerId: null },
+      });
+      expect(crossCommunity.status).toBe(403);
+      expect(crossCommunity.body.message).toBe("Comunidade fora do escopo do usuario");
+    } finally {
+      await db.delete(schedules).where(eq(schedules.id, editablePositionId));
+    }
+  });
+
   it("keeps substitution requests scoped to the active community", async () => {
     const allowed = await mobileGet("/substitutions", {
       userId: MOBILE_P0_DEMO_IDS.ministerA,

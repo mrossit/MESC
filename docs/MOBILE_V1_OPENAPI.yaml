@@ -1346,6 +1346,72 @@ paths:
           description: Schedule is outside the user's permission scope.
         "404":
           description: Schedule not found.
+    patch:
+      summary: Let P1, P2, or coordination update one position in their published mass.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ministerId]
+              properties:
+                ministerId:
+                  type: string
+                  nullable: true
+                  description: Active minister from the same community, or null to leave a vacancy.
+      responses:
+        "200":
+          description: Position updated idempotently.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, assignment]
+                properties:
+                  success:
+                    type: boolean
+                  assignment:
+                    $ref: "#/components/schemas/ScheduleEditorAssignment"
+        "400":
+          description: Schedule is unpublished, the minister is unavailable, or the request is invalid.
+        "403":
+          description: User is not P1, P2, or coordination for this mass.
+        "404":
+          description: Schedule not found.
+        "409":
+          description: Idempotency-Key is already in progress or was reused with a different mutation.
+  /schedules/{id}/editor:
+    get:
+      summary: Load the published mass roster and active community ministers for a P1/P2 edit.
+      parameters:
+        - $ref: "#/components/parameters/CommunityHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Editable published mass and minimal community roster.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleEditor"
+        "403":
+          description: User is not P1, P2, or coordination for this mass.
+        "404":
+          description: Schedule not found.
   /schedules/{id}/confirm:
     post:
       summary: Confirm or decline the authenticated user's presence for a schedule.
@@ -2600,6 +2666,7 @@ components:
         - scheduleDisplayName
         - source
         - isCurrentUser
+        - canEditMass
       properties:
         id:
           type: string
@@ -2636,6 +2703,65 @@ components:
           enum: [schedule, adoration]
         isCurrentUser:
           type: boolean
+        canEditMass:
+          type: boolean
+    ScheduleEditor:
+      type: object
+      required: [success, community, mass, ministers]
+      properties:
+        success:
+          type: boolean
+        community:
+          $ref: "#/components/schemas/Community"
+        mass:
+          type: object
+          required: [date, time, type, location, assignments]
+          properties:
+            date:
+              type: string
+              format: date
+            time:
+              type: string
+            type:
+              type: string
+            location:
+              type: string
+              nullable: true
+            assignments:
+              type: array
+              items:
+                $ref: "#/components/schemas/ScheduleEditorAssignment"
+        ministers:
+          type: array
+          items:
+            type: object
+            required: [id, name, displayName]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              displayName:
+                type: string
+    ScheduleEditorAssignment:
+      type: object
+      required: [id, scheduleId, position, ministerId, ministerName, scheduleDisplayName]
+      properties:
+        id:
+          type: string
+        scheduleId:
+          type: string
+        position:
+          type: integer
+        ministerId:
+          type: string
+          nullable: true
+        ministerName:
+          type: string
+          nullable: true
+        scheduleDisplayName:
+          type: string
+          nullable: true
     ScheduleDetail:
       allOf:
         - $ref: "#/components/schemas/ScheduleSummary"
