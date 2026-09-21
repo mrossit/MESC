@@ -120,15 +120,16 @@ async function readSourceRows(source: postgres.Sql, tableName: string, columns: 
 }
 
 function scheduleSlotKey(row: JsonRow) {
+  const communityId = String(row.community_id ?? "");
   const date = String(row.date ?? "").slice(0, 10);
   const time = String(row.time ?? "").slice(0, 8);
   const position = String(row.position ?? "");
-  return `${date}|${time}|${position}`;
+  return `${communityId}|${date}|${time}|${position}`;
 }
 
 async function reconcileScheduleIds(target: postgres.Sql, rows: JsonRow[]) {
-  const existingRows = await target<{ id: string; date: string; time: string; position: number }[]>`
-    SELECT id, date::text AS date, time::text AS time, position
+  const existingRows = await target<{ id: string; community_id: string; date: string; time: string; position: number }[]>`
+    SELECT id, community_id, date::text AS date, time::text AS time, position
     FROM public.schedules
   `;
   const existingBySlot = new Map(existingRows.map((row) => [scheduleSlotKey(row), row.id]));
@@ -146,6 +147,30 @@ async function reconcileScheduleIds(target: postgres.Sql, rows: JsonRow[]) {
   });
 
   return { rows: reconciledRows, sourceToNative, remapped };
+}
+
+async function ensureCommunityScopedScheduleUniqueness(target: postgres.Sql) {
+  const [existing] = await target<{ ready: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'uq_schedules_community_date_time_position'
+    ) AS ready
+  `;
+  if (existing?.ready) return false;
+
+  // Matches migration 0011: a slot is unique inside a community, never globally.
+  await target.begin(async (transaction) => {
+    await transaction.unsafe(
+      "ALTER TABLE public.schedules DROP CONSTRAINT IF EXISTS uq_schedules_date_time_position",
+    );
+    await transaction.unsafe("DROP INDEX IF EXISTS public.uq_schedules_date_time_position");
+    await transaction.unsafe(
+      "CREATE UNIQUE INDEX IF NOT EXISTS uq_schedules_community_date_time_position ON public.schedules(community_id, date, time, position)",
+    );
+  });
+  return true;
 }
 
 function remapSubstitutionScheduleIds(rows: JsonRow[], scheduleIds: ReadonlyMap<string, string>) {
@@ -209,6 +234,7 @@ export type CurrentMescImportResult = {
   tables: TableImportReport[];
   userCrossReferences: number;
   remappedScheduleSlots: number;
+  appliedScheduleScopeMigration: boolean;
 };
 
 /**
@@ -223,8 +249,13 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
   let userRows: JsonRow[] = [];
   let scheduleIds = new Map<string, string>();
   let remappedScheduleSlots = 0;
+  let appliedScheduleScopeMigration = false;
 
   try {
+    if (mode === "apply") {
+      appliedScheduleScopeMigration = await ensureCommunityScopedScheduleUniqueness(target);
+    }
+
     for (const entry of IMPORT_TABLES) {
       const sourceHasTable = await tableExists(source, entry.table);
       if (!sourceHasTable) {
@@ -270,7 +301,13 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
     }
 
     const userCrossReferences = mode === "apply" ? await updateUserCrossReferences(target, userRows) : 0;
-    return { mode, tables: reports, userCrossReferences, remappedScheduleSlots };
+    return {
+      mode,
+      tables: reports,
+      userCrossReferences,
+      remappedScheduleSlots,
+      appliedScheduleScopeMigration,
+    };
   } catch (error) {
     throw new Error(sanitizeError(error));
   } finally {
