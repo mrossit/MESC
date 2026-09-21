@@ -127,26 +127,54 @@ function scheduleSlotKey(row: JsonRow) {
   return `${communityId}|${date}|${time}|${position}`;
 }
 
+function scheduleRecency(row: JsonRow) {
+  const timestamp = Date.parse(String(row.updated_at ?? row.created_at ?? ""));
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
 async function reconcileScheduleIds(target: postgres.Sql, rows: JsonRow[]) {
   const existingRows = await target<{ id: string; community_id: string; date: string; time: string; position: number }[]>`
     SELECT id, community_id, date::text AS date, time::text AS time, position
     FROM public.schedules
   `;
   const existingBySlot = new Map(existingRows.map((row) => [scheduleSlotKey(row), row.id]));
+  const canonicalSourceBySlot = new Map<string, JsonRow>();
+  for (const row of rows) {
+    const slot = scheduleSlotKey(row);
+    const current = canonicalSourceBySlot.get(slot);
+    if (!current || scheduleRecency(row) > scheduleRecency(current)) {
+      canonicalSourceBySlot.set(slot, row);
+    }
+  }
+
   const sourceToNative = new Map<string, string>();
   let remapped = 0;
+  let consolidatedSourceDuplicates = 0;
+  const nativeIdBySlot = new Map<string, string>();
 
-  const reconciledRows = rows.map((row) => {
+  for (const [slot, canonicalSource] of canonicalSourceBySlot) {
+    const sourceId = typeof canonicalSource.id === "string" ? canonicalSource.id : "";
+    const nativeId = existingBySlot.get(slot) ?? sourceId;
+    if (nativeId) nativeIdBySlot.set(slot, nativeId);
+  }
+
+  for (const row of rows) {
     const sourceId = typeof row.id === "string" ? row.id : "";
-    const existingId = existingBySlot.get(scheduleSlotKey(row));
-    if (!sourceId || !existingId || sourceId === existingId) return row;
+    const slot = scheduleSlotKey(row);
+    const nativeId = nativeIdBySlot.get(slot);
+    if (!sourceId || !nativeId || sourceId === nativeId) continue;
 
-    sourceToNative.set(sourceId, existingId);
+    sourceToNative.set(sourceId, nativeId);
     remapped += 1;
-    return { ...row, id: existingId };
-  });
+    if (canonicalSourceBySlot.get(slot)?.id !== sourceId) consolidatedSourceDuplicates += 1;
+  }
 
-  return { rows: reconciledRows, sourceToNative, remapped };
+  const reconciledRows = [...canonicalSourceBySlot.entries()].map(([slot, row]) => ({
+    ...row,
+    id: nativeIdBySlot.get(slot) ?? row.id,
+  }));
+
+  return { rows: reconciledRows, sourceToNative, remapped, consolidatedSourceDuplicates };
 }
 
 async function ensureCommunityScopedScheduleUniqueness(target: postgres.Sql) {
@@ -234,6 +262,7 @@ export type CurrentMescImportResult = {
   tables: TableImportReport[];
   userCrossReferences: number;
   remappedScheduleSlots: number;
+  consolidatedScheduleDuplicates: number;
   appliedScheduleScopeMigration: boolean;
 };
 
@@ -249,6 +278,7 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
   let userRows: JsonRow[] = [];
   let scheduleIds = new Map<string, string>();
   let remappedScheduleSlots = 0;
+  let consolidatedScheduleDuplicates = 0;
   let appliedScheduleScopeMigration = false;
 
   try {
@@ -282,6 +312,7 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
         rows = reconciled.rows;
         scheduleIds = reconciled.sourceToNative;
         remappedScheduleSlots = reconciled.remapped;
+        consolidatedScheduleDuplicates = reconciled.consolidatedSourceDuplicates;
       }
       if (entry.table === "substitution_requests") {
         rows = remapSubstitutionScheduleIds(sourceRows, scheduleIds);
@@ -309,6 +340,7 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
       tables: reports,
       userCrossReferences,
       remappedScheduleSlots,
+      consolidatedScheduleDuplicates,
       appliedScheduleScopeMigration,
     };
   } catch (error) {
