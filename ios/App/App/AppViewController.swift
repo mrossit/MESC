@@ -2108,7 +2108,7 @@ final class MESCNativeAppModel: ObservableObject {
     }
 
     static func scheduleDateTitle(date: String?) -> String {
-        guard let parsed = parseDate(date) else { return "Próxima missão" }
+        guard let parsed = parseDate(date) else { return "Próxima escala" }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "pt_BR")
         formatter.dateFormat = "EEEE, dd 'de' MMMM"
@@ -2314,7 +2314,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .mission: return "Missão"
+        case .mission: return "Servir"
         case .coordination: return "Coordenação"
         case .schedules: return "Escalas"
         case .formation: return "Formação"
@@ -2325,7 +2325,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .mission: return "cross"
+        case .mission: return "hands.sparkles"
         case .coordination: return "person.3"
         case .schedules: return "calendar"
         case .formation: return "book.closed"
@@ -2467,7 +2467,7 @@ struct LoadingScreen: View {
                 ProgressView()
                     .tint(MESCColor.accent)
 
-                Text("Preparando sua missão")
+                Text("Preparando seu espaço de serviço")
                     .font(MESCFont.body.weight(.semibold))
                     .foregroundStyle(MESCColor.textPrimary)
             }
@@ -2576,19 +2576,19 @@ struct MissionScreen: View {
     var body: some View {
         let mission = appModel.missionHome?.nextMission
 
-        MESCScrollScreen(title: "Sua Missão", subtitle: "Paz e bem, \(appModel.firstName)") {
+        MESCScrollScreen(title: "Seu serviço", subtitle: "Paz e bem, \(appModel.firstName)") {
             if appModel.isUsingFallbackData {
                 FallbackBanner()
             }
 
             GlassPanel(spacing: 18) {
                 HStack(alignment: .top, spacing: 14) {
-                    SymbolTile(symbol: "sparkles", tint: MESCColor.accent)
+                    SymbolTile(symbol: "hands.sparkles", tint: MESCColor.accent)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Próxima missão")
+                        Text("Próxima escala")
                             .font(MESCFont.caption)
                             .foregroundStyle(MESCColor.accent)
-                        Text(mission.map { MESCNativeAppModel.scheduleDateTitle(date: $0.date) } ?? "Nenhuma missão publicada")
+                        Text(mission.map { MESCNativeAppModel.scheduleDateTitle(date: $0.date) } ?? "Nenhuma escala publicada")
                             .font(MESCFont.titleSerif)
                         Text(mission.map { "\(MESCNativeAppModel.timeLabel($0.time)) - \($0.location ?? appModel.activeCommunity?.name ?? "Comunidade")" } ?? "Assim que a escala for publicada, ela aparecerá aqui.")
                             .font(MESCFont.body)
@@ -5460,11 +5460,8 @@ struct MESCScrollScreen<Content: View>: View {
                         appModel.isNotificationCenterPresented = true
                     }
 
-                    Image(systemName: "cross.case.fill")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(MESCColor.gold)
-                        .frame(width: 44, height: 44)
-                        .mescGlass(cornerRadius: 16)
+                    MESCLogoMark(size: 44, cornerRadius: 16)
+                        .accessibilityLabel("MESC São Judas Tadeu")
                 }
                 .padding(16)
                 .mescGlass(cornerRadius: 24, intensity: .floating)
