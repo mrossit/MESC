@@ -290,11 +290,14 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
 
       let upserted = 0;
       if (mode === "apply") {
-        await target.begin(async (transaction) => {
-          for (let start = 0; start < rows.length; start += BATCH_SIZE) {
-            upserted += await upsertRows(transaction, entry.table, importColumns, rows.slice(start, start + BATCH_SIZE));
-          }
-        });
+        // Supabase poolers enforce a transaction timeout. Keep each write batch
+        // atomic while allowing a large historical import to resume safely.
+        for (let start = 0; start < rows.length; start += BATCH_SIZE) {
+          const batch = rows.slice(start, start + BATCH_SIZE);
+          await target.begin(async (transaction) => {
+            upserted += await upsertRows(transaction, entry.table, importColumns, batch);
+          });
+        }
       }
 
       reports.push({ table: entry.table, sourceRows: sourceRows.length, columns: importColumns.length, upserted });
