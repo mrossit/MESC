@@ -119,6 +119,43 @@ async function readSourceRows(source: postgres.Sql, tableName: string, columns: 
   );
 }
 
+function scheduleSlotKey(row: JsonRow) {
+  const date = String(row.date ?? "").slice(0, 10);
+  const time = String(row.time ?? "").slice(0, 8);
+  const position = String(row.position ?? "");
+  return `${date}|${time}|${position}`;
+}
+
+async function reconcileScheduleIds(target: postgres.Sql, rows: JsonRow[]) {
+  const existingRows = await target<{ id: string; date: string; time: string; position: number }[]>`
+    SELECT id, date::text AS date, time::text AS time, position
+    FROM public.schedules
+  `;
+  const existingBySlot = new Map(existingRows.map((row) => [scheduleSlotKey(row), row.id]));
+  const sourceToNative = new Map<string, string>();
+  let remapped = 0;
+
+  const reconciledRows = rows.map((row) => {
+    const sourceId = typeof row.id === "string" ? row.id : "";
+    const existingId = existingBySlot.get(scheduleSlotKey(row));
+    if (!sourceId || !existingId || sourceId === existingId) return row;
+
+    sourceToNative.set(sourceId, existingId);
+    remapped += 1;
+    return { ...row, id: existingId };
+  });
+
+  return { rows: reconciledRows, sourceToNative, remapped };
+}
+
+function remapSubstitutionScheduleIds(rows: JsonRow[], scheduleIds: ReadonlyMap<string, string>) {
+  return rows.map((row) => {
+    const scheduleId = typeof row.schedule_id === "string" ? row.schedule_id : "";
+    const nativeScheduleId = scheduleIds.get(scheduleId);
+    return nativeScheduleId ? { ...row, schedule_id: nativeScheduleId } : row;
+  });
+}
+
 async function upsertRows(target: postgres.Sql, tableName: string, columns: string[], rows: JsonRow[]) {
   if (rows.length === 0) return 0;
 
@@ -171,6 +208,7 @@ export type CurrentMescImportResult = {
   mode: "dry-run" | "apply";
   tables: TableImportReport[];
   userCrossReferences: number;
+  remappedScheduleSlots: number;
 };
 
 /**
@@ -183,6 +221,8 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
   const target = postgres(targetUrl, { max: 1, prepare: false });
   const reports: TableImportReport[] = [];
   let userRows: JsonRow[] = [];
+  let scheduleIds = new Map<string, string>();
+  let remappedScheduleSlots = 0;
 
   try {
     for (const entry of IMPORT_TABLES) {
@@ -203,8 +243,18 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
       }
       if (!sourceColumns.includes("id")) throw new Error(`Source ${entry.table} has no id column.`);
 
-      const rows = normalizedRows(entry.table, await readSourceRows(source, entry.table, sourceColumns));
-      if (entry.table === "users") userRows = rows;
+      const sourceRows = normalizedRows(entry.table, await readSourceRows(source, entry.table, sourceColumns));
+      let rows = sourceRows;
+      if (entry.table === "users") userRows = sourceRows;
+      if (entry.table === "schedules") {
+        const reconciled = await reconcileScheduleIds(target, sourceRows);
+        rows = reconciled.rows;
+        scheduleIds = reconciled.sourceToNative;
+        remappedScheduleSlots = reconciled.remapped;
+      }
+      if (entry.table === "substitution_requests") {
+        rows = remapSubstitutionScheduleIds(sourceRows, scheduleIds);
+      }
       const importColumns = sourceColumns.filter((column) => !entry.omitOnInitialUsersImport?.includes(column));
 
       let upserted = 0;
@@ -216,11 +266,11 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
         });
       }
 
-      reports.push({ table: entry.table, sourceRows: rows.length, columns: importColumns.length, upserted });
+      reports.push({ table: entry.table, sourceRows: sourceRows.length, columns: importColumns.length, upserted });
     }
 
     const userCrossReferences = mode === "apply" ? await updateUserCrossReferences(target, userRows) : 0;
-    return { mode, tables: reports, userCrossReferences };
+    return { mode, tables: reports, userCrossReferences, remappedScheduleSlots };
   } catch (error) {
     throw new Error(sanitizeError(error));
   } finally {
