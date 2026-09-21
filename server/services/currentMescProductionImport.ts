@@ -132,12 +132,7 @@ function scheduleRecency(row: JsonRow) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
-async function reconcileScheduleIds(target: postgres.Sql, rows: JsonRow[]) {
-  const existingRows = await target<{ id: string; community_id: string; date: string; time: string; position: number }[]>`
-    SELECT id, community_id, date::text AS date, time::text AS time, position
-    FROM public.schedules
-  `;
-  const existingBySlot = new Map(existingRows.map((row) => [scheduleSlotKey(row), row.id]));
+function reconcileDuplicateSourceScheduleSlots(rows: JsonRow[]) {
   const canonicalSourceBySlot = new Map<string, JsonRow>();
   for (const row of rows) {
     const slot = scheduleSlotKey(row);
@@ -147,34 +142,40 @@ async function reconcileScheduleIds(target: postgres.Sql, rows: JsonRow[]) {
     }
   }
 
+  return {
+    rows: [...canonicalSourceBySlot.values()],
+    consolidatedSourceDuplicates: rows.length - canonicalSourceBySlot.size,
+  };
+}
+
+async function resolveNativeScheduleIds(target: postgres.Sql, sourceRows: JsonRow[]) {
   const sourceToNative = new Map<string, string>();
-  let remapped = 0;
-  let consolidatedSourceDuplicates = 0;
-  const nativeIdBySlot = new Map<string, string>();
 
-  for (const [slot, canonicalSource] of canonicalSourceBySlot) {
-    const sourceId = typeof canonicalSource.id === "string" ? canonicalSource.id : "";
-    const nativeId = existingBySlot.get(slot) ?? sourceId;
-    if (nativeId) nativeIdBySlot.set(slot, nativeId);
+  for (let start = 0; start < sourceRows.length; start += BATCH_SIZE) {
+    const batch = sourceRows.slice(start, start + BATCH_SIZE);
+    const values = batch.flatMap((row) => [row.id, row.community_id, row.date, row.time, row.position]);
+    const placeholders = batch.map((_, index) => {
+      const offset = index * 5;
+      return `($${offset + 1}::uuid, $${offset + 2}::uuid, $${offset + 3}::date, $${offset + 4}::time, $${offset + 5}::integer)`;
+    });
+    const matches = await target.unsafe<{ source_id: string; native_id: string }[]>(
+      `SELECT source.source_id, destination.id AS native_id
+       FROM (VALUES ${placeholders.join(", ")}) AS source(source_id, community_id, date, time, position)
+       JOIN public.schedules AS destination
+         ON destination.community_id = source.community_id
+        AND destination.date = source.date
+        AND destination.time = source.time
+        AND destination.position = source.position`,
+      values as any[],
+    );
+    for (const match of matches) sourceToNative.set(match.source_id, match.native_id);
   }
 
-  for (const row of rows) {
-    const sourceId = typeof row.id === "string" ? row.id : "";
-    const slot = scheduleSlotKey(row);
-    const nativeId = nativeIdBySlot.get(slot);
-    if (!sourceId || !nativeId || sourceId === nativeId) continue;
-
-    sourceToNative.set(sourceId, nativeId);
-    remapped += 1;
-    if (canonicalSourceBySlot.get(slot)?.id !== sourceId) consolidatedSourceDuplicates += 1;
+  if (sourceToNative.size !== sourceRows.length) {
+    throw new Error(`Unable to resolve ${sourceRows.length - sourceToNative.size} imported schedule slot(s).`);
   }
 
-  const reconciledRows = [...canonicalSourceBySlot.entries()].map(([slot, row]) => ({
-    ...row,
-    id: nativeIdBySlot.get(slot) ?? row.id,
-  }));
-
-  return { rows: reconciledRows, sourceToNative, remapped, consolidatedSourceDuplicates };
+  return sourceToNative;
 }
 
 async function ensureCommunityScopedScheduleUniqueness(target: postgres.Sql) {
@@ -209,7 +210,13 @@ function remapSubstitutionScheduleIds(rows: JsonRow[], scheduleIds: ReadonlyMap<
   });
 }
 
-async function upsertRows(target: postgres.Sql, tableName: string, columns: string[], rows: JsonRow[]) {
+async function upsertRows(
+  target: postgres.Sql,
+  tableName: string,
+  columns: string[],
+  rows: JsonRow[],
+  conflictColumns = ["id"],
+) {
   if (rows.length === 0) return 0;
 
   const values = rows.flatMap((row) => columns.map((column) => row[column] ?? null));
@@ -225,7 +232,7 @@ async function upsertRows(target: postgres.Sql, tableName: string, columns: stri
   const result = await target.unsafe(
     `INSERT INTO public.${quoteIdentifier(tableName)} (${columns.map(quoteIdentifier).join(", ")})
      VALUES ${placeholders.join(", ")}
-     ON CONFLICT (id) ${updateStatement}`,
+     ON CONFLICT (${conflictColumns.map(quoteIdentifier).join(", ")}) ${updateStatement}`,
     values as any[],
   );
   return result.count;
@@ -276,6 +283,7 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
   const target = postgres(targetUrl, { max: 1, prepare: false });
   const reports: TableImportReport[] = [];
   let userRows: JsonRow[] = [];
+  let scheduleSourceRows: JsonRow[] = [];
   let scheduleIds = new Map<string, string>();
   let remappedScheduleSlots = 0;
   let consolidatedScheduleDuplicates = 0;
@@ -308,10 +316,9 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
       let rows = sourceRows;
       if (entry.table === "users") userRows = sourceRows;
       if (entry.table === "schedules") {
-        const reconciled = await reconcileScheduleIds(target, sourceRows);
+        scheduleSourceRows = sourceRows;
+        const reconciled = reconcileDuplicateSourceScheduleSlots(sourceRows);
         rows = reconciled.rows;
-        scheduleIds = reconciled.sourceToNative;
-        remappedScheduleSlots = reconciled.remapped;
         consolidatedScheduleDuplicates = reconciled.consolidatedSourceDuplicates;
       }
       if (entry.table === "substitution_requests") {
@@ -326,8 +333,20 @@ export async function importCurrentMescProductionData(mode: "dry-run" | "apply")
         for (let start = 0; start < rows.length; start += BATCH_SIZE) {
           const batch = rows.slice(start, start + BATCH_SIZE);
           await target.begin(async (transaction) => {
-            upserted += await upsertRows(transaction, entry.table, importColumns, batch);
+            upserted += await upsertRows(
+              transaction,
+              entry.table,
+              importColumns,
+              batch,
+              entry.table === "schedules"
+                ? ["community_id", "date", "time", "position"]
+                : undefined,
+            );
           });
+        }
+        if (entry.table === "schedules") {
+          scheduleIds = await resolveNativeScheduleIds(target, scheduleSourceRows);
+          remappedScheduleSlots = [...scheduleIds].filter(([sourceId, nativeId]) => sourceId !== nativeId).length;
         }
       }
 
