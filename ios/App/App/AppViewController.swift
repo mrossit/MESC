@@ -8935,7 +8935,8 @@ final class MESCNativeSessionStore {
 }
 
 enum MESCKeychain {
-    private static let service = "app.saojudastadeu.mesc.native"
+    // Keep TestFlight's legacy tokens isolated after the native session restoration crash.
+    private static let service = "app.saojudastadeu.mesc.native.v2"
 
     static func read(key: String) -> String? {
         let query: [String: Any] = [
