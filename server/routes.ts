@@ -25,6 +25,7 @@ import substitutionsRoutes from "./routes/substitutions";
 import massPendenciesRoutes from "./routes/mass-pendencies";
 import formationAdminRoutes from "./routes/formationAdmin";
 import dbBackfillRoutes from "./routes/dbBackfill";
+import currentMescDataImportRoutes from "./routes/currentMescDataImport";
 import versionRoutes from "./routes/version";
 import dashboardRoutes from "./routes/dashboard";
 import pushSubscriptionsRoutes from "./routes/pushSubscriptions";
@@ -74,6 +75,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // One-shot secret-guarded additive schema backfill (no auth/CSRF; gated by DB_BACKFILL_SECRET)
   app.use('/api/admin/db-backfill', dbBackfillRoutes);
+
+  // Temporary, token-gated live-data equalization. Disabled unless explicitly enabled.
+  app.use('/api/admin/native-current-data-import', currentMescDataImportRoutes);
 
   // Auth routes com rate limiting específico
   app.use('/api/auth', authRateLimiter, authRoutes);
