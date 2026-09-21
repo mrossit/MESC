@@ -332,11 +332,20 @@ final class MESCNativeAppModel: ObservableObject {
     }
 
     func restoreSessionIfNeeded() async {
-        await refreshDevicePermissions()
-
         guard sessionState == .checking else { return }
 
-        if sessionStore.accessToken == nil {
+        // A clean install has no session to restore. Keep the launch path limited to
+        // the login UI and defer device permission probes until after authentication.
+        let hasStoredAccessToken = sessionStore.accessToken != nil
+        let hasStoredRefreshToken = sessionStore.refreshToken != nil
+        guard hasStoredAccessToken || hasStoredRefreshToken else {
+            sessionState = .unauthenticated
+            return
+        }
+
+        await refreshDevicePermissions()
+
+        if !hasStoredAccessToken {
             if await refreshSession() {
                 do {
                     try await loadHomeAndSchedules()
