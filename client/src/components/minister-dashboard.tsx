@@ -472,7 +472,7 @@ export function MinisterDashboard({ userName }: MinisterDashboardProps) {
                       <Sparkles className="h-4 w-4 text-burgundy dark:text-amber-200" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium uppercase text-muted-foreground">Próxima missão</p>
+                      <p className="text-xs font-medium uppercase text-muted-foreground">Próxima escala</p>
                       <p className="text-sm font-semibold text-foreground">
                         {nextSchedule ? "Você está escalado" : "Sem escala próxima"}
                       </p>

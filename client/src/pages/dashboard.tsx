@@ -283,7 +283,7 @@ export default function Dashboard() {
 
   const getTitle = () => {
     if (isAdminRole(user?.role)) return "Central de Operações";
-    return "Minha Missão";
+    return "Meu Serviço";
   };
 
   const getSubtitle = () => {
