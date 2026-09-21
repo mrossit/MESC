@@ -206,6 +206,7 @@ export interface MobilePublicScheduleAssignment {
   scheduleDisplayName: string | null;
   source: "schedule" | "adoration";
   isCurrentUser: boolean;
+  canEditMass: boolean;
 }
 
 export interface MobilePublicScheduleMonth {
@@ -525,6 +526,43 @@ export interface MobileScheduleConfirmResponse {
     time: string;
     deepLink: string;
   };
+}
+
+export interface MobileScheduleEditorMinister {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
+export interface MobileScheduleEditorAssignment {
+  id: string;
+  scheduleId: string;
+  position: number;
+  ministerId: string | null;
+  ministerName: string | null;
+  scheduleDisplayName: string | null;
+}
+
+export interface MobileScheduleEditorResponse {
+  success: true;
+  community: MobileCommunity;
+  mass: {
+    date: string;
+    time: string;
+    type: string;
+    location: string | null;
+    assignments: MobileScheduleEditorAssignment[];
+  };
+  ministers: MobileScheduleEditorMinister[];
+}
+
+export interface MobileScheduleAssignmentUpdatePayload {
+  ministerId: string | null;
+}
+
+export interface MobileScheduleAssignmentUpdateResponse {
+  success: true;
+  assignment: MobileScheduleEditorAssignment;
 }
 
 export interface MobileSubstitution {
@@ -1108,6 +1146,7 @@ export const mobileEndpoints = {
     withQuery("/schedules/month", { month: input.month }),
   confirmSchedule: (id: string) => `/schedules/${encodePathSegment(id)}/confirm`,
   schedule: (id: string) => `/schedules/${encodePathSegment(id)}`,
+  scheduleEditor: (id: string) => `/schedules/${encodePathSegment(id)}/editor`,
   adminCommunityHome: (input: { month?: string } = {}) =>
     withQuery("/admin/community/home", { month: input.month }),
   adminScheduleReadiness: (input: { month?: string } = {}) =>
@@ -1467,6 +1506,27 @@ export class MescMobileApiClient {
     return this.request<MobileScheduleConfirmResponse>({
       method: "POST",
       path: mobileEndpoints.confirmSchedule(scheduleId),
+      body: payload,
+      ...options,
+    });
+  }
+
+  async getScheduleEditor(scheduleId: string, options: MobileClientRequestOptions = {}) {
+    return this.request<MobileScheduleEditorResponse>({
+      method: "GET",
+      path: mobileEndpoints.scheduleEditor(scheduleId),
+      ...options,
+    });
+  }
+
+  async updateScheduleAssignment(
+    scheduleId: string,
+    payload: MobileScheduleAssignmentUpdatePayload,
+    options: MobileClientRequestOptions,
+  ) {
+    return this.request<MobileScheduleAssignmentUpdateResponse>({
+      method: "PATCH",
+      path: mobileEndpoints.schedule(scheduleId),
       body: payload,
       ...options,
     });

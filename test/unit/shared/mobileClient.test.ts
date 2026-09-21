@@ -19,6 +19,8 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.submitQuestionnaire("questionnaire/with slash"))
       .toBe("/questionnaires/questionnaire%2Fwith%20slash/response");
     expect(mobileEndpoints.confirmSchedule("schedule-1")).toBe("/schedules/schedule-1/confirm");
+    expect(mobileEndpoints.scheduleEditor("schedule/with slash"))
+      .toBe("/schedules/schedule%2Fwith%20slash/editor");
     expect(mobileEndpoints.claimSubstitution("substitution/with slash"))
       .toBe("/substitutions/substitution%2Fwith%20slash/claim");
     expect(mobileEndpoints.notifications({ limit: 5 })).toBe("/notifications?limit=5");
@@ -53,6 +55,65 @@ describe("mobileClient contract", () => {
     expect(mobileEndpoints.adminQuestionnaireReminders("questionnaire/with slash"))
       .toBe("/admin/questionnaires/questionnaire%2Fwith%20slash/reminders");
     expect(mobileEndpoints.adminMinisters()).toBe("/admin/ministers");
+  });
+
+  it("uses authenticated mobile contracts for a P1/P2 mass editor", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const fetcher: MobileFetch = async (input, init) => {
+      requests.push({ input, init });
+      if (init?.method === "PATCH") {
+        return new Response(JSON.stringify({
+          success: true,
+          assignment: {
+            id: "schedule-1",
+            scheduleId: "schedule-1",
+            position: 3,
+            ministerId: "minister-2",
+            ministerName: "Ministro Dois",
+            scheduleDisplayName: "M. Dois",
+          },
+        }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        community: { id: "community-1", name: "Matriz", slug: "matriz", colorHex: null, parishName: null, isMatriz: true },
+        mass: {
+          date: "2026-07-05",
+          time: "08:00:00",
+          type: "missa",
+          location: "Igreja Matriz",
+          assignments: [],
+        },
+        ministers: [],
+      }), { status: 200 });
+    };
+    const client = new MescMobileApiClient({
+      baseUrl: "https://example.test",
+      accessToken: "access-token-1",
+      communityId: "community-1",
+      deviceId: "ios-device-1",
+      platform: "ios",
+      fetch: fetcher,
+    });
+
+    await client.getScheduleEditor("schedule-1");
+    await client.updateScheduleAssignment("schedule-1", { ministerId: "minister-2" }, {
+      idempotencyKey: "11111111-1111-4111-8111-111111111111",
+    });
+
+    expect(requests[0].input).toBe("https://example.test/api/mobile/v1/schedules/schedule-1/editor");
+    expect(requests[0].init.headers).toMatchObject({
+      Authorization: "Bearer access-token-1",
+      "X-Community-Id": "community-1",
+      "X-Device-Id": "ios-device-1",
+    });
+    expect(requests[1].input).toBe("https://example.test/api/mobile/v1/schedules/schedule-1");
+    expect(requests[1].init.method).toBe("PATCH");
+    expect(requests[1].init.headers).toMatchObject({
+      [MOBILE_IDEMPOTENCY_HEADER]: "11111111-1111-4111-8111-111111111111",
+      "Content-Type": "application/json",
+    });
   });
 
   it("sends native contract headers and stores auth state after login", async () => {

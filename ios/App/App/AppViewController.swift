@@ -115,6 +115,7 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var activeCommunity: MobileCommunityDTO?
     @Published var missionHome: MobileMissionHomeDTO?
     @Published var scheduleMonth: MobileScheduleMonthDTO?
+    @Published var scheduleEditor: MobileScheduleEditorDTO?
     @Published var questionnaireCurrent: MobileQuestionnaireCurrentDTO?
     @Published var formationOverview: MobileFormationOverviewDTO?
     @Published var formationLessonDetail: MobileFormationLessonDetailDTO?
@@ -140,6 +141,9 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var coordinatorMessage: String?
     @Published var scheduleActionMessage: String?
     @Published var isMutatingSchedule = false
+    @Published var isLoadingScheduleEditor = false
+    @Published var isSavingScheduleEditor = false
+    @Published var scheduleEditorMessage: String?
     @Published var substitutions: [MobileSubstitutionDTO] = []
     @Published var isLoadingSubstitutions = false
     @Published var substitutionMessage: String?
@@ -438,6 +442,7 @@ final class MESCNativeAppModel: ObservableObject {
         activeCommunity = nil
         missionHome = nil
         scheduleMonth = nil
+        scheduleEditor = nil
         questionnaireCurrent = nil
         formationOverview = nil
         formationLessonDetail = nil
@@ -555,33 +560,19 @@ final class MESCNativeAppModel: ObservableObject {
         let startDate = Self.monthStartDate(from: scheduleMonth.month) ?? ScheduleFixtures.monthDate
         let dayRange = Calendar.current.range(of: .day, in: .month, for: startDate) ?? 1..<32
 
-        let missionsByDay: [Int: [ScheduleMission]]
+        let publicMissions = buildPublicScheduleMissions(
+            from: scheduleMonth.publicSchedule.assignments,
+            ownSchedules: scheduleMonth.schedules
+        )
+        let visibleMissions: [ScheduleMission]
         switch mode {
-        case .full:
-            missionsByDay = Dictionary(grouping: buildPublicScheduleMissions(from: scheduleMonth.publicSchedule.assignments), by: \.dayNumber)
-                .mapValues { $0.sorted { $0.time < $1.time } }
-        case .mine, .month:
-            missionsByDay = Dictionary(grouping: scheduleMonth.schedules.compactMap { schedule -> ScheduleMission? in
-                guard let date = Self.parseDate(schedule.date), let day = Calendar.current.dateComponents([.day], from: date).day else {
-                    return nil
-                }
-                return ScheduleMission(
-                    id: schedule.id,
-                    scheduleId: schedule.id,
-                    dayNumber: day,
-                    time: Self.timeLabel(schedule.time),
-                    title: Self.scheduleTitle(type: schedule.type),
-                    community: schedule.location ?? activeCommunity?.name ?? scheduleMonth.community.name,
-                    role: Self.positionLabel(schedule.position),
-                    ministers: [user?.name ?? firstName],
-                    confirmationStatus: schedule.confirmationStatus,
-                    canConfirm: schedule.canConfirm ?? false,
-                    canRequestSubstitution: schedule.canRequestSubstitution ?? false,
-                    isCurrentUser: true
-                )
-            }, by: \.dayNumber)
-            .mapValues { $0.sorted { $0.time < $1.time } }
+        case .mine:
+            visibleMissions = publicMissions.filter(\.isCurrentUser)
+        case .month, .full:
+            visibleMissions = publicMissions
         }
+        let missionsByDay = Dictionary(grouping: visibleMissions, by: \.dayNumber)
+            .mapValues { $0.sorted { $0.time < $1.time } }
 
         return dayRange.compactMap { day -> ScheduleDay? in
             guard let date = Calendar.current.date(byAdding: .day, value: day - 1, to: startDate) else { return nil }
@@ -921,6 +912,7 @@ final class MESCNativeAppModel: ObservableObject {
 
         let html = Self.officialScheduleHTML(
             monthLabel: currentMonthLabel,
+            monthKey: scheduleMonth.month,
             communityName: scheduleMonth.community.name,
             assignments: scheduleMonth.publicSchedule.assignments
         )
@@ -928,6 +920,93 @@ final class MESCNativeAppModel: ObservableObject {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
         try html.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+
+    func loadScheduleEditor(scheduleId: String) async {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isLoadingScheduleEditor = true
+        scheduleEditor = nil
+        scheduleEditorMessage = nil
+        do {
+            scheduleEditor = try await client.scheduleEditor(
+                scheduleId: scheduleId,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    scheduleEditor = try await client.scheduleEditor(
+                        scheduleId: scheduleId,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                } catch {
+                    scheduleEditorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                scheduleEditorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+        isLoadingScheduleEditor = false
+    }
+
+    func updateScheduleAssignment(scheduleId: String, ministerId: String?) async -> Bool {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        isSavingScheduleEditor = true
+        scheduleEditorMessage = nil
+        let idempotencyKey = UUID().uuidString
+        do {
+            _ = try await client.updateScheduleAssignment(
+                scheduleId: scheduleId,
+                ministerId: ministerId,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+            await reload()
+            scheduleEditorMessage = "Escala atualizada."
+            isSavingScheduleEditor = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    _ = try await client.updateScheduleAssignment(
+                        scheduleId: scheduleId,
+                        ministerId: ministerId,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId,
+                        idempotencyKey: idempotencyKey
+                    )
+                    await reload()
+                    scheduleEditorMessage = "Escala atualizada."
+                    isSavingScheduleEditor = false
+                    return true
+                } catch {
+                    scheduleEditorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                scheduleEditorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+        isSavingScheduleEditor = false
+        return false
     }
 
     func shiftScheduleMonth(by monthDelta: Int) async {
@@ -1937,12 +2016,16 @@ final class MESCNativeAppModel: ObservableObject {
         })?.id
     }
 
-    private func buildPublicScheduleMissions(from assignments: [MobilePublicScheduleAssignmentDTO]) -> [ScheduleMission] {
+    private func buildPublicScheduleMissions(
+        from assignments: [MobilePublicScheduleAssignmentDTO],
+        ownSchedules: [MobileMissionScheduleDTO]
+    ) -> [ScheduleMission] {
+        let ownScheduleById = Dictionary(uniqueKeysWithValues: ownSchedules.map { ($0.id, $0) })
         let grouped = Dictionary(grouping: assignments) { assignment in
             "\(assignment.date)|\(assignment.time)|\(assignment.type)|\(assignment.location ?? "")"
         }
 
-        return grouped.values.compactMap { group in
+        return grouped.values.compactMap { group -> ScheduleMission? in
             guard let first = group.first,
                   let date = Self.parseDate(first.date),
                   let day = Calendar.current.dateComponents([.day], from: date).day
@@ -1950,65 +2033,87 @@ final class MESCNativeAppModel: ObservableObject {
                 return nil
             }
 
-            let ministers = group
+            let positions = group
                 .sorted { $0.position < $1.position }
                 .map { assignment in
                     let name = assignment.scheduleDisplayName ?? assignment.ministerName ?? "Vaga"
-                    return "\(Self.positionLabel(assignment.position)): \(name)"
+                    return SchedulePosition(
+                        id: assignment.id,
+                        scheduleId: assignment.scheduleId,
+                        position: assignment.position,
+                        displayName: name,
+                        isCurrentUser: assignment.isCurrentUser,
+                        isVacant: assignment.ministerId == nil,
+                        source: assignment.source
+                    )
                 }
+            let currentAssignment = group.first(where: { $0.isCurrentUser })
+            let ownSchedule = currentAssignment.flatMap { ownScheduleById[$0.scheduleId] }
 
             return ScheduleMission(
                 id: "\(first.date)-\(first.time)-\(first.location ?? "")",
-                scheduleId: nil,
+                scheduleId: currentAssignment?.scheduleId ?? first.scheduleId,
                 dayNumber: day,
                 time: Self.timeLabel(first.time),
                 title: Self.scheduleTitle(type: first.type),
                 community: first.location ?? activeCommunity?.name ?? "Comunidade",
-                role: group.first(where: { $0.isCurrentUser }).map { Self.positionLabel($0.position) } ?? "\(group.count) ministros",
-                ministers: ministers,
-                confirmationStatus: nil,
-                canConfirm: false,
-                canRequestSubstitution: false,
-                isCurrentUser: group.contains { $0.isCurrentUser }
+                role: currentAssignment.map { Self.positionDisplayLabel($0.position) } ?? "\(positions.count) ministros escalados",
+                ministers: positions.map { "\($0.positionLabel): \($0.displayName)" },
+                confirmationStatus: ownSchedule?.confirmationStatus,
+                canConfirm: ownSchedule?.canConfirm ?? false,
+                canRequestSubstitution: ownSchedule?.canRequestSubstitution ?? false,
+                isCurrentUser: currentAssignment != nil,
+                positions: positions,
+                canEditMass: group.contains { $0.canEditMass == true && $0.source == "schedule" }
             )
         }
     }
 
     private static func officialScheduleHTML(
         monthLabel: String,
+        monthKey: String,
         communityName: String,
         assignments: [MobilePublicScheduleAssignmentDTO]
     ) -> String {
-        let grouped = Dictionary(grouping: assignments) { assignment in
-            "\(assignment.date)|\(timeLabel(assignment.time))|\(scheduleTitle(type: assignment.type))|\(assignment.location ?? communityName)"
+        let positionGroups: [(name: String, positions: [Int])] = [
+            ("AUXILIAR", [1, 2]), ("RECOLHER", [3, 4]), ("VELAS", [5, 6]),
+            ("ADORAÇÃO/FILA", [7, 8]), ("PURIFICAR/EXPOR", [9, 10, 11, 12]),
+            ("MEZANINO", [13, 14, 15]), ("CORREDOR AMBÃO", [16]), ("CORREDOR CAPELA", [17]),
+            ("CORREDOR CADEIRAS", [18]), ("NAVE CENTRAL PE. PIO", [19]),
+            ("NAVE CENTRAL LADO MÚSICOS", [20, 21]), ("NAVE CENTRAL AMBÃO", [22]),
+            ("NAVE CENTRAL CAPELA", [23]), ("ÁTRIO EXTERNO", [24, 25, 26, 27, 28]),
+        ]
+        let namesByMassAndPosition = Dictionary(grouping: assignments) { assignment in
+            "\(assignment.date)|\(timeLabel(assignment.time))"
         }
-        let sortedGroups = grouped.keys.sorted()
-        let maxPosition = max(28, assignments.map(\.position).max() ?? 0)
-        let headerCells = (1...maxPosition).map { "<th>P\($0)</th>" }.joined()
+        let startDate = monthStartDate(from: monthKey) ?? Date()
+        let dayRange = Calendar.current.range(of: .day, in: .month, for: startDate) ?? 1..<32
+        let headerGroups = positionGroups.map { "<th colspan=\"\($0.positions.count)\">\($0.name)</th>" }.joined()
+        let headerPositions = positionGroups.flatMap(\.positions).map { "<th>\($0)</th>" }.joined()
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "pt_BR")
+        dateFormatter.dateFormat = "EEEE"
+        let rows = dayRange.flatMap { day -> [String] in
+            guard let date = Calendar.current.date(bySetting: .day, value: day, of: startDate) else { return [] }
+            let dateKey = Self.isoDate(date)
+            let assignedTimes = assignments
+                .filter { $0.date == dateKey }
+                .map { timeLabel($0.time) }
+            let times = Array(Set(officialMassTimes(for: date) + assignedTimes)).sorted()
 
-        let bodyRows = sortedGroups.map { key -> String in
-            let parts = key.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-            let group = grouped[key] ?? []
-            var namesByPosition: [Int: String] = [:]
-            for assignment in group {
-                let name = assignment.scheduleDisplayName ?? assignment.ministerName ?? "VACANTE"
-                namesByPosition[assignment.position] = escapeHTML(name)
+            return times.map { time in
+                let group = namesByMassAndPosition["\(dateKey)|\(time)"] ?? []
+                let namesByPosition = Dictionary(uniqueKeysWithValues: group.map { assignment in
+                    (assignment.position, escapeHTML(assignment.scheduleDisplayName ?? assignment.ministerName ?? ""))
+                })
+                let cells = (1...28).map { "<td>\(namesByPosition[$0] ?? "")</td>" }.joined()
+                let colors = officialMassColors(for: date, time: time)
+                return "<tr style=\"background-color: \(colors.background); color: \(colors.text);\"><td>\(day)</td><td>\(escapeHTML(dateFormatter.string(from: date)))</td><td>\(time)</td>\(cells)</tr>"
             }
-
-            let ministerCells = (1...maxPosition)
-                .map { "<td>\(namesByPosition[$0] ?? "")</td>" }
-                .joined()
-
-            return """
-            <tr>
-              <td>\(escapeHTML(parts[safe: 0] ?? ""))</td>
-              <td>\(escapeHTML(parts[safe: 1] ?? ""))</td>
-              <td>\(escapeHTML(parts[safe: 2] ?? ""))</td>
-              <td>\(escapeHTML(parts[safe: 3] ?? ""))</td>
-              \(ministerCells)
-            </tr>
-            """
         }.joined(separator: "\n")
+        let logoHTML = UIImage(named: "Splash")?.pngData().map {
+            "<img src=\"data:image/png;base64,\($0.base64EncodedString())\" alt=\"MESC\" class=\"logo\">"
+        } ?? ""
 
         return """
         <!doctype html>
@@ -2016,31 +2121,83 @@ final class MESCNativeAppModel: ObservableObject {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Escala MESC - \(escapeHTML(monthLabel))</title>
+          <title>Escala - \(escapeHTML(monthLabel))</title>
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px; color: #2C2C2C; }
-            h1 { font-family: Georgia, serif; color: #722F37; margin-bottom: 4px; }
-            p { margin-top: 0; color: #666; }
-            table { border-collapse: collapse; width: 100%; font-size: 12px; }
-            th { background: #722F37; color: white; }
-            th, td { border: 1px solid #D7C7A1; padding: 6px 7px; text-align: left; vertical-align: top; }
-            tr:nth-child(even) td { background: #FDFBF7; }
+            body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #2C2C2C; }
+            .header { display: flex; align-items: center; justify-content: center; margin: 16px 0 10px; position: relative; min-height: 64px; }
+            .logo { position: absolute; left: 14px; width: 58px; height: 58px; object-fit: cover; object-position: center 33%; border-radius: 10px; }
+            h1 { text-align: center; font-size: 18px; margin: 0; }
+            .community { text-align: center; margin: 0 0 12px; color: #595959; }
+            .legend { display: flex; justify-content: center; gap: 15px; margin: 12px 0; font-size: 10px; flex-wrap: wrap; }
+            .legend span { display: inline-flex; align-items: center; gap: 5px; }
+            .legend i { width: 11px; height: 11px; border: 1px solid #777; display: inline-block; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th, td { border: 1px solid #000; padding: 5px 4px; text-align: left; vertical-align: middle; }
+            th { background-color: #e0e0e0; font-weight: bold; text-align: center; font-size: 9px; }
+            td { font-size: 9px; min-width: 42px; }
+            td:nth-child(-n+3) { font-weight: 600; min-width: auto; white-space: nowrap; }
+            @media print { @page { size: A3 landscape; margin: 0.5cm; } body { margin: 0; font-size: 8px; } th, td { padding: 2px 3px; font-size: 7px; } .logo { width: 46px; height: 46px; } }
           </style>
         </head>
         <body>
-          <h1>Escala MESC - \(escapeHTML(monthLabel))</h1>
-          <p>\(escapeHTML(communityName))</p>
+          <div class="header">\(logoHTML)<h1>SANTUÁRIO SÃO JUDAS TADEU - \(escapeHTML(monthLabel.uppercased()))</h1></div>
+          <p class="community">\(escapeHTML(communityName))</p>
+          <div class="legend">
+            <span><i style="background:#c5c6c8"></i>Missa Diária</span><span><i style="background:#ffda9e"></i>Missa Dominical</span><span><i style="background:#d4b5e8"></i>Adoração ao Santíssimo</span><span><i style="background:#b2e2f2"></i>Cura e Libertação</span><span><i style="background:#fabfb7"></i>Sagrado Coração de Jesus</span><span><i style="background:#e3b1c8"></i>Imaculado Coração de Maria</span><span><i style="background:#fdf9c4"></i>Novena de Outubro</span>
+          </div>
           <table>
             <thead>
-              <tr><th>Data</th><th>Hora</th><th>Tipo</th><th>Local</th>\(headerCells)</tr>
+              <tr><th rowspan="2">Data</th><th rowspan="2">Dia</th><th rowspan="2">Hora</th>\(headerGroups)</tr>
+              <tr>\(headerPositions)</tr>
             </thead>
             <tbody>
-              \(bodyRows.isEmpty ? "<tr><td colspan=\"\(maxPosition + 4)\">Sem escala publicada para este mês.</td></tr>" : bodyRows)
+              \(rows.isEmpty ? "<tr><td colspan=\"31\">Sem escala publicada para este mês.</td></tr>" : rows)
             </tbody>
           </table>
         </body>
         </html>
         """
+    }
+
+    private static func officialMassTimes(for date: Date) -> [String] {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+        let day = calendar.component(.day, from: date)
+        let month = calendar.component(.month, from: date)
+        let firstWeek = (1...7).contains(day)
+
+        if month == 10 && (20...27).contains(day) {
+            if weekday >= 2 && weekday <= 6 { return ["19:30"] }
+            if weekday == 7 { return ["19:00"] }
+        }
+        if weekday == 1 { return ["08:00", "10:00", "19:00"] }
+
+        var times = ["06:30"]
+        if weekday == 5 && firstWeek { times.append("19:30") }
+        return times
+    }
+
+    private static func officialMassColors(for date: Date, time: String) -> (background: String, text: String) {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+        let day = calendar.component(.day, from: date)
+        let month = calendar.component(.month, from: date)
+        let firstWeek = (1...7).contains(day)
+        if month == 10 && (20...27).contains(day) { return ("#fdf9c4", "#8B7500") }
+        if weekday == 1 { return ("#ffda9e", "#8B5A00") }
+        if weekday == 2 && time == "22:00" { return ("#d4b5e8", "#5B2C6F") }
+        if weekday == 5 && firstWeek && time == "19:30" { return ("#b2e2f2", "#0D5F7F") }
+        if weekday == 6 && firstWeek { return ("#fabfb7", "#8B3A3A") }
+        if weekday == 7 && firstWeek { return ("#e3b1c8", "#6B2D5C") }
+        return ("#c5c6c8", "#2C2C2C")
+    }
+
+    private static func isoDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     private static func escapeHTML(_ value: String) -> String {
@@ -2143,9 +2300,28 @@ final class MESCNativeAppModel: ObservableObject {
         }
     }
 
-    static func positionLabel(_ position: Int?) -> String {
+    nonisolated static func positionLabel(_ position: Int?) -> String {
         guard let position, position > 0 else { return "Ministro" }
         return "P\(position)"
+    }
+
+    nonisolated static func positionDisplayLabel(_ position: Int?) -> String {
+        guard let position, position > 0 else { return "Ministro" }
+        return "P\(position) - \(positionDescription(position))"
+    }
+
+    nonisolated static func positionDescription(_ position: Int) -> String {
+        let descriptions = [
+            1: "Auxiliar 1", 2: "Auxiliar 2", 3: "Recolher 1", 4: "Recolher 2",
+            5: "Velas 1", 6: "Velas 2", 7: "Adoração/Fila 1", 8: "Adoração/Fila 2",
+            9: "Purificar/Expor 1", 10: "Purificar/Expor 2", 11: "Purificar/Expor 3", 12: "Purificar/Expor 4",
+            13: "Mezanino 1", 14: "Mezanino 2", 15: "Mezanino 3", 16: "Corredor Ambão",
+            17: "Corredor Capela", 18: "Corredor Cadeiras", 19: "Nave Central Pe. Pio",
+            20: "Nave Central Lado Músicos 1", 21: "Nave Central Lado Músicos 2", 22: "Nave Central Ambão",
+            23: "Nave Central Capela", 24: "Átrio Externo 1", 25: "Átrio Externo 2", 26: "Átrio Externo 3",
+            27: "Átrio Externo 4", 28: "Átrio Externo 5",
+        ]
+        return descriptions[position] ?? "Posição \(position)"
     }
 }
 
@@ -2576,7 +2752,7 @@ struct MissionScreen: View {
     var body: some View {
         let mission = appModel.missionHome?.nextMission
 
-        MESCScrollScreen(title: "Seu serviço", subtitle: "Paz e bem, \(appModel.firstName)") {
+        MESCScrollScreen(title: "Ministrare", subtitle: "Paz e bem, \(appModel.firstName)") {
             if appModel.isUsingFallbackData {
                 FallbackBanner()
             }
@@ -2629,10 +2805,7 @@ struct MissionScreen: View {
                 }
             }
 
-            HStack(spacing: 12) {
-                StatusPill(title: questionnaireStatus, symbol: "list.bullet.clipboard", tint: MESCColor.gold)
-                StatusPill(title: noticesStatus, symbol: "bell", tint: MESCColor.accent)
-            }
+            StatusPill(title: questionnaireStatus, symbol: "list.bullet.clipboard", tint: MESCColor.gold)
 
             if let questionnaire = appModel.activeQuestionnaire {
                 GlassPanel(spacing: 14) {
@@ -2658,7 +2831,7 @@ struct MissionScreen: View {
             }
 
             GlassPanel(spacing: 12) {
-                SectionTitle(title: "Pendências e avisos", symbol: "bell.badge")
+                SectionTitle(title: "Para acompanhar", symbol: "checklist")
                 let pendingActions = appModel.missionHome?.pendingActions ?? []
                 let notices = appModel.missionHome?.notices ?? []
 
@@ -2701,11 +2874,6 @@ struct MissionScreen: View {
     private var questionnaireStatus: String {
         let hasQuestionnaire = appModel.missionHome?.pendingActions.contains { $0.type == "questionnaire" } ?? true
         return hasQuestionnaire ? "Questionário aberto" : "Questionário em dia"
-    }
-
-    private var noticesStatus: String {
-        let count = appModel.unreadNotificationsCount
-        return count == 1 ? "1 aviso" : "\(count) avisos"
     }
 
     private func presentQuestionnaireIfRequested() {
@@ -3029,13 +3197,15 @@ struct SubstitutionCenterSheet: View {
                             SectionTitle(title: "Pedidos abertos", symbol: "person.2.badge.gearshape")
                                 .padding(.horizontal, 4)
 
-                            ForEach(openRequests) { substitution in
-                                SubstitutionRow(
-                                    substitution: substitution,
-                                    isOwnRequest: false,
-                                    canClaim: true
-                                ) {
-                                    substitutionToClaim = substitution
+                            ForEach(compactedGroups(openRequests)) { group in
+                                SubstitutionRequestGroupCard(group: group) { substitution in
+                                    SubstitutionRow(
+                                        substitution: substitution,
+                                        isOwnRequest: false,
+                                        canClaim: true
+                                    ) {
+                                        substitutionToClaim = substitution
+                                    }
                                 }
                             }
                         }
@@ -3044,12 +3214,14 @@ struct SubstitutionCenterSheet: View {
                             SectionTitle(title: "Meus pedidos", symbol: "clock.arrow.circlepath")
                                 .padding(.horizontal, 4)
 
-                            ForEach(myRequests) { substitution in
-                                SubstitutionRow(
-                                    substitution: substitution,
-                                    isOwnRequest: true,
-                                    canClaim: false
-                                )
+                            ForEach(compactedGroups(myRequests)) { group in
+                                SubstitutionRequestGroupCard(group: group) { substitution in
+                                    SubstitutionRow(
+                                        substitution: substitution,
+                                        isOwnRequest: true,
+                                        canClaim: false
+                                    )
+                                }
                             }
                         }
 
@@ -3057,12 +3229,14 @@ struct SubstitutionCenterSheet: View {
                             SectionTitle(title: "Escalas que assumi", symbol: "checkmark.circle")
                                 .padding(.horizontal, 4)
 
-                            ForEach(acceptedRequests) { substitution in
-                                SubstitutionRow(
-                                    substitution: substitution,
-                                    isOwnRequest: false,
-                                    canClaim: false
-                                )
+                            ForEach(compactedGroups(acceptedRequests)) { group in
+                                SubstitutionRequestGroupCard(group: group) { substitution in
+                                    SubstitutionRow(
+                                        substitution: substitution,
+                                        isOwnRequest: false,
+                                        canClaim: false
+                                    )
+                                }
                             }
                         }
 
@@ -3117,6 +3291,83 @@ struct SubstitutionCenterSheet: View {
     private func canClaim(_ substitution: MobileSubstitutionDTO) -> Bool {
         let isOpen = substitution.status == "available" || (substitution.status == "pending" && substitution.substituteId == nil)
         return isOpen && substitution.requesterId != currentUserId
+    }
+
+    private func compactedGroups(_ substitutions: [MobileSubstitutionDTO]) -> [SubstitutionRequestGroup] {
+        let grouped = Dictionary(grouping: substitutions) { substitution in
+            "\(substitution.schedule.date)|\(substitution.schedule.time)"
+        }
+
+        return grouped.values.compactMap { requests in
+            guard let first = requests.first else { return nil }
+            return SubstitutionRequestGroup(
+                id: "\(first.schedule.date)|\(first.schedule.time)",
+                date: first.schedule.date,
+                time: first.schedule.time,
+                requests: requests.sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
+            )
+        }
+        .sorted {
+            let dateComparison = $0.date.localizedCompare($1.date)
+            return dateComparison == .orderedSame ? $0.time < $1.time : dateComparison == .orderedAscending
+        }
+    }
+}
+
+struct SubstitutionRequestGroup: Identifiable {
+    let id: String
+    let date: String
+    let time: String
+    let requests: [MobileSubstitutionDTO]
+}
+
+struct SubstitutionRequestGroupCard<Content: View>: View {
+    let group: SubstitutionRequestGroup
+    @ViewBuilder let content: (MobileSubstitutionDTO) -> Content
+    @State private var isExpanded: Bool
+
+    init(group: SubstitutionRequestGroup, @ViewBuilder content: @escaping (MobileSubstitutionDTO) -> Content) {
+        self.group = group
+        self.content = content
+        _isExpanded = State(initialValue: group.requests.count == 1)
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SymbolTile(symbol: "calendar.badge.clock", tint: MESCColor.gold)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(MESCNativeAppModel.scheduleDateTitle(date: group.date))
+                            .font(MESCFont.body.weight(.semibold))
+                        Text("às \(MESCNativeAppModel.timeLabel(group.time))")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    Spacer()
+                    Text(group.requests.count == 1 ? "1 pedido" : "\(group.requests.count) pedidos")
+                        .font(MESCFont.caption.weight(.semibold))
+                        .foregroundStyle(MESCColor.accent)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(MESCColor.accent)
+                }
+                .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .mescGlass(cornerRadius: 20)
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                ForEach(group.requests) { request in
+                    content(request)
+                }
+            }
+        }
     }
 }
 
@@ -3481,11 +3732,12 @@ enum ScheduleMode: String, CaseIterable, Identifiable {
 
 struct SchedulesScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
-    @State private var mode: ScheduleMode = .mine
+    @State private var mode: ScheduleMode = .month
     @State private var selectedDayNumber = Calendar.current.component(.day, from: Date())
     @State private var substitutionTarget: SubstitutionTarget?
     @State private var isSubstitutionCenterPresented = false
     @State private var shareFile: ShareFile?
+    @State private var scheduleDetail: ScheduleMission?
 
     var body: some View {
         let days = appModel.scheduleDays(for: mode)
@@ -3536,7 +3788,11 @@ struct SchedulesScreen: View {
                 HStack(spacing: 10) {
                     StatusPill(title: "\(scheduledDaysCount) dias", symbol: "calendar.badge.checkmark", tint: MESCColor.accent)
                     StatusPill(title: "\(totalMissionsCount) missas", symbol: "list.bullet.clipboard", tint: MESCColor.gold)
-                    StatusPill(title: "\(pendingConfirmationCount) pend.", symbol: "clock.badge", tint: pendingConfirmationCount == 0 ? MESCColor.textSecondary : MESCColor.primaryWine)
+                    StatusPill(
+                        title: pendingConfirmationCount == 0 ? "Em dia" : "\(pendingConfirmationCount) para confirmar",
+                        symbol: pendingConfirmationCount == 0 ? "checkmark.circle" : "clock.badge",
+                        tint: pendingConfirmationCount == 0 ? MESCColor.accent : MESCColor.primaryWine
+                    )
                 }
 
                 CalendarMonthGrid(
@@ -3560,6 +3816,9 @@ struct SchedulesScreen: View {
                         title: "\(selectedDay.formattedTitle) às \(mission.time)",
                         subtitle: "\(mission.title) - \(mission.community)"
                     )
+                },
+                onOpenDetails: { mission in
+                    scheduleDetail = mission
                 }
             )
 
@@ -3590,6 +3849,24 @@ struct SchedulesScreen: View {
         }
         .sheet(item: $shareFile) { file in
             ActivityView(activityItems: [file.url])
+        }
+        .sheet(item: $scheduleDetail) { mission in
+            ScheduleMassDetailSheet(
+                mission: mission,
+                dayTitle: selectedDay.formattedTitle,
+                onConfirm: mission.canConfirm && mission.isCurrentUser ? {
+                    Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
+                } : nil,
+                onRequestSubstitution: mission.canRequestSubstitution && mission.isCurrentUser ? {
+                    substitutionTarget = SubstitutionTarget(
+                        id: mission.id,
+                        scheduleId: mission.scheduleId ?? mission.id,
+                        title: "\(selectedDay.formattedTitle) às \(mission.time)",
+                        subtitle: "\(mission.title) - \(mission.community)"
+                    )
+                } : nil
+            )
+            .environmentObject(appModel)
         }
         .task {
             await appModel.loadSubstitutions()
@@ -3628,6 +3905,7 @@ struct ScheduleDayPanel: View {
     let mode: ScheduleMode
     let onConfirm: (ScheduleMission) -> Void
     let onRequestSubstitution: (ScheduleMission) -> Void
+    let onOpenDetails: (ScheduleMission) -> Void
 
     var body: some View {
         GlassPanel(spacing: 14) {
@@ -3651,13 +3929,9 @@ struct ScheduleDayPanel: View {
                     ForEach(day.missions) { mission in
                         ScheduleMissionRow(
                             mission: mission,
-                            mode: mode,
-                            onConfirm: mission.canConfirm && mission.scheduleId != nil ? {
-                                onConfirm(mission)
-                            } : nil,
-                            onRequestSubstitution: mission.canRequestSubstitution && mission.scheduleId != nil ? {
-                                onRequestSubstitution(mission)
-                            } : nil
+                            onOpenDetails: {
+                                onOpenDetails(mission)
+                            }
                         )
                     }
                 }
@@ -4014,9 +4288,9 @@ struct FormationModuleRow: View {
                                 .font(MESCFont.subheadline.weight(.semibold))
                                 .foregroundStyle(MESCColor.textPrimary)
                                 .lineLimit(2)
-                            Text("Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " - \($0) min" } ?? "")")
+                            Text("\(statusTitle(for: lesson)) - Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " - \($0) min" } ?? "")")
                                 .font(MESCFont.caption2)
-                                .foregroundStyle(MESCColor.textSecondary)
+                                .foregroundStyle(statusTint(for: lesson))
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -4030,6 +4304,22 @@ struct FormationModuleRow: View {
         }
         .padding(14)
         .background(MESCColor.surface.opacity(0.68), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func statusTitle(for lesson: MobileFormationLessonDTO) -> String {
+        switch lesson.progress?.status {
+        case "completed": return "Concluída"
+        case "in_progress": return "Em andamento"
+        default: return "Não iniciada"
+        }
+    }
+
+    private func statusTint(for lesson: MobileFormationLessonDTO) -> Color {
+        switch lesson.progress?.status {
+        case "completed": return MESCColor.accent
+        case "in_progress": return MESCColor.gold
+        default: return MESCColor.textSecondary
+        }
     }
 }
 
@@ -5440,6 +5730,7 @@ struct MESCScrollScreen<Content: View>: View {
     let title: String
     let subtitle: String
     @ViewBuilder let content: Content
+    @State private var isCommunityIdentityPresented = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -5460,8 +5751,13 @@ struct MESCScrollScreen<Content: View>: View {
                         appModel.isNotificationCenterPresented = true
                     }
 
-                    MESCLogoMark(size: 44, cornerRadius: 16)
-                        .accessibilityLabel("MESC São Judas Tadeu")
+                    Button {
+                        isCommunityIdentityPresented = true
+                    } label: {
+                        MESCLogoMark(size: 44, cornerRadius: 16, focalMark: true)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Identidade e comunidade ativa do MESC")
                 }
                 .padding(16)
                 .mescGlass(cornerRadius: 24, intensity: .floating)
@@ -5471,6 +5767,64 @@ struct MESCScrollScreen<Content: View>: View {
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 28)
+        }
+        .sheet(isPresented: $isCommunityIdentityPresented) {
+            MESCCommunityIdentitySheet()
+                .environmentObject(appModel)
+        }
+    }
+}
+
+struct MESCCommunityIdentitySheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Text("MESC São Judas Tadeu")
+                        .font(MESCFont.cardTitle)
+                    Spacer()
+                    MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar identidade do MESC") {
+                        dismiss()
+                    }
+                }
+
+                HStack(spacing: 18) {
+                    MESCLogoMark(size: 88, cornerRadius: 28)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Ministrar é servir")
+                            .font(MESCFont.title2)
+                        Text("Ministério Extraordinário da Sagrada Comunhão")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                GlassPanel(spacing: 6) {
+                    Text("Comunidade ativa")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.accent)
+                    Text(appModel.activeCommunity?.name ?? "Comunidade MESC")
+                        .font(MESCFont.cardTitle)
+                    if let parish = appModel.activeCommunity?.parishName, !parish.isEmpty {
+                        Text(parish)
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                }
+
+                MESCSecondaryButton(title: "Atualizar informações", symbol: "arrow.clockwise") {
+                    Task { await appModel.reload() }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(22)
         }
     }
 }
@@ -5681,11 +6035,14 @@ struct MESCNotificationRow: View {
 struct MESCLogoMark: View {
     let size: CGFloat
     let cornerRadius: CGFloat
+    var focalMark = false
 
     var body: some View {
         Image("Splash")
             .resizable()
             .scaledToFill()
+            .scaleEffect(focalMark ? 1.65 : 1)
+            .offset(y: focalMark ? size * 0.34 : 0)
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
@@ -5939,94 +6296,350 @@ struct NoticeSummaryRow: View {
 
 struct ScheduleMissionRow: View {
     let mission: ScheduleMission
-    let mode: ScheduleMode
-    var onConfirm: (() -> Void)?
-    var onRequestSubstitution: (() -> Void)?
+    let onOpenDetails: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 4) {
-                Text(mission.time)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(MESCColor.accent)
-                Image(systemName: mission.isCurrentUser ? "person.crop.circle.badge.checkmark" : "calendar")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(mission.isCurrentUser ? MESCColor.gold : MESCColor.textSecondary)
-            }
-            .frame(width: 54)
+        Button(action: onOpenDetails) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(spacing: 5) {
+                    Text(mission.time)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(MESCColor.accent)
+                    Image(systemName: mission.isCurrentUser ? "person.crop.circle.badge.checkmark" : "person.2")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(mission.isCurrentUser ? MESCColor.gold : MESCColor.textSecondary)
+                }
+                .frame(width: 54)
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(mission.title)
-                        .font(MESCFont.cardTitle)
-                        .foregroundStyle(MESCColor.textPrimary)
-                    Spacer()
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(mission.title)
+                            .font(MESCFont.cardTitle)
+                            .foregroundStyle(MESCColor.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(MESCColor.accent)
+                    }
+
                     Text(mission.community)
-                        .font(MESCFont.caption2)
+                        .font(MESCFont.caption)
                         .foregroundStyle(MESCColor.textSecondary)
                         .lineLimit(1)
-                }
 
-                Text(mode == .full ? mission.ministers.joined(separator: " • ") : mission.role)
-                    .font(MESCFont.body)
-                    .foregroundStyle(MESCColor.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    if mission.isCurrentUser {
+                        Label("Sua posição: \(mission.role)", systemImage: "person.text.rectangle")
+                            .font(MESCFont.caption.weight(.semibold))
+                            .foregroundStyle(MESCColor.accent)
+                    } else {
+                        Text("\(mission.positions.count) ministros escalados")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
 
-                if mission.isCurrentUser {
-                    Label(confirmationLabel, systemImage: confirmationSymbol)
-                        .font(MESCFont.caption)
-                        .foregroundStyle(confirmationTint)
-
-                    if onConfirm != nil || onRequestSubstitution != nil {
-                        HStack(spacing: 10) {
-                            if let onConfirm {
-                                MESCPrimaryButton(title: "Confirmar", symbol: "checkmark.circle", action: onConfirm)
-                            }
-                            if let onRequestSubstitution {
-                                MESCSecondaryButton(title: "Trocar", symbol: "arrow.triangle.2.circlepath", action: onRequestSubstitution)
-                            }
-                        }
+                    if mission.canEditMass {
+                        Label("Você pode organizar esta missa", systemImage: "pencil.circle")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.gold)
                     }
                 }
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .mescGlass(cornerRadius: 18)
         }
-        .padding(14)
-        .mescGlass(cornerRadius: 18)
+        .buttonStyle(.plain)
+        .accessibilityHint("Abre a equipe e os detalhes desta missa")
+    }
+}
+
+struct ScheduleMassDetailSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let mission: ScheduleMission
+    let dayTitle: String
+    var onConfirm: (() -> Void)?
+    var onRequestSubstitution: (() -> Void)?
+    @State private var isEditorPresented = false
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    GlassPanel(spacing: 12) {
+                        HStack(alignment: .top, spacing: 12) {
+                            SymbolTile(symbol: "calendar.badge.clock", tint: MESCColor.gold)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(dayTitle)
+                                    .font(MESCFont.caption)
+                                    .foregroundStyle(MESCColor.accent)
+                                Text(mission.title)
+                                    .font(MESCFont.title2)
+                                Text("\(mission.time) - \(mission.community)")
+                                    .font(MESCFont.body)
+                                    .foregroundStyle(MESCColor.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar detalhes da missa") {
+                                dismiss()
+                            }
+                        }
+                    }
+
+                    if mission.isCurrentUser {
+                        GlassPanel(spacing: 8) {
+                            SectionTitle(title: "Sua escala", symbol: "person.text.rectangle")
+                            Text(mission.role)
+                                .font(MESCFont.cardTitle)
+                                .foregroundStyle(MESCColor.accent)
+                            Text(confirmationDetail)
+                                .font(MESCFont.caption)
+                                .foregroundStyle(confirmationTint)
+
+                            if onConfirm != nil || onRequestSubstitution != nil {
+                                HStack(spacing: 10) {
+                                    if let onConfirm {
+                                        MESCPrimaryButton(title: "Confirmar", symbol: "checkmark.circle", action: onConfirm)
+                                    }
+                                    if let onRequestSubstitution {
+                                        MESCSecondaryButton(title: "Pedir troca", symbol: "arrow.triangle.2.circlepath", action: onRequestSubstitution)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    GlassPanel(spacing: 10) {
+                        HStack {
+                            SectionTitle(title: "Equipe escalada", symbol: "person.2")
+                            Spacer()
+                            Text("\(mission.positions.count)")
+                                .font(MESCFont.caption.weight(.bold))
+                                .foregroundStyle(MESCColor.accent)
+                        }
+
+                        ForEach(mission.positions) { position in
+                            SchedulePositionRow(position: position)
+                        }
+                    }
+
+                    if mission.canEditMass, let scheduleId = mission.scheduleId, !scheduleId.hasPrefix("adoration-") {
+                        GlassPanel(spacing: 10) {
+                            SectionTitle(title: "Organizar a missa", symbol: "slider.horizontal.3")
+                            Text("Como P1 ou P2 desta missa, você pode ajustar os ministros e as vagas desta equipe.")
+                                .font(MESCFont.body)
+                                .foregroundStyle(MESCColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            MESCSecondaryButton(title: "Editar escala desta missa", symbol: "pencil") {
+                                isEditorPresented = true
+                            }
+                        }
+                        .sheet(isPresented: $isEditorPresented) {
+                            ScheduleMassEditorSheet(anchorScheduleId: scheduleId)
+                                .environmentObject(appModel)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
     }
 
-    private var confirmationLabel: String {
+    private var confirmationDetail: String {
         switch mission.confirmationStatus {
-        case "confirmed":
-            return "Presença confirmada"
-        case "declined":
-            return "Presença recusada"
-        case "pending":
-            return "Confirmação pendente"
-        default:
-            return mission.canConfirm ? "Aguardando confirmação" : "Sem ação pendente"
-        }
-    }
-
-    private var confirmationSymbol: String {
-        switch mission.confirmationStatus {
-        case "confirmed":
-            return "checkmark.seal.fill"
-        case "declined":
-            return "xmark.circle"
-        default:
-            return "clock"
+        case "confirmed": return "Presença confirmada"
+        case "declined": return "Presença recusada"
+        case "pending": return "Aguardando sua confirmação"
+        default: return mission.canConfirm ? "Aguardando sua confirmação" : "Escala registrada"
         }
     }
 
     private var confirmationTint: Color {
         switch mission.confirmationStatus {
-        case "confirmed":
-            return MESCColor.accent
-        case "declined":
-            return MESCColor.primaryWine
-        default:
-            return MESCColor.gold
+        case "confirmed": return MESCColor.accent
+        case "declined": return MESCColor.primaryWine
+        default: return MESCColor.gold
         }
+    }
+}
+
+struct SchedulePositionRow: View {
+    let position: SchedulePosition
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("P\(position.position)")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(MESCColor.accent)
+                .frame(width: 38, height: 32)
+                .background(MESCColor.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(MESCNativeAppModel.positionDescription(position.position))
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                Text(position.isVacant ? "Vaga disponível" : position.displayName)
+                    .font(MESCFont.body.weight(position.isCurrentUser ? .bold : .semibold))
+                    .foregroundStyle(position.isVacant ? MESCColor.textSecondary : MESCColor.textPrimary)
+            }
+
+            Spacer()
+
+            if position.isCurrentUser {
+                Image(systemName: "person.crop.circle.fill.badge.checkmark")
+                    .foregroundStyle(MESCColor.gold)
+                    .accessibilityLabel("Sua posição")
+            }
+        }
+        .padding(.vertical, 7)
+    }
+}
+
+struct ScheduleMassEditorSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let anchorScheduleId: String
+    @State private var selections: [String: String] = [:]
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+
+                    if appModel.isLoadingScheduleEditor && appModel.scheduleEditor == nil {
+                        ProgressView()
+                            .tint(MESCColor.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 44)
+                    } else if let editor = appModel.scheduleEditor {
+                        GlassPanel(spacing: 10) {
+                            SectionTitle(title: "Posições desta missa", symbol: "person.2")
+                            Text("As alterações atualizam a escala publicada e removem a confirmação anterior daquela posição.")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            ForEach(editor.mass.assignments) { assignment in
+                                editorRow(assignment, editor: editor)
+                            }
+                        }
+
+                        if let message = appModel.scheduleEditorMessage {
+                            Label(message, systemImage: message == "Escala atualizada." ? "checkmark.seal" : "info.circle")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(message == "Escala atualizada." ? MESCColor.accent : MESCColor.primaryWine)
+                        }
+
+                        MESCPrimaryButton(
+                            title: appModel.isSavingScheduleEditor ? "Atualizando..." : "Salvar alterações",
+                            symbol: "checkmark.circle"
+                        ) {
+                            Task { await saveChanges(editor) }
+                        }
+                        .disabled(!hasChanges(editor) || appModel.isSavingScheduleEditor)
+                    } else {
+                        EmptyState(
+                            title: "Não foi possível abrir a edição",
+                            detail: appModel.scheduleEditorMessage ?? "Atualize a tela e tente novamente."
+                        )
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+        .task {
+            await appModel.loadScheduleEditor(scheduleId: anchorScheduleId)
+            if let editor = appModel.scheduleEditor {
+                selections = Dictionary(uniqueKeysWithValues: editor.mass.assignments.map {
+                    ($0.id, $0.ministerId ?? "")
+                })
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Organizar escala")
+                    .font(MESCFont.screenTitle)
+                if let mass = appModel.scheduleEditor?.mass {
+                    Text("\(MESCNativeAppModel.scheduleDateTitle(date: mass.date)) às \(MESCNativeAppModel.timeLabel(mass.time))")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+            }
+            Spacer()
+            MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar edição da escala") {
+                dismiss()
+            }
+        }
+        .padding(16)
+        .mescGlass(cornerRadius: 24, intensity: .floating)
+    }
+
+    private func editorRow(
+        _ assignment: MobileScheduleEditorAssignmentDTO,
+        editor: MobileScheduleEditorDTO
+    ) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text("P\(assignment.position)")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(MESCColor.accent)
+                .frame(width: 36, height: 32)
+                .background(MESCColor.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(MESCNativeAppModel.positionDescription(assignment.position))
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                Picker("P\(assignment.position)", selection: selectionBinding(for: assignment)) {
+                    Text("Vaga disponível").tag("")
+                    ForEach(editor.ministers) { minister in
+                        Text(minister.displayName).tag(minister.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .font(MESCFont.body.weight(.semibold))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 7)
+    }
+
+    private func selectionBinding(for assignment: MobileScheduleEditorAssignmentDTO) -> Binding<String> {
+        Binding(
+            get: { selections[assignment.id] ?? assignment.ministerId ?? "" },
+            set: { selections[assignment.id] = $0 }
+        )
+    }
+
+    private func hasChanges(_ editor: MobileScheduleEditorDTO) -> Bool {
+        editor.mass.assignments.contains { assignment in
+            (selections[assignment.id] ?? assignment.ministerId ?? "") != (assignment.ministerId ?? "")
+        }
+    }
+
+    private func saveChanges(_ editor: MobileScheduleEditorDTO) async {
+        for assignment in editor.mass.assignments where (selections[assignment.id] ?? assignment.ministerId ?? "") != (assignment.ministerId ?? "") {
+            let selectedId = selections[assignment.id] ?? ""
+            let didSave = await appModel.updateScheduleAssignment(
+                scheduleId: assignment.scheduleId,
+                ministerId: selectedId.isEmpty ? nil : selectedId
+            )
+            if !didSave { return }
+        }
+        dismiss()
     }
 }
 
@@ -6787,6 +7400,42 @@ struct MobilePublicScheduleAssignmentDTO: Codable, Identifiable {
     let scheduleDisplayName: String?
     let source: String
     let isCurrentUser: Bool
+    let canEditMass: Bool?
+}
+
+struct MobileScheduleEditorAssignmentDTO: Codable, Identifiable {
+    let id: String
+    let scheduleId: String
+    let position: Int
+    let ministerId: String?
+    let ministerName: String?
+    let scheduleDisplayName: String?
+}
+
+struct MobileScheduleEditorMinisterDTO: Codable, Identifiable {
+    let id: String
+    let name: String
+    let displayName: String
+}
+
+struct MobileScheduleEditorMassDTO: Codable {
+    let date: String
+    let time: String
+    let type: String
+    let location: String?
+    let assignments: [MobileScheduleEditorAssignmentDTO]
+}
+
+struct MobileScheduleEditorDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let mass: MobileScheduleEditorMassDTO
+    let ministers: [MobileScheduleEditorMinisterDTO]
+}
+
+struct MobileScheduleAssignmentUpdateResponseDTO: Codable {
+    let success: Bool
+    let assignment: MobileScheduleEditorAssignmentDTO
 }
 
 struct MobileQuestionnaireCurrentDTO: Codable {
@@ -7449,6 +8098,38 @@ final class MESCMobileAPIClient {
             communityId: communityId,
             deviceId: deviceId,
             queryItems: [URLQueryItem(name: "month", value: month)]
+        )
+    }
+
+    func scheduleEditor(
+        scheduleId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileScheduleEditorDTO {
+        try await get(
+            "schedules/\(scheduleId)/editor",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func updateScheduleAssignment(
+        scheduleId: String,
+        ministerId: String?,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileScheduleAssignmentUpdateResponseDTO {
+        try await authenticatedPatch(
+            "schedules/\(scheduleId)",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: ScheduleAssignmentUpdateRequestBody(ministerId: ministerId)
         )
     }
 
@@ -8128,6 +8809,10 @@ private struct ScheduleConfirmRequestBody: Encodable {
     let notes: String?
 }
 
+private struct ScheduleAssignmentUpdateRequestBody: Encodable {
+    let ministerId: String?
+}
+
 private struct SubstitutionCreateRequestBody: Encodable {
     let scheduleId: String
     let reason: String?
@@ -8317,10 +9002,58 @@ struct ScheduleMission: Identifiable, Equatable {
     let community: String
     let role: String
     let ministers: [String]
+    let positions: [SchedulePosition]
     let confirmationStatus: String?
     let canConfirm: Bool
     let canRequestSubstitution: Bool
     let isCurrentUser: Bool
+    let canEditMass: Bool
+
+    init(
+        id: String,
+        scheduleId: String?,
+        dayNumber: Int,
+        time: String,
+        title: String,
+        community: String,
+        role: String,
+        ministers: [String],
+        confirmationStatus: String?,
+        canConfirm: Bool,
+        canRequestSubstitution: Bool,
+        isCurrentUser: Bool,
+        positions: [SchedulePosition] = [],
+        canEditMass: Bool = false
+    ) {
+        self.id = id
+        self.scheduleId = scheduleId
+        self.dayNumber = dayNumber
+        self.time = time
+        self.title = title
+        self.community = community
+        self.role = role
+        self.ministers = ministers
+        self.confirmationStatus = confirmationStatus
+        self.canConfirm = canConfirm
+        self.canRequestSubstitution = canRequestSubstitution
+        self.isCurrentUser = isCurrentUser
+        self.positions = positions
+        self.canEditMass = canEditMass
+    }
+}
+
+struct SchedulePosition: Identifiable, Equatable {
+    let id: String
+    let scheduleId: String
+    let position: Int
+    let displayName: String
+    let isCurrentUser: Bool
+    let isVacant: Bool
+    let source: String
+
+    var positionLabel: String {
+        MESCNativeAppModel.positionDisplayLabel(position)
+    }
 }
 
 enum ScheduleFixtures {

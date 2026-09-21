@@ -29,6 +29,7 @@ import { createSession } from "./session";
 import { QuestionnaireService } from "../services/questionnaireService";
 import { sanitizeQuestionnaireResponses } from "../utils/questionnaireSanitization";
 import { scheduleCache } from "../services/scheduleCache";
+import { canRearrangeMassSchedule } from "../utils/scheduleAuthorization";
 import { trackSubstitutionFulfillment, trackSubstitutionRequest } from "../services/reliabilityScoreService";
 import { isMissingTableError } from "../utils/databaseErrors";
 import { formatMinisterName } from "../utils/formatters";
@@ -145,6 +146,10 @@ const confirmationSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
+const scheduleAssignmentUpdateSchema = z.object({
+  ministerId: z.string().trim().min(1).max(255).nullable(),
+});
+
 const optionalTrimmedText = (maxLength: number) =>
   z.preprocess(
     (value) => {
@@ -230,7 +235,99 @@ type MobilePublicScheduleAssignmentPayload = {
   scheduleDisplayName: string | null;
   source: "schedule" | "adoration";
   isCurrentUser: boolean;
+  canEditMass: boolean;
 };
+
+type MobileScheduleEditorAssignmentPayload = {
+  id: string;
+  scheduleId: string;
+  position: number;
+  ministerId: string | null;
+  ministerName: string | null;
+  scheduleDisplayName: string | null;
+};
+
+async function loadMobileScheduleEditorContext(input: {
+  scheduleId: string;
+  activeCommunityId: string;
+  role: string | undefined;
+  userId: string | undefined;
+}) {
+  const [schedule] = await db
+    .select({
+      id: schedules.id,
+      communityId: schedules.communityId,
+      date: schedules.date,
+      time: schedules.time,
+      type: schedules.type,
+      location: schedules.location,
+      status: schedules.status,
+    })
+    .from(schedules)
+    .where(and(
+      eq(schedules.id, input.scheduleId),
+      eq(schedules.communityId, input.activeCommunityId),
+    ))
+    .limit(1);
+
+  if (!schedule) {
+    throw new MobileHttpError(404, "Escala nao encontrada");
+  }
+
+  if (schedule.status !== "published") {
+    throw new MobileHttpError(400, "Esta escala ainda nao foi publicada");
+  }
+
+  const assignments = await db
+    .select({
+      id: schedules.id,
+      scheduleId: schedules.id,
+      position: schedules.position,
+      ministerId: schedules.ministerId,
+      ministerName: users.name,
+      scheduleDisplayName: users.scheduleDisplayName,
+    })
+    .from(schedules)
+    .leftJoin(users, eq(schedules.ministerId, users.id))
+    .where(and(
+      eq(schedules.communityId, input.activeCommunityId),
+      eq(schedules.date, schedule.date),
+      eq(schedules.time, schedule.time),
+    ))
+    .orderBy(asc(schedules.position), asc(schedules.id));
+
+  if (!canRearrangeMassSchedule({
+    role: input.role,
+    userId: input.userId,
+    assignments,
+  })) {
+    throw new MobileHttpError(403, "Apenas P1, P2 ou a coordenacao podem editar esta escala");
+  }
+
+  return { schedule, assignments };
+}
+
+function toMobileScheduleEditorAssignment(
+  assignment: {
+    id: string;
+    scheduleId: string;
+    position: number | null;
+    ministerId: string | null;
+    ministerName: string | null;
+    scheduleDisplayName: string | null;
+  },
+): MobileScheduleEditorAssignmentPayload {
+  const isVacant = !assignment.ministerId || assignment.ministerId === "VACANT";
+
+  return {
+    id: assignment.id,
+    scheduleId: assignment.scheduleId,
+    position: assignment.position ?? 0,
+    ministerId: isVacant ? null : assignment.ministerId,
+    ministerName: isVacant ? null : assignment.ministerName,
+    scheduleDisplayName: isVacant ? null : assignment.scheduleDisplayName,
+  };
+}
 
 const adminQuestionnaireReminderSchema = z.object({
   target: z.enum(["pending_questionnaire", "data_quality", "pending_or_data_quality"])
@@ -4244,8 +4341,30 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
         scheduleDisplayName: isVacant ? "VACANTE" : schedule.scheduleDisplayName ?? null,
         source: "schedule" as const,
         isCurrentUser: !isVacant && schedule.ministerId === user.id,
+        canEditMass: false,
       };
     });
+
+    const editableScheduleIds = new Set<string>();
+    const publicRowsByMass = new Map<string, typeof publicRows>();
+    for (const row of publicRows) {
+      const key = `${toDateOnly(row.date) ?? monthRange.startDate}|${normalizeMobileScheduleTime(row.time)}`;
+      const existing = publicRowsByMass.get(key) ?? [];
+      existing.push(row);
+      publicRowsByMass.set(key, existing);
+    }
+    for (const rowsForMass of publicRowsByMass.values()) {
+      if (canRearrangeMassSchedule({
+        role: user.role,
+        userId: user.id,
+        assignments: rowsForMass,
+      })) {
+        rowsForMass.forEach((row) => editableScheduleIds.add(row.id));
+      }
+    }
+    for (const assignment of publicAssignments) {
+      assignment.canEditMass = editableScheduleIds.has(assignment.scheduleId);
+    }
 
     try {
       const existingAdorationKeys = new Set(
@@ -4315,6 +4434,7 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
             scheduleDisplayName: result.scheduleDisplayName ?? null,
             source: "adoration" as const,
             isCurrentUser: result.ministerId === user.id,
+            canEditMass: false,
           });
         }
 
@@ -4507,6 +4627,177 @@ router.post("/schedules/:id/confirm", authenticateToken, async (req: AuthRequest
   } catch (error) {
     await releaseMobileIdempotencyQuietly(idempotencyRecordId);
     return handleMobileError(res, error, "Erro ao confirmar presenca");
+  }
+});
+
+router.get("/schedules/:id/editor", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const { schedule, assignments } = await loadMobileScheduleEditorContext({
+      scheduleId: req.params.id,
+      activeCommunityId: activeCommunity.id,
+      role: user.role,
+      userId: user.id,
+    });
+
+    const ministers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        displayName: users.scheduleDisplayName,
+      })
+      .from(users)
+      .where(and(
+        eq(users.homeCommunityId, activeCommunity.id),
+        eq(users.status, "active"),
+      ))
+      .orderBy(asc(users.name));
+
+    res.json({
+      success: true,
+      community: activeCommunity,
+      mass: {
+        date: toDateOnly(schedule.date),
+        time: normalizeMobileScheduleTime(schedule.time),
+        type: schedule.type,
+        location: schedule.location,
+        assignments: assignments.map(toMobileScheduleEditorAssignment),
+      },
+      ministers: ministers.map((minister) => ({
+        id: minister.id,
+        name: minister.name,
+        displayName: minister.displayName ?? minister.name,
+      })),
+    });
+  } catch (error) {
+    return handleMobileError(res, error, "Erro ao carregar edicao de escala");
+  }
+});
+
+router.patch("/schedules/:id", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    if (!user) {
+      throw new MobileHttpError(401, "Usuario nao autenticado");
+    }
+
+    const parsed = scheduleAssignmentUpdateSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const { schedule, assignments } = await loadMobileScheduleEditorContext({
+      scheduleId: req.params.id,
+      activeCommunityId: activeCommunity.id,
+      role: user.role,
+      userId: user.id,
+    });
+
+    let selectedMinister: { id: string; name: string; displayName: string | null } | null = null;
+    if (parsed.ministerId) {
+      const [minister] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          displayName: users.scheduleDisplayName,
+        })
+        .from(users)
+        .where(and(
+          eq(users.id, parsed.ministerId),
+          eq(users.homeCommunityId, activeCommunity.id),
+          eq(users.status, "active"),
+        ))
+        .limit(1);
+
+      if (!minister) {
+        throw new MobileHttpError(400, "Ministro indisponivel nesta comunidade");
+      }
+      selectedMinister = minister;
+    }
+
+    const currentAssignment = assignments.find((assignment) => assignment.id === req.params.id);
+    if (!currentAssignment) {
+      throw new MobileHttpError(404, "Escala nao encontrada");
+    }
+
+    const didChangeMinister = (currentAssignment.ministerId ?? null) !== parsed.ministerId;
+    const [updated] = await db
+      .update(schedules)
+      .set({
+        ministerId: parsed.ministerId,
+        substituteId: null,
+      })
+      .where(and(
+        eq(schedules.id, schedule.id),
+        eq(schedules.communityId, activeCommunity.id),
+      ))
+      .returning({
+        id: schedules.id,
+        scheduleId: schedules.id,
+        position: schedules.position,
+        ministerId: schedules.ministerId,
+      });
+
+    if (!updated) {
+      throw new MobileHttpError(404, "Escala nao encontrada");
+    }
+
+    if (didChangeMinister) {
+      await db
+        .delete(scheduleConfirmations)
+        .where(eq(scheduleConfirmations.scheduleId, schedule.id));
+    }
+
+    scheduleCache.invalidateByDate(schedule.date);
+    await logActivity(user.id, "update_schedule", {
+      source: "mobile-v1",
+      action: "update_schedule_assignment",
+      scheduleId: schedule.id,
+      communityId: activeCommunity.id,
+      previousMinisterId: currentAssignment.ministerId,
+      ministerId: parsed.ministerId,
+      idempotencyKey: idempotency.idempotencyKey,
+    }, req);
+
+    const responseBody = {
+      success: true,
+      assignment: {
+        id: updated.id,
+        scheduleId: updated.scheduleId,
+        position: updated.position ?? 0,
+        ministerId: updated.ministerId ?? null,
+        ministerName: selectedMinister?.name ?? null,
+        scheduleDisplayName: selectedMinister?.displayName ?? null,
+      },
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao atualizar escala");
   }
 });
 
