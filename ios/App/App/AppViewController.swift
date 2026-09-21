@@ -2020,38 +2020,44 @@ final class MESCNativeAppModel: ObservableObject {
         from assignments: [MobilePublicScheduleAssignmentDTO],
         ownSchedules: [MobileMissionScheduleDTO]
     ) -> [ScheduleMission] {
-        let ownScheduleById = Dictionary(uniqueKeysWithValues: ownSchedules.map { ($0.id, $0) })
+        var ownScheduleById: [String: MobileMissionScheduleDTO] = [:]
+        for schedule in ownSchedules where ownScheduleById[schedule.id] == nil {
+            ownScheduleById[schedule.id] = schedule
+        }
         let grouped = Dictionary(grouping: assignments) { assignment in
             "\(assignment.date)|\(assignment.time)|\(assignment.type)|\(assignment.location ?? "")"
         }
 
         return grouped.values.compactMap { group -> ScheduleMission? in
-            guard let first = group.first,
+            let orderedGroup = group.sorted {
+                if $0.position != $1.position { return $0.position < $1.position }
+                return $0.id < $1.id
+            }
+
+            guard let first = orderedGroup.first,
                   let date = Self.parseDate(first.date),
                   let day = Calendar.current.dateComponents([.day], from: date).day
             else {
                 return nil
             }
 
-            let positions = group
-                .sorted { $0.position < $1.position }
-                .map { assignment in
-                    let name = assignment.scheduleDisplayName ?? assignment.ministerName ?? "Vaga"
-                    return SchedulePosition(
-                        id: assignment.id,
-                        scheduleId: assignment.scheduleId,
-                        position: assignment.position,
-                        displayName: name,
-                        isCurrentUser: assignment.isCurrentUser,
-                        isVacant: assignment.ministerId == nil,
-                        source: assignment.source
-                    )
-                }
-            let currentAssignment = group.first(where: { $0.isCurrentUser })
+            let positions = orderedGroup.map { assignment in
+                let name = assignment.scheduleDisplayName ?? assignment.ministerName ?? "Vaga"
+                return SchedulePosition(
+                    id: "\(assignment.id)-\(assignment.position)",
+                    scheduleId: assignment.scheduleId,
+                    position: assignment.position,
+                    displayName: name,
+                    isCurrentUser: assignment.isCurrentUser,
+                    isVacant: assignment.ministerId == nil,
+                    source: assignment.source
+                )
+            }
+            let currentAssignment = orderedGroup.first(where: { $0.isCurrentUser })
             let ownSchedule = currentAssignment.flatMap { ownScheduleById[$0.scheduleId] }
 
             return ScheduleMission(
-                id: "\(first.date)-\(first.time)-\(first.location ?? "")",
+                id: "mass-\(first.scheduleId)",
                 scheduleId: currentAssignment?.scheduleId ?? first.scheduleId,
                 dayNumber: day,
                 time: Self.timeLabel(first.time),
@@ -2064,7 +2070,7 @@ final class MESCNativeAppModel: ObservableObject {
                 canRequestSubstitution: ownSchedule?.canRequestSubstitution ?? false,
                 isCurrentUser: currentAssignment != nil,
                 positions: positions,
-                canEditMass: group.contains { $0.canEditMass == true && $0.source == "schedule" }
+                canEditMass: orderedGroup.contains { $0.canEditMass == true && $0.source == "schedule" }
             )
         }
     }

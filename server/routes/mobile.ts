@@ -4296,6 +4296,17 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
       )
       .orderBy(asc(schedules.date), asc(schedules.time), asc(schedules.position));
 
+    // Historical imports may have duplicate confirmation rows for an assignment.
+    // The native payload must expose exactly one entry for each schedule ID.
+    const ownSchedulesById = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+      const current = ownSchedulesById.get(row.id);
+      if (!current || (!current.confirmationStatus && row.confirmationStatus)) {
+        ownSchedulesById.set(row.id, row);
+      }
+    }
+    const uniqueRows = Array.from(ownSchedulesById.values());
+
     const publicRows = await db
       .select({
         id: schedules.id,
@@ -4457,7 +4468,7 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
       }
     }
 
-    const scheduleIds = rows.map((schedule) => schedule.id);
+    const scheduleIds = uniqueRows.map((schedule) => schedule.id);
     const activeSubstitutions = scheduleIds.length
       ? await db
           .select({
@@ -4483,7 +4494,7 @@ router.get("/schedules/month", authenticateToken, async (req: AuthRequest, res) 
       success: true,
       community: activeCommunity,
       month: monthRange.isoMonth,
-      schedules: rows.map((schedule) => {
+      schedules: uniqueRows.map((schedule) => {
         const dateOnly = toDateOnly(schedule.date);
         const substitution = substitutionByScheduleId.get(schedule.id);
         const isPast = isLocalScheduleDateTimePast(schedule.date, schedule.time);
