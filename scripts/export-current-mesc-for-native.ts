@@ -12,6 +12,7 @@ type ExportTable = {
 
 const NATIVE_STAGING_PROJECT_REF = "sdochgpfjosmhrbztthr";
 const EXPORT_TABLES: ExportTable[] = [
+  { table: "communities", file: "communities.json", required: true },
   { table: "users", file: "users.json", required: true },
   { table: "questionnaires", file: "questionnaires.json", required: true },
   { table: "questionnaire_responses", file: "questionnaire_responses.json", required: true },
@@ -54,6 +55,23 @@ function option(name: string, fallback: string) {
 
 function quoteIdentifier(identifier: string) {
   return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function selectedExportTables() {
+  const selected = option("tables", "")
+    .split(",")
+    .map((table) => table.trim())
+    .filter(Boolean);
+
+  if (selected.length === 0) return EXPORT_TABLES;
+
+  const knownTables = new Map(EXPORT_TABLES.map((entry) => [entry.table, entry]));
+  const unknown = selected.filter((table) => !knownTables.has(table));
+  if (unknown.length > 0) {
+    throw new Error(`Tabela(s) nao exportavel(is): ${unknown.join(", ")}`);
+  }
+
+  return selected.map((table) => knownTables.get(table)!);
 }
 
 function sourceDatabaseUrl() {
@@ -113,7 +131,7 @@ async function main() {
   const manifest: Array<{ table: string; file: string; rows: number; columns: string[]; sha256: string }> = [];
 
   try {
-    for (const entry of EXPORT_TABLES) {
+    for (const entry of selectedExportTables()) {
       if (!(await tableExists(sql, entry.table))) {
         if (entry.required) throw new Error(`Tabela obrigatoria ausente na origem: ${entry.table}`);
         console.log(`- ${entry.table}: ausente, ignorada`);
