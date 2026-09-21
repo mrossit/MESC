@@ -2516,7 +2516,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .mission: return "hands.sparkles"
+        case .mission: return "cross.case.fill"
         case .coordination: return "person.3"
         case .schedules: return "calendar"
         case .formation: return "book.closed"
@@ -2774,7 +2774,7 @@ struct MissionScreen: View {
 
             GlassPanel(spacing: 18) {
                 HStack(alignment: .top, spacing: 14) {
-                    SymbolTile(symbol: "hands.sparkles", tint: MESCColor.accent)
+                    SymbolTile(symbol: "cross.case.fill", tint: MESCColor.accent)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Próxima escala")
                             .font(MESCFont.caption)
@@ -3747,7 +3747,7 @@ enum ScheduleMode: String, CaseIterable, Identifiable {
 
 struct SchedulesScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
-    @State private var mode: ScheduleMode = .month
+    @State private var mode: ScheduleMode = .mine
     @State private var selectedDayNumber = Calendar.current.component(.day, from: Date())
     @State private var substitutionTarget: SubstitutionTarget?
     @State private var isSubstitutionCenterPresented = false
@@ -3757,10 +3757,6 @@ struct SchedulesScreen: View {
     var body: some View {
         let days = appModel.scheduleDays(for: mode)
         let selectedDay = days.first(where: { $0.dayNumber == selectedDayNumber }) ?? days.first ?? ScheduleFixtures.days[0]
-        let scheduledDaysCount = days.filter { !$0.missions.isEmpty }.count
-        let totalMissionsCount = days.reduce(0) { $0 + $1.missions.count }
-        let pendingConfirmationCount = days.flatMap(\.missions).filter { $0.canConfirm }.count
-
         MESCScrollScreen(title: "Escalas", subtitle: appModel.currentMonthLabel) {
             if appModel.isUsingFallbackData {
                 FallbackBanner()
@@ -3772,12 +3768,6 @@ struct SchedulesScreen: View {
                 title: { $0.rawValue },
                 symbol: { $0.symbol }
             )
-
-            SubstitutionCenterLink(
-                openCount: appModel.substitutions.filter { $0.status == "available" && $0.requesterId != appModel.user?.id }.count
-            ) {
-                isSubstitutionCenterPresented = true
-            }
 
             GlassPanel(spacing: 14) {
                 HStack(alignment: .center, spacing: 12) {
@@ -3798,16 +3788,6 @@ struct SchedulesScreen: View {
                     MESCIconButton(symbol: "chevron.right", accessibilityLabel: "Próximo mês", isDisabled: appModel.isLoading) {
                         Task { await appModel.shiftScheduleMonth(by: 1) }
                     }
-                }
-
-                HStack(spacing: 10) {
-                    StatusPill(title: "\(scheduledDaysCount) dias", symbol: "calendar.badge.checkmark", tint: MESCColor.accent)
-                    StatusPill(title: "\(totalMissionsCount) missas", symbol: "list.bullet.clipboard", tint: MESCColor.gold)
-                    StatusPill(
-                        title: pendingConfirmationCount == 0 ? "Em dia" : "\(pendingConfirmationCount) para confirmar",
-                        symbol: pendingConfirmationCount == 0 ? "checkmark.circle" : "clock.badge",
-                        tint: pendingConfirmationCount == 0 ? MESCColor.accent : MESCColor.primaryWine
-                    )
                 }
 
                 CalendarMonthGrid(
@@ -3837,19 +3817,27 @@ struct SchedulesScreen: View {
                 }
             )
 
-            GlassPanel(spacing: 12) {
-                if let message = appModel.scheduleActionMessage {
-                    Label(message, systemImage: message.contains("sucesso") || message.contains("publicado") ? "checkmark.seal" : "info.circle")
-                        .font(MESCFont.caption)
-                        .foregroundStyle(message.contains("sucesso") || message.contains("publicado") ? MESCColor.accent : MESCColor.primaryWine)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            SubstitutionCenterLink(
+                openCount: appModel.substitutions.filter { $0.status == "available" && $0.requesterId != appModel.user?.id }.count
+            ) {
+                isSubstitutionCenterPresented = true
+            }
 
-                MESCSecondaryButton(title: "Exportar modelo oficial", symbol: "square.and.arrow.up") {
-                    do {
-                        shareFile = ShareFile(url: try appModel.createOfficialScheduleExport())
-                    } catch {
-                        appModel.scheduleActionMessage = MESCMobileAPIClient.userMessage(for: error)
+            if mode == .full {
+                GlassPanel(spacing: 12) {
+                    if let message = appModel.scheduleActionMessage {
+                        Label(message, systemImage: message.contains("sucesso") || message.contains("publicado") ? "checkmark.seal" : "info.circle")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(message.contains("sucesso") || message.contains("publicado") ? MESCColor.accent : MESCColor.primaryWine)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    MESCSecondaryButton(title: "Exportar modelo oficial", symbol: "square.and.arrow.up") {
+                        do {
+                            shareFile = ShareFile(url: try appModel.createOfficialScheduleExport())
+                        } catch {
+                            appModel.scheduleActionMessage = MESCMobileAPIClient.userMessage(for: error)
+                        }
                     }
                 }
             }
@@ -3923,14 +3911,13 @@ struct ScheduleDayPanel: View {
     let onOpenDetails: (ScheduleMission) -> Void
 
     var body: some View {
-        GlassPanel(spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                SymbolTile(symbol: mode == .full ? "tablecells" : "calendar.badge.clock", tint: MESCColor.gold)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(day.formattedTitle)
-                        .font(MESCFont.cardTitle)
+                        .font(MESCFont.title2)
                         .foregroundStyle(MESCColor.textPrimary)
-                    Text(day.missions.isEmpty ? "Nenhuma missa publicada para esta data." : "\(day.missions.count) missa(s) nesta data.")
+                    Text(day.missions.isEmpty ? "Nenhuma missa publicada para esta data." : daySummary)
                         .font(MESCFont.caption)
                         .foregroundStyle(MESCColor.textSecondary)
                 }
@@ -3951,6 +3938,16 @@ struct ScheduleDayPanel: View {
                     }
                 }
             }
+        }
+    }
+
+    private var daySummary: String {
+        let massLabel = day.missions.count == 1 ? "1 missa publicada" : "\(day.missions.count) missas publicadas"
+        switch mode {
+        case .mine:
+            return "\(massLabel) para você"
+        case .month, .full:
+            return massLabel
         }
     }
 }
@@ -4231,25 +4228,23 @@ struct FormationTrackPanel: View {
     let onOpenLesson: (MobileFormationLessonDTO) -> Void
 
     var body: some View {
-        GlassPanel(spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionTitle(title: track.title, symbol: trackSymbol)
-                if let description = track.description {
-                    Text(description)
-                        .font(MESCFont.body)
-                        .foregroundStyle(MESCColor.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 10) {
-                    Text("\(track.stats.totalModules) módulos")
-                    Text("\(track.stats.totalLessons) aulas")
-                    Text("\(track.stats.progressPercentage)%")
-                }
-                .font(MESCFont.caption)
-                .foregroundStyle(MESCColor.textSecondary)
-                ProgressView(value: Double(track.stats.progressPercentage), total: 100)
-                    .tint(MESCColor.accent)
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle(title: track.title, symbol: trackSymbol)
+            if let description = track.description {
+                Text(description)
+                    .font(MESCFont.body)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            HStack(spacing: 10) {
+                Text("\(track.stats.totalModules) módulos")
+                Text("\(track.stats.totalLessons) aulas")
+                Text("\(track.stats.progressPercentage)%")
+            }
+            .font(MESCFont.caption)
+            .foregroundStyle(MESCColor.textSecondary)
+            ProgressView(value: Double(track.stats.progressPercentage), total: 100)
+                .tint(MESCColor.accent)
 
             ForEach(track.modules) { module in
                 FormationModuleRow(module: module, onOpenLesson: onOpenLesson)
@@ -4262,7 +4257,7 @@ struct FormationTrackPanel: View {
         case "espiritualidade":
             return "sparkles"
         case "pratica", "prática":
-            return "hands.sparkles"
+            return "book.pages"
         default:
             return "book.closed"
         }
@@ -4318,7 +4313,7 @@ struct FormationModuleRow: View {
             }
         }
         .padding(14)
-        .background(MESCColor.surface.opacity(0.68), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .mescGlass(cornerRadius: 18)
     }
 
     private func statusTitle(for lesson: MobileFormationLessonDTO) -> String {
@@ -5689,7 +5684,7 @@ struct SettingsScreen: View {
 
             GlassPanel(spacing: 16) {
                 SectionTitle(title: "Preferências por tipo", symbol: "slider.horizontal.3")
-                ForEach(MESCNotificationPreference.options) { option in
+                ForEach(Array(MESCNotificationPreference.options.enumerated()), id: \.element.id) { index, option in
                     SettingsToggleRow(
                         title: option.title,
                         detail: option.detail,
@@ -5697,6 +5692,11 @@ struct SettingsScreen: View {
                         isOn: notificationBinding(option.key)
                     )
                     .disabled(appModel.isUpdatingSettings)
+
+                    if index < MESCNotificationPreference.options.count - 1 {
+                        Divider()
+                            .opacity(0.55)
+                    }
                 }
             }
 
@@ -5748,20 +5748,27 @@ struct MESCScrollScreen<Content: View>: View {
     @State private var isCommunityIdentityPresented = false
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 5) {
+        NavigationView {
+            ZStack {
+                MESCBackground()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
                         Text(subtitle)
-                            .font(MESCFont.caption)
+                            .font(MESCFont.subheadline.weight(.semibold))
                             .foregroundStyle(MESCColor.accent)
-                        Text(title)
-                            .font(MESCFont.screenTitle)
-                            .foregroundStyle(MESCColor.textPrimary)
+                            .padding(.top, 8)
+
+                        content
                     }
-
-                    Spacer()
-
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 28)
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     MESCNotificationBell(unreadCount: appModel.unreadNotificationsCount) {
                         appModel.isNotificationCenterPresented = true
                     }
@@ -5769,20 +5776,14 @@ struct MESCScrollScreen<Content: View>: View {
                     Button {
                         isCommunityIdentityPresented = true
                     } label: {
-                        MESCLogoMark(size: 44, cornerRadius: 16, focalMark: true)
+                        MESCLogoMark(size: 34, cornerRadius: 12, focalMark: true)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Identidade e comunidade ativa do MESC")
                 }
-                .padding(16)
-                .mescGlass(cornerRadius: 24, intensity: .floating)
-                .padding(.top, 20)
-
-                content
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 28)
         }
+        .navigationViewStyle(.stack)
         .sheet(isPresented: $isCommunityIdentityPresented) {
             MESCCommunityIdentitySheet()
                 .environmentObject(appModel)
@@ -6727,8 +6728,7 @@ struct SettingsToggleRow: View {
             Toggle("", isOn: $isOn)
                 .labelsHidden()
         }
-        .padding(12)
-        .mescGlass(cornerRadius: 18)
+        .padding(.vertical, 6)
     }
 }
 
@@ -6772,8 +6772,7 @@ struct NativePermissionRow: View {
                         .minimumScaleFactor(0.78)
                 }
             }
-            .padding(12)
-            .mescGlass(cornerRadius: 18)
+            .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
     }
@@ -7084,15 +7083,15 @@ enum MESCColor {
 }
 
 enum MESCFont {
-    static let screenTitle = Font.system(size: 34, weight: .bold)
-    static let titleSerif = Font.system(size: 28, weight: .bold)
-    static let title2 = Font.system(size: 22, weight: .bold)
-    static let cardTitle = Font.system(size: 17, weight: .semibold)
-    static let body = Font.system(size: 17, weight: .regular)
-    static let callout = Font.system(size: 16, weight: .regular)
-    static let subheadline = Font.system(size: 15, weight: .regular)
-    static let caption = Font.system(size: 13, weight: .medium)
-    static let caption2 = Font.system(size: 11, weight: .medium)
+    static let screenTitle = Font.system(.largeTitle, design: .serif).weight(.bold)
+    static let titleSerif = Font.system(.title, design: .serif).weight(.bold)
+    static let title2 = Font.system(.title2, design: .serif).weight(.bold)
+    static let cardTitle = Font.headline
+    static let body = Font.body
+    static let callout = Font.callout
+    static let subheadline = Font.subheadline
+    static let caption = Font.caption
+    static let caption2 = Font.caption2
 }
 
 extension Color {
