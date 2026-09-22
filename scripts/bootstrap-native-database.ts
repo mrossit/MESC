@@ -100,8 +100,14 @@ async function main() {
     CONFIRM_NATIVE_RLS_HARDENING: "true",
   });
 
+  console.log("Semeando a formação oficial MESC...");
+  run("npm", ["run", "db:seed:formation"], process.env);
+
   console.log("Validando fundacao mobile...");
   run("npm", ["run", "db:validate:mobile"], process.env);
+
+  console.log("Validando formação oficial...");
+  run("npm", ["run", "db:validate:formation"], process.env);
 
   console.log("Validando hardening RLS...");
   run("npm", ["run", "db:validate:native-rls"], process.env);

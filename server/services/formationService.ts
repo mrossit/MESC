@@ -59,8 +59,8 @@ type SectionRow = {
   videoUrl: string | null;
   audioUrl: string | null;
   documentUrl: string | null;
-  quizData: string | null;
-  interactiveData: string | null;
+  quizData: unknown;
+  interactiveData: unknown;
 };
 
 type ProgressRow = {
@@ -271,6 +271,22 @@ const parseCompletedSections = (value: unknown): string[] => {
     }
   }
   return [];
+};
+
+const parseOptionalJson = (value: unknown): unknown | undefined => {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
 };
 
 const parseProgressMeta = (
@@ -603,6 +619,7 @@ export async function getLessonDetail(params: {
       ), '') AS "documentUrl"
     FROM formation_lessons
     WHERE module_id = ${moduleId}
+      AND track_id = ${trackId}
       AND lesson_number = ${lessonNumber}
       AND COALESCE(is_active, true) = true
     LIMIT 1
@@ -646,8 +663,8 @@ export async function getLessonDetail(params: {
     estimatedMinutes: lessonRow.estimatedDuration
       ? Math.max(1, Math.round(lessonRow.estimatedDuration / sectionsCount))
       : null,
-    quizData: section.quizData ? JSON.parse(section.quizData) : undefined,
-    interactiveData: section.interactiveData ? JSON.parse(section.interactiveData) : undefined,
+    quizData: parseOptionalJson(section.quizData),
+    interactiveData: parseOptionalJson(section.interactiveData),
   }));
 
   let progressView: LessonProgressView = {
@@ -721,7 +738,7 @@ async function ensureLessonProgressRecord(userId: string, lessonId: string): Pro
 
 async function countLessonSections(lessonId: string): Promise<number> {
   const result = await db.execute(sql`
-    SELECT COUNT(*)::integer AS count
+    SELECT COUNT(*) AS count
     FROM formation_lesson_sections
     WHERE lesson_id = ${lessonId}
   `);
@@ -773,7 +790,7 @@ export async function markLessonSectionCompleted(params: {
       SET
         status = ${status},
         progress_percentage = ${meta.progressPercentage},
-        completed_sections = ${JSON.stringify(meta.completedSections)}::jsonb,
+        completed_sections = ${JSON.stringify(meta.completedSections)},
         time_spent_minutes = COALESCE(time_spent_minutes, 0) + 1,
         last_accessed_at = ${now},
         completed_at = ${completedAt},
@@ -801,7 +818,7 @@ export async function markLessonSectionCompleted(params: {
         ${status},
         ${meta.progressPercentage},
         ${1},
-        ${JSON.stringify(meta.completedSections)}::jsonb,
+        ${JSON.stringify(meta.completedSections)},
         ${now},
         ${completedAt},
         ${now},
@@ -878,7 +895,7 @@ export async function markLessonCompleted(params: {
       SET
         status = 'completed',
         progress_percentage = 100,
-        completed_sections = ${JSON.stringify(meta.completedSections)}::jsonb,
+        completed_sections = ${JSON.stringify(meta.completedSections)},
         last_accessed_at = ${now},
         completed_at = COALESCE(completed_at, ${now}),
         updated_at = ${now}
@@ -905,7 +922,7 @@ export async function markLessonCompleted(params: {
         'completed',
         ${100},
         ${0},
-        ${JSON.stringify(meta.completedSections)}::jsonb,
+        ${JSON.stringify(meta.completedSections)},
         ${now},
         ${now},
         ${now},
@@ -1385,8 +1402,8 @@ export async function getFormationAdminLessonDetail(lessonId: string): Promise<F
       audioUrl: section.audioUrl,
       documentUrl: section.documentUrl,
       estimatedMinutes: null,
-      quizData: section.quizData ? JSON.parse(section.quizData) : undefined,
-      interactiveData: section.interactiveData ? JSON.parse(section.interactiveData) : undefined,
+      quizData: parseOptionalJson(section.quizData),
+      interactiveData: parseOptionalJson(section.interactiveData),
     })),
   };
 }

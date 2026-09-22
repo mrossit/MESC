@@ -1145,6 +1145,11 @@ final class MESCNativeAppModel: ObservableObject {
             return false
         }
 
+        guard completingFormationSectionId == nil else {
+            formationMessage = "Aguarde a conclusão da seção em andamento."
+            return false
+        }
+
         guard detail.progress.status != "completed" else {
             formationMessage = "Aula já concluída."
             return true
@@ -1167,7 +1172,7 @@ final class MESCNativeAppModel: ObservableObject {
                 idempotencyKey: UUID().uuidString
             )
             formationLessonDetail = detail.withProgress(response.progress)
-            try await loadFormationOverview(accessToken: accessToken)
+            await refreshFormationOverviewAfterProgress(accessToken: accessToken)
             formationMessage = "Aula concluída com sucesso."
             isCompletingFormationLesson = false
             return true
@@ -1182,7 +1187,7 @@ final class MESCNativeAppModel: ObservableObject {
                         idempotencyKey: UUID().uuidString
                     )
                     formationLessonDetail = detail.withProgress(response.progress)
-                    try await loadFormationOverview(accessToken: accessToken)
+                    await refreshFormationOverviewAfterProgress(accessToken: accessToken)
                     formationMessage = "Aula concluída com sucesso."
                     isCompletingFormationLesson = false
                     return true
@@ -1203,6 +1208,11 @@ final class MESCNativeAppModel: ObservableObject {
     func completeFormationLessonSection(sectionId: String) async -> Bool {
         guard let detail = formationLessonDetail else {
             formationMessage = "Abra uma aula antes de concluir."
+            return false
+        }
+
+        guard !isCompletingFormationLesson, completingFormationSectionId == nil else {
+            formationMessage = "Aguarde a conclusão em andamento."
             return false
         }
 
@@ -1229,7 +1239,7 @@ final class MESCNativeAppModel: ObservableObject {
                 idempotencyKey: UUID().uuidString
             )
             formationLessonDetail = detail.withProgress(response.progress)
-            try await loadFormationOverview(accessToken: accessToken)
+            await refreshFormationOverviewAfterProgress(accessToken: accessToken)
             formationMessage = response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída."
             completingFormationSectionId = nil
             return true
@@ -1245,7 +1255,7 @@ final class MESCNativeAppModel: ObservableObject {
                         idempotencyKey: UUID().uuidString
                     )
                     formationLessonDetail = detail.withProgress(response.progress)
-                    try await loadFormationOverview(accessToken: accessToken)
+                    await refreshFormationOverviewAfterProgress(accessToken: accessToken)
                     formationMessage = response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída."
                     completingFormationSectionId = nil
                     return true
@@ -1375,6 +1385,86 @@ final class MESCNativeAppModel: ObservableObject {
                     try await loadFormationOverview(accessToken: accessToken)
                     await loadFormationAdminStudio()
                     formationMessage = payload.isActive == false ? "Aula salva como rascunho." : "Aula publicada com sucesso."
+                    isSavingFormationContent = false
+                    return true
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isSavingFormationContent = false
+        return false
+    }
+
+    func updateFormationAdminLesson(
+        lessonId: String,
+        payload: FormationAdminLessonUpdateRequestBody
+    ) async -> Bool {
+        await persistFormationContent(successMessage: "Aula atualizada com sucesso.") { accessToken, idempotencyKey in
+            _ = try await self.client.updateFormationAdminLesson(
+                lessonId: lessonId,
+                payload: payload,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+        }
+    }
+
+    func createFormationAdminLessonSection(
+        lessonId: String,
+        payload: FormationAdminSectionRequestBody
+    ) async -> Bool {
+        await persistFormationContent(successMessage: "Conteúdo adicionado à aula.") { accessToken, idempotencyKey in
+            _ = try await self.client.createFormationAdminLessonSection(
+                lessonId: lessonId,
+                payload: payload,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+        }
+    }
+
+    private func persistFormationContent(
+        successMessage: String,
+        operation: @escaping (String, String) async throws -> Void
+    ) async -> Bool {
+        guard canManageFormation else {
+            formationMessage = "Apenas gestores e coordenadores podem editar formação."
+            return false
+        }
+
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        let idempotencyKey = UUID().uuidString
+        isSavingFormationContent = true
+        formationMessage = nil
+
+        do {
+            try await operation(accessToken, idempotencyKey)
+            await refreshFormationOverviewAfterProgress(accessToken: accessToken)
+            await loadFormationAdminStudio()
+            formationMessage = successMessage
+            isSavingFormationContent = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await operation(refreshedAccessToken, idempotencyKey)
+                    await refreshFormationOverviewAfterProgress(accessToken: refreshedAccessToken)
+                    await loadFormationAdminStudio()
+                    formationMessage = successMessage
                     isSavingFormationContent = false
                     return true
                 } catch {
@@ -1756,6 +1846,14 @@ final class MESCNativeAppModel: ObservableObject {
             deviceId: sessionStore.deviceId
         )
         formationOverview = response.overview
+    }
+
+    private func refreshFormationOverviewAfterProgress(accessToken: String) async {
+        do {
+            try await loadFormationOverview(accessToken: accessToken)
+        } catch {
+            // The mutation has already succeeded; retain its result in the lesson view.
+        }
     }
 
     private func loadCurrentDevice(accessToken: String) async throws {
@@ -2516,7 +2614,7 @@ enum MESCTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .mission: return "cross.case.fill"
+        case .mission: return "cross.fill"
         case .coordination: return "person.3"
         case .schedules: return "calendar"
         case .formation: return "book.closed"
@@ -2762,32 +2860,70 @@ struct NativeLoginScreen: View {
 struct MissionScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @State private var isQuestionnairePresented = false
+    @State private var isSubstitutionCenterPresented = false
     @State private var substitutionTarget: SubstitutionTarget?
 
     var body: some View {
         let mission = appModel.missionHome?.nextMission
 
-        MESCScrollScreen(title: "Ministrare", subtitle: "Paz e bem, \(appModel.firstName)") {
+        MESCScrollScreen(title: appModel.activeCommunity?.name ?? "São Judas Tadeu", subtitle: "Paz e bem, \(appModel.firstName)") {
             if appModel.isUsingFallbackData {
                 FallbackBanner()
             }
 
-            GlassPanel(spacing: 18) {
-                HStack(alignment: .top, spacing: 14) {
-                    SymbolTile(symbol: "cross.case.fill", tint: MESCColor.accent)
-                    VStack(alignment: .leading, spacing: 8) {
+            GlassPanel(spacing: 16) {
+                if let mission {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Próxima escala")
                             .font(MESCFont.caption)
                             .foregroundStyle(MESCColor.accent)
-                        Text(mission.map { MESCNativeAppModel.scheduleDateTitle(date: $0.date) } ?? "Nenhuma escala publicada")
-                            .font(MESCFont.titleSerif)
-                        Text(mission.map { "\(MESCNativeAppModel.timeLabel($0.time)) - \($0.location ?? appModel.activeCommunity?.name ?? "Comunidade")" } ?? "Assim que a escala for publicada, ela aparecerá aqui.")
-                            .font(MESCFont.body)
-                            .foregroundStyle(MESCColor.textSecondary)
-                        Text(mission.map { MESCNativeAppModel.positionLabel($0.position) } ?? "Sem posição definida")
-                            .font(MESCFont.body.weight(.semibold))
+                        Text("Você está escalado")
+                            .font(MESCFont.title2)
+                            .foregroundStyle(MESCColor.textPrimary)
                     }
-                    Spacer()
+
+                    HStack(alignment: .center, spacing: 14) {
+                        Text(MESCNativeAppModel.positionLabel(mission.position))
+                            .font(.system(size: 42, weight: .bold, design: .rounded))
+                            .foregroundStyle(MESCColor.accent)
+                            .frame(minWidth: 66, alignment: .leading)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let position = mission.position {
+                                Text(MESCNativeAppModel.positionDescription(position))
+                                    .font(MESCFont.cardTitle)
+                                    .foregroundStyle(MESCColor.textPrimary)
+                            } else {
+                                Text("Posição na escala")
+                                    .font(MESCFont.cardTitle)
+                                    .foregroundStyle(MESCColor.textPrimary)
+                            }
+                            Text("Sua função nesta missa")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.textSecondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+
+                    Divider()
+                        .opacity(0.55)
+
+                    Label(MESCNativeAppModel.scheduleDateTitle(date: mission.date), systemImage: "calendar")
+                        .font(MESCFont.callout.weight(.semibold))
+                        .foregroundStyle(MESCColor.textSecondary)
+
+                    HStack(spacing: 14) {
+                        Label(MESCNativeAppModel.timeLabel(mission.time), systemImage: "clock")
+                        Label(mission.location ?? appModel.activeCommunity?.name ?? "Comunidade", systemImage: "mappin.and.ellipse")
+                            .lineLimit(1)
+                    }
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                } else {
+                    EmptyState(
+                        title: "Nenhuma escala publicada",
+                        detail: "Assim que a coordenação publicar uma escala, ela aparecerá aqui."
+                    )
                 }
 
                 HStack(spacing: 12) {
@@ -2855,8 +2991,13 @@ struct MissionScreen: View {
                 } else {
                     ForEach(pendingActions) { action in
                         Button {
-                            if action.type == "questionnaire" {
+                            switch action.type {
+                            case "questionnaire":
                                 isQuestionnairePresented = true
+                            case "substitution":
+                                isSubstitutionCenterPresented = true
+                            default:
+                                break
                             }
                         } label: {
                             PendingActionRow(action: action)
@@ -2872,6 +3013,10 @@ struct MissionScreen: View {
         }
         .sheet(isPresented: $isQuestionnairePresented) {
             QuestionnaireSheet()
+                .environmentObject(appModel)
+        }
+        .sheet(isPresented: $isSubstitutionCenterPresented) {
+            SubstitutionCenterSheet()
                 .environmentObject(appModel)
         }
         .sheet(item: $substitutionTarget) { target in
@@ -3167,6 +3312,8 @@ struct SubstitutionCenterSheet: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @Environment(\.dismiss) private var dismiss
     @State private var substitutionToClaim: MobileSubstitutionDTO?
+    @State private var expandedGroupIDs = Set<String>()
+    @State private var hasConfiguredInitialExpansion = false
 
     private var currentUserId: String {
         appModel.user?.id ?? ""
@@ -3184,6 +3331,30 @@ struct SubstitutionCenterSheet: View {
         appModel.substitutions.filter {
             $0.substituteId == currentUserId && $0.requesterId != currentUserId
         }
+    }
+
+    private var openRequestGroups: [SubstitutionRequestGroup] {
+        compactedGroups(openRequests)
+    }
+
+    private var myRequestGroups: [SubstitutionRequestGroup] {
+        compactedGroups(myRequests)
+    }
+
+    private var acceptedRequestGroups: [SubstitutionRequestGroup] {
+        compactedGroups(acceptedRequests)
+    }
+
+    private var allGroups: [SubstitutionRequestGroup] {
+        openRequestGroups + myRequestGroups + acceptedRequestGroups
+    }
+
+    private var allGroupIDs: Set<String> {
+        Set(allGroups.map(\.id))
+    }
+
+    private var areAllGroupsExpanded: Bool {
+        !allGroupIDs.isEmpty && allGroupIDs.isSubset(of: expandedGroupIDs)
     }
 
     var body: some View {
@@ -3212,8 +3383,8 @@ struct SubstitutionCenterSheet: View {
                             SectionTitle(title: "Pedidos abertos", symbol: "person.2.badge.gearshape")
                                 .padding(.horizontal, 4)
 
-                            ForEach(compactedGroups(openRequests)) { group in
-                                SubstitutionRequestGroupCard(group: group) { substitution in
+                            ForEach(openRequestGroups) { group in
+                                SubstitutionRequestGroupCard(group: group, isExpanded: expansionBinding(for: group)) { substitution in
                                     SubstitutionRow(
                                         substitution: substitution,
                                         isOwnRequest: false,
@@ -3229,8 +3400,8 @@ struct SubstitutionCenterSheet: View {
                             SectionTitle(title: "Meus pedidos", symbol: "clock.arrow.circlepath")
                                 .padding(.horizontal, 4)
 
-                            ForEach(compactedGroups(myRequests)) { group in
-                                SubstitutionRequestGroupCard(group: group) { substitution in
+                            ForEach(myRequestGroups) { group in
+                                SubstitutionRequestGroupCard(group: group, isExpanded: expansionBinding(for: group)) { substitution in
                                     SubstitutionRow(
                                         substitution: substitution,
                                         isOwnRequest: true,
@@ -3244,8 +3415,8 @@ struct SubstitutionCenterSheet: View {
                             SectionTitle(title: "Escalas que assumi", symbol: "checkmark.circle")
                                 .padding(.horizontal, 4)
 
-                            ForEach(compactedGroups(acceptedRequests)) { group in
-                                SubstitutionRequestGroupCard(group: group) { substitution in
+                            ForEach(acceptedRequestGroups) { group in
+                                SubstitutionRequestGroupCard(group: group, isExpanded: expansionBinding(for: group)) { substitution in
                                     SubstitutionRow(
                                         substitution: substitution,
                                         isOwnRequest: false,
@@ -3272,6 +3443,7 @@ struct SubstitutionCenterSheet: View {
         }
         .task {
             await appModel.loadSubstitutions()
+            configureInitialGroupExpansion()
         }
         .refreshable {
             await appModel.loadSubstitutions()
@@ -3294,6 +3466,14 @@ struct SubstitutionCenterSheet: View {
             }
 
             Spacer()
+
+            MESCIconButton(
+                symbol: areAllGroupsExpanded ? "rectangle.compress.vertical" : "rectangle.expand.vertical",
+                accessibilityLabel: areAllGroupsExpanded ? "Recolher todos os pedidos" : "Expandir todos os pedidos",
+                isDisabled: allGroupIDs.isEmpty
+            ) {
+                toggleAllGroups()
+            }
 
             MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar substituições") {
                 dismiss()
@@ -3327,6 +3507,35 @@ struct SubstitutionCenterSheet: View {
             return dateComparison == .orderedSame ? $0.time < $1.time : dateComparison == .orderedAscending
         }
     }
+
+    private func expansionBinding(for group: SubstitutionRequestGroup) -> Binding<Bool> {
+        Binding(
+            get: { expandedGroupIDs.contains(group.id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedGroupIDs.insert(group.id)
+                } else {
+                    expandedGroupIDs.remove(group.id)
+                }
+            }
+        )
+    }
+
+    private func configureInitialGroupExpansion() {
+        guard !hasConfiguredInitialExpansion else { return }
+        expandedGroupIDs = Set(allGroups.filter { $0.requests.count == 1 }.map(\.id))
+        hasConfiguredInitialExpansion = true
+    }
+
+    private func toggleAllGroups() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if areAllGroupsExpanded {
+                expandedGroupIDs.removeAll()
+            } else {
+                expandedGroupIDs.formUnion(allGroupIDs)
+            }
+        }
+    }
 }
 
 struct SubstitutionRequestGroup: Identifiable {
@@ -3339,12 +3548,16 @@ struct SubstitutionRequestGroup: Identifiable {
 struct SubstitutionRequestGroupCard<Content: View>: View {
     let group: SubstitutionRequestGroup
     @ViewBuilder let content: (MobileSubstitutionDTO) -> Content
-    @State private var isExpanded: Bool
+    @Binding private var isExpanded: Bool
 
-    init(group: SubstitutionRequestGroup, @ViewBuilder content: @escaping (MobileSubstitutionDTO) -> Content) {
+    init(
+        group: SubstitutionRequestGroup,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: @escaping (MobileSubstitutionDTO) -> Content
+    ) {
         self.group = group
         self.content = content
-        _isExpanded = State(initialValue: group.requests.count == 1)
+        _isExpanded = isExpanded
     }
 
     var body: some View {
@@ -4027,6 +4240,7 @@ struct FormationScreen: View {
     @State private var isLessonPresented = false
     @State private var isVideoLibraryPresented = false
     @State private var isStudioPresented = false
+    @State private var selectedModule: FormationModuleSelection?
 
     var body: some View {
         MESCScrollScreen(title: "Formação", subtitle: "Caminho de preparo e serviço") {
@@ -4045,7 +4259,13 @@ struct FormationScreen: View {
                 )
 
                 ForEach(overview.tracks) { track in
-                    FormationTrackPanel(track: track, onOpenLesson: openLesson)
+                    FormationTrackPanel(
+                        track: track,
+                        onOpenLesson: openLesson,
+                        onOpenModule: { module in
+                            selectedModule = FormationModuleSelection(trackTitle: track.title, module: module)
+                        }
+                    )
                 }
             } else {
                 GlassPanel(spacing: 14) {
@@ -4090,6 +4310,15 @@ struct FormationScreen: View {
             FormationAdminStudioSheet()
                 .environmentObject(appModel)
         }
+        .sheet(item: $selectedModule) { selection in
+            FormationModuleSheet(trackTitle: selection.trackTitle, module: selection.module) { lesson in
+                selectedModule = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    openLesson(lesson)
+                }
+            }
+            .environmentObject(appModel)
+        }
         .task {
             guard appModel.formationOverview == nil, !appModel.isLoadingFormationOverview else { return }
             await appModel.refreshFormation()
@@ -4104,6 +4333,13 @@ struct FormationScreen: View {
             }
         }
     }
+}
+
+private struct FormationModuleSelection: Identifiable {
+    let trackTitle: String
+    let module: MobileFormationModuleDTO
+
+    var id: String { module.id }
 }
 
 struct FormationOverviewPanel: View {
@@ -4226,6 +4462,7 @@ struct FormationActionButton: View {
 struct FormationTrackPanel: View {
     let track: MobileFormationTrackDTO
     let onOpenLesson: (MobileFormationLessonDTO) -> Void
+    let onOpenModule: (MobileFormationModuleDTO) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -4247,7 +4484,11 @@ struct FormationTrackPanel: View {
                 .tint(MESCColor.accent)
 
             ForEach(track.modules) { module in
-                FormationModuleRow(module: module, onOpenLesson: onOpenLesson)
+                FormationModuleRow(
+                    module: module,
+                    onOpenLesson: onOpenLesson,
+                    onOpenModule: { onOpenModule(module) }
+                )
             }
         }
     }
@@ -4267,25 +4508,31 @@ struct FormationTrackPanel: View {
 struct FormationModuleRow: View {
     let module: MobileFormationModuleDTO
     let onOpenLesson: (MobileFormationLessonDTO) -> Void
+    let onOpenModule: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(module.title)
-                        .font(MESCFont.body.weight(.semibold))
-                    Text("\(module.stats.completedLessons)/\(module.stats.totalLessons) aulas concluídas")
-                        .font(MESCFont.caption)
-                        .foregroundStyle(MESCColor.textSecondary)
+            Button(action: onOpenModule) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(module.title)
+                            .font(MESCFont.body.weight(.semibold))
+                        Text("\(module.stats.completedLessons)/\(module.stats.totalLessons) aulas concluídas")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: module.videoUrl == nil ? "chevron.right" : "play.rectangle")
+                        .foregroundStyle(MESCColor.accent)
                 }
-                Spacer()
-                Image(systemName: module.videoUrl == nil ? "chevron.right" : "play.rectangle")
-                    .foregroundStyle(MESCColor.accent)
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Abre as aulas deste módulo")
+
             ProgressView(value: Double(module.stats.progressPercentage), total: 100)
                 .tint(MESCColor.gold)
 
-            ForEach(module.lessons.prefix(3)) { lesson in
+            ForEach(module.lessons) { lesson in
                 Button {
                     onOpenLesson(lesson)
                 } label: {
@@ -4333,6 +4580,95 @@ struct FormationModuleRow: View {
     }
 }
 
+struct FormationModuleSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let trackTitle: String
+    let module: MobileFormationModuleDTO
+    let onOpenLesson: (MobileFormationLessonDTO) -> Void
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    GlassPanel(spacing: 12) {
+                        HStack(alignment: .top, spacing: 12) {
+                            SymbolTile(symbol: module.videoUrl == nil ? "book.closed" : "play.rectangle", tint: MESCColor.gold)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(trackTitle)
+                                    .font(MESCFont.caption)
+                                    .foregroundStyle(MESCColor.accent)
+                                Text(module.title)
+                                    .font(MESCFont.title2)
+                                    .foregroundStyle(MESCColor.textPrimary)
+                                Text("\(module.stats.completedLessons) de \(module.stats.totalLessons) aulas concluídas")
+                                    .font(MESCFont.caption)
+                                    .foregroundStyle(MESCColor.textSecondary)
+                            }
+                            Spacer()
+                            MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar módulo") {
+                                dismiss()
+                            }
+                        }
+
+                        if let description = module.description, !description.isEmpty {
+                            Text(description)
+                                .font(MESCFont.body)
+                                .foregroundStyle(MESCColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    ForEach(module.lessons) { lesson in
+                        Button {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                onOpenLesson(lesson)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SymbolTile(
+                                    symbol: lesson.progress?.status == "completed" ? "checkmark.seal.fill" : "play.circle.fill",
+                                    tint: lesson.progress?.status == "completed" ? MESCColor.gold : MESCColor.accent
+                                )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(lesson.title)
+                                        .font(MESCFont.body.weight(.semibold))
+                                        .foregroundStyle(MESCColor.textPrimary)
+                                    Text(lessonDetail(lesson))
+                                        .font(MESCFont.caption)
+                                        .foregroundStyle(MESCColor.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(MESCColor.textSecondary)
+                            }
+                            .padding(14)
+                            .mescGlass(cornerRadius: 18)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+    }
+
+    private func lessonDetail(_ lesson: MobileFormationLessonDTO) -> String {
+        let status: String
+        switch lesson.progress?.status {
+        case "completed": status = "Concluída"
+        case "in_progress": status = "Em andamento"
+        default: status = "Não iniciada"
+        }
+        return "\(status) - Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " - \($0) min" } ?? "")"
+    }
+}
+
 struct FormationLessonSheet: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @Environment(\.dismiss) private var dismiss
@@ -4370,6 +4706,7 @@ struct FormationLessonSheet: View {
                                 section: section,
                                 isCompleted: detail.progress.completedSections?.contains(section.id) == true || detail.progress.status == "completed",
                                 isCompleting: appModel.completingFormationSectionId == section.id,
+                                isProgressMutationInFlight: appModel.isCompletingFormationLesson || appModel.completingFormationSectionId != nil,
                                 isLessonCompleted: detail.progress.status == "completed"
                             ) {
                                 Task { await appModel.completeFormationLessonSection(sectionId: section.id) }
@@ -4393,7 +4730,7 @@ struct FormationLessonSheet: View {
                         ) {
                             Task { await appModel.completeCurrentFormationLesson() }
                         }
-                        .disabled(appModel.isCompletingFormationLesson || detail.progress.status == "completed")
+                        .disabled(appModel.isCompletingFormationLesson || appModel.completingFormationSectionId != nil || detail.progress.status == "completed")
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 20)
@@ -4549,6 +4886,7 @@ struct FormationAdminStudioSheet: View {
     @State private var videoUrl = ""
     @State private var durationText = ""
     @State private var isActive = true
+    @State private var selectedLessonForEditing: MobileFormationAdminLessonDTO?
 
     var body: some View {
         ZStack {
@@ -4590,6 +4928,12 @@ struct FormationAdminStudioSheet: View {
         }
         .onChange(of: moduleIds) { _ in
             selectDefaultModuleIfNeeded()
+        }
+        .sheet(item: $selectedLessonForEditing) { lesson in
+            FormationAdminLessonEditorSheet(lesson: lesson) {
+                selectedLessonForEditing = nil
+            }
+            .environmentObject(appModel)
         }
     }
 
@@ -4717,8 +5061,10 @@ struct FormationAdminStudioSheet: View {
             if lessons.isEmpty {
                 EmptyState(title: "Sem aulas cadastradas", detail: "As novas aulas aparecerão aqui após o primeiro salvamento.")
             } else {
-                ForEach(lessons.prefix(8)) { lesson in
-                    FormationAdminLessonListRow(lesson: lesson)
+                ForEach(lessons) { lesson in
+                    FormationAdminLessonListRow(lesson: lesson) {
+                        selectedLessonForEditing = lesson
+                    }
                 }
             }
         }
@@ -4798,32 +5144,243 @@ struct FormationAdminStudioSheet: View {
 
 struct FormationAdminLessonListRow: View {
     let lesson: MobileFormationAdminLessonDTO
+    let onOpen: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            SymbolTile(symbol: lesson.videoUrl == nil ? "text.book.closed" : "play.rectangle", tint: lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(lesson.title)
-                    .font(MESCFont.body.weight(.semibold))
-                    .foregroundStyle(MESCColor.textPrimary)
-                    .lineLimit(2)
-                HStack(spacing: 8) {
-                    Text("Aula \(lesson.lessonNumber)")
-                    if let duration = lesson.estimatedDuration {
-                        Text("\(duration) min")
+        Button(action: onOpen) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: lesson.videoUrl == nil ? "text.book.closed" : "play.rectangle", tint: lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lesson.title)
+                        .font(MESCFont.body.weight(.semibold))
+                        .foregroundStyle(MESCColor.textPrimary)
+                        .lineLimit(2)
+                    HStack(spacing: 8) {
+                        Text("Aula \(lesson.lessonNumber)")
+                        if let duration = lesson.estimatedDuration {
+                            Text("\(duration) min")
+                        }
+                        Text("\(lesson.sectionsCount) seções")
                     }
-                    Text("\(lesson.sectionsCount) seções")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    Text(lesson.isActive ? "Publicada" : "Rascunho")
+                        .font(MESCFont.caption2.weight(.semibold))
+                        .foregroundStyle(lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
                 }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+            .padding(12)
+            .mescGlass(cornerRadius: 16)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Edita esta aula ou adiciona conteúdo")
+    }
+}
+
+struct FormationAdminLessonEditorSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let lesson: MobileFormationAdminLessonDTO
+    let onFinished: () -> Void
+
+    @State private var title: String
+    @State private var description: String
+    @State private var durationText: String
+    @State private var isActive: Bool
+    @State private var sectionTitle = ""
+    @State private var sectionContent = ""
+    @State private var sectionVideoUrl = ""
+
+    init(lesson: MobileFormationAdminLessonDTO, onFinished: @escaping () -> Void) {
+        self.lesson = lesson
+        self.onFinished = onFinished
+        _title = State(initialValue: lesson.title)
+        _description = State(initialValue: lesson.description ?? "")
+        _durationText = State(initialValue: lesson.estimatedDuration.map(String.init) ?? "")
+        _isActive = State(initialValue: lesson.isActive)
+    }
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    lessonDetails
+                    contentForm
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 34)
+            }
+        }
+    }
+
+    private var header: some View {
+        GlassPanel(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(symbol: lesson.videoUrl == nil ? "text.book.closed" : "play.rectangle", tint: MESCColor.gold)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Coordenação")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.accent)
+                    Text("Editar aula")
+                        .font(MESCFont.title2)
+                    Text("Aula \(lesson.lessonNumber) · \(lesson.sectionsCount) seções")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+                Spacer()
+                MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar edição") {
+                    onFinished()
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    private var lessonDetails: some View {
+        GlassPanel(spacing: 14) {
+            SectionTitle(title: "Dados da aula", symbol: "square.and.pencil")
+            field("Título", text: $title, placeholder: "Título da aula")
+            field("Descrição", text: $description, placeholder: "Resumo para os ministros")
+            field("Duração em minutos", text: $durationText, placeholder: "Ex.: 12", keyboard: .numberPad)
+
+            Toggle(isOn: $isActive) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Publicada")
+                        .font(MESCFont.body.weight(.semibold))
+                    Text(isActive ? "Visível para os ministros." : "Mantida como rascunho para a coordenação.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+            }
+            .tint(MESCColor.accent)
+            .padding(12)
+            .mescGlass(cornerRadius: 16)
+
+            MESCPrimaryButton(
+                title: appModel.isSavingFormationContent ? "Salvando..." : "Salvar alterações",
+                symbol: "checkmark.circle"
+            ) {
+                Task { await saveLesson() }
+            }
+            .disabled(appModel.isSavingFormationContent || cleaned(title).count < 3)
+            .opacity(appModel.isSavingFormationContent || cleaned(title).count < 3 ? 0.55 : 1)
+        }
+    }
+
+    private var contentForm: some View {
+        GlassPanel(spacing: 14) {
+            SectionTitle(title: "Adicionar conteúdo", symbol: "plus.rectangle.on.rectangle")
+            Text("Inclua uma nova seção de leitura ou vídeo sem substituir o que já foi publicado.")
                 .font(MESCFont.caption)
                 .foregroundStyle(MESCColor.textSecondary)
-                Text(lesson.isActive ? "Publicada" : "Rascunho")
-                    .font(MESCFont.caption2.weight(.semibold))
-                    .foregroundStyle(lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            field("Título da seção", text: $sectionTitle, placeholder: "Ex.: Preparação da procissão")
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Conteúdo da seção")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                TextEditor(text: $sectionContent)
+                    .font(MESCFont.body)
+                    .frame(minHeight: 120)
+                    .padding(10)
+                    .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(MESCColor.separator, lineWidth: 1)
+                    )
             }
-            Spacer()
+
+            field("URL do vídeo", text: $sectionVideoUrl, placeholder: "https://...", keyboard: .URL)
+
+            MESCSecondaryButton(
+                title: appModel.isSavingFormationContent ? "Adicionando..." : "Adicionar seção",
+                symbol: "plus.circle"
+            ) {
+                Task { await addSection() }
+            }
+            .disabled(appModel.isSavingFormationContent || cleaned(sectionTitle).count < 3)
+            .opacity(appModel.isSavingFormationContent || cleaned(sectionTitle).count < 3 ? 0.55 : 1)
         }
-        .padding(12)
-        .mescGlass(cornerRadius: 16)
+    }
+
+    private func field(
+        _ label: String,
+        text: Binding<String>,
+        placeholder: String,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+            TextField(placeholder, text: text)
+                .font(MESCFont.body)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(keyboard == .URL ? .never : .sentences)
+                .autocorrectionDisabled(keyboard == .URL)
+                .padding(14)
+                .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(MESCColor.separator, lineWidth: 1)
+                )
+        }
+    }
+
+    private func saveLesson() async {
+        let saved = await appModel.updateFormationAdminLesson(
+            lessonId: lesson.id,
+            payload: FormationAdminLessonUpdateRequestBody(
+                title: cleaned(title),
+                description: nilIfEmpty(description),
+                lessonNumber: nil,
+                durationMinutes: Int(cleaned(durationText)),
+                isActive: isActive
+            )
+        )
+        if saved {
+            onFinished()
+        }
+    }
+
+    private func addSection() async {
+        let created = await appModel.createFormationAdminLessonSection(
+            lessonId: lesson.id,
+            payload: FormationAdminSectionRequestBody(
+                title: cleaned(sectionTitle),
+                content: nilIfEmpty(sectionContent),
+                type: nil,
+                videoUrl: nilIfEmpty(sectionVideoUrl),
+                audioUrl: nil,
+                documentUrl: nil,
+                estimatedMinutes: Int(cleaned(durationText)),
+                isRequired: true
+            )
+        )
+        if created {
+            sectionTitle = ""
+            sectionContent = ""
+            sectionVideoUrl = ""
+            onFinished()
+        }
+    }
+
+    private func cleaned(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func nilIfEmpty(_ value: String) -> String? {
+        let value = cleaned(value)
+        return value.isEmpty ? nil : value
     }
 }
 
@@ -4831,6 +5388,7 @@ struct FormationLessonSectionCard: View {
     let section: MobileFormationLessonSectionDTO
     let isCompleted: Bool
     let isCompleting: Bool
+    let isProgressMutationInFlight: Bool
     let isLessonCompleted: Bool
     let onComplete: () -> Void
 
@@ -4881,7 +5439,7 @@ struct FormationLessonSectionCard: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(MESCColor.accent)
-                .disabled(isCompleting || isLessonCompleted)
+                .disabled(isProgressMutationInFlight || isLessonCompleted)
             }
         }
     }
@@ -6957,18 +7515,18 @@ enum MESCGlassIntensity {
     var shadowOpacity: Double {
         switch self {
         case .panel:
-            return 0.13
+            return 0.08
         case .floating:
-            return 0.20
+            return 0.12
         }
     }
 
     var highlightOpacity: Double {
         switch self {
         case .panel:
-            return 0.22
+            return 0.16
         case .floating:
-            return 0.30
+            return 0.22
         }
     }
 }
@@ -6977,29 +7535,24 @@ extension View {
     @ViewBuilder
     func mescGlass(cornerRadius: CGFloat, intensity: MESCGlassIntensity = .panel) -> some View {
         if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
-                self
-                    .background(intensity.material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .glassEffect(
-                        .regular
-                            .tint(intensity.tint)
-                            .interactive(),
-                        in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    )
-                    .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
-                    .overlay(glassBorder(cornerRadius: cornerRadius))
-                    .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity), radius: intensity == .floating ? 30 : 24, x: 0, y: intensity == .floating ? 12 : 10)
-                    .shadow(color: Color.white.opacity(intensity == .floating ? 0.28 : 0.18), radius: 1, x: -0.5, y: -0.5)
-            }
+            self
+                .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .glassEffect(
+                    .regular.tint(intensity.tint),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
+                .overlay(glassBorder(cornerRadius: cornerRadius))
+                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity), radius: intensity == .floating ? 18 : 14, x: 0, y: intensity == .floating ? 8 : 6)
+                .shadow(color: Color.white.opacity(intensity == .floating ? 0.22 : 0.14), radius: 0.6, x: -0.5, y: -0.5)
         } else {
             self
                 .background(intensity.material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
                 .overlay(glassBorder(cornerRadius: cornerRadius))
-                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity * 0.82), radius: intensity == .floating ? 26 : 20, x: 0, y: intensity == .floating ? 10 : 8)
-                .shadow(color: Color.white.opacity(intensity == .floating ? 0.24 : 0.14), radius: 1, x: -0.5, y: -0.5)
+                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity * 0.82), radius: intensity == .floating ? 16 : 12, x: 0, y: intensity == .floating ? 8 : 6)
+                .shadow(color: Color.white.opacity(intensity == .floating ? 0.20 : 0.12), radius: 0.6, x: -0.5, y: -0.5)
         }
     }
 
@@ -7022,34 +7575,21 @@ extension View {
     private func glassRefraction(cornerRadius: CGFloat, opacity: Double) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        return ZStack {
-            shape
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(opacity),
-                            Color.white.opacity(opacity * 0.18),
-                            MESCColor.gold.opacity(opacity * 0.34),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+        return shape
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(opacity),
+                        Color.white.opacity(opacity * 0.16),
+                        MESCColor.gold.opacity(opacity * 0.26),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
-
-            shape
-                .stroke(Color.white.opacity(opacity * 0.70), lineWidth: 0.7)
-                .blur(radius: 0.6)
-                .offset(x: -0.5, y: -0.5)
-                .mask(shape)
-
-            shape
-                .stroke(MESCColor.primaryWine.opacity(opacity * 0.28), lineWidth: 1)
-                .blur(radius: 1.4)
-                .offset(x: 1.2, y: 1.2)
-                .mask(shape)
-        }
-        .allowsHitTesting(false)
+            )
+            .overlay(shape.stroke(Color.white.opacity(opacity * 0.52), lineWidth: 0.5))
+            .allowsHitTesting(false)
     }
 }
 
@@ -8366,6 +8906,42 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func updateFormationAdminLesson(
+        lessonId: String,
+        payload: FormationAdminLessonUpdateRequestBody,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileFormationAdminLessonResponseDTO {
+        try await authenticatedPatch(
+            "formation/admin/lessons/\(lessonId)",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: payload
+        )
+    }
+
+    func createFormationAdminLessonSection(
+        lessonId: String,
+        payload: FormationAdminSectionRequestBody,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileFormationAdminLessonResponseDTO {
+        try await authenticatedPost(
+            "formation/admin/lessons/\(lessonId)/sections",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: payload
+        )
+    }
+
     func confirmSchedule(
         scheduleId: String,
         accessToken: String,
@@ -8860,6 +9436,25 @@ struct FormationAdminLessonRequestBody: Encodable {
     let sectionTitle: String?
     let sectionContent: String?
     let videoUrl: String?
+}
+
+struct FormationAdminLessonUpdateRequestBody: Encodable {
+    let title: String?
+    let description: String?
+    let lessonNumber: Int?
+    let durationMinutes: Int?
+    let isActive: Bool?
+}
+
+struct FormationAdminSectionRequestBody: Encodable {
+    let title: String
+    let content: String?
+    let type: String?
+    let videoUrl: String?
+    let audioUrl: String?
+    let documentUrl: String?
+    let estimatedMinutes: Int?
+    let isRequired: Bool?
 }
 
 private struct CoordinatorSchedulePreviewRequestBody: Encodable {

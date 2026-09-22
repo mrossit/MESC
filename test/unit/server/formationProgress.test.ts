@@ -149,6 +149,38 @@ describe("formation progress", () => {
     expect(lesson.progress.progressPercentage).toBe(100);
   });
 
+  it("accepts JSONB section metadata returned as an object", async () => {
+    dbMock.execute
+      .mockResolvedValueOnce({ rows: [lessonRow] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "section-1",
+          lessonId: "lesson-altar",
+          title: "Revisão",
+          content: "Conteúdo",
+          orderIndex: 1,
+          contentType: "quiz",
+          videoUrl: null,
+          audioUrl: null,
+          documentUrl: null,
+          quizData: { questions: [{ prompt: "Qual é a resposta?" }] },
+          interactiveData: { kind: "checklist" },
+        }],
+      });
+
+    const { getLessonDetail } = await import("../../../server/services/formationService");
+    const detail = await getLessonDetail({
+      trackId: "track-liturgia",
+      moduleId: "module-ritos",
+      lessonNumber: 1,
+    });
+
+    expect(detail?.sections[0]?.quizData).toEqual({
+      questions: [{ prompt: "Qual é a resposta?" }],
+    });
+    expect(detail?.sections[0]?.interactiveData).toEqual({ kind: "checklist" });
+  });
+
   it("marks a valid lesson section as partial progress", async () => {
     dbMock.execute
       .mockResolvedValueOnce({ rows: [{ id: "section-1" }] })
