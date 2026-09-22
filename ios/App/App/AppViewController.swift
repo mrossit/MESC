@@ -3055,7 +3055,7 @@ struct QuestionnaireSheet: View {
 
             if let questionnaire = appModel.activeQuestionnaire {
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: 18) {
                         header(questionnaire)
 
                         if questionnaire.responseStatus == "answered" {
@@ -3362,7 +3362,7 @@ struct SubstitutionCenterSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     header
 
                     if appModel.isLoadingSubstitutions && appModel.substitutions.isEmpty {
@@ -4591,7 +4591,7 @@ struct FormationModuleSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     GlassPanel(spacing: 12) {
                         HStack(alignment: .top, spacing: 12) {
                             SymbolTile(symbol: module.videoUrl == nil ? "book.closed" : "play.rectangle", tint: MESCColor.gold)
@@ -4679,7 +4679,7 @@ struct FormationLessonSheet: View {
 
             if let detail = appModel.formationLessonDetail {
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: 18) {
                         header(detail)
 
                         if let description = detail.lesson.description, !description.isEmpty {
@@ -4809,7 +4809,7 @@ struct FormationVideoLibrarySheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     GlassPanel(spacing: 12) {
                         HStack(alignment: .top, spacing: 12) {
                             SymbolTile(symbol: "play.rectangle", tint: MESCColor.gold)
@@ -4893,7 +4893,7 @@ struct FormationAdminStudioSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     header
 
                     if let studio = appModel.formationAdminStudio {
@@ -5209,7 +5209,7 @@ struct FormationAdminLessonEditorSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     header
                     lessonDetails
                     contentForm
@@ -6311,7 +6311,7 @@ struct MESCScrollScreen<Content: View>: View {
                 MESCBackground()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: 18) {
                         Text(subtitle)
                             .font(MESCFont.subheadline.weight(.semibold))
                             .foregroundStyle(MESCColor.accent)
@@ -6414,7 +6414,7 @@ struct MESCNotificationBell: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(MESCColor.accent)
                     .frame(width: 42, height: 42)
-                    .mescGlass(cornerRadius: 14)
+                    .mescLiveGlass(cornerRadius: 14)
 
                 if unreadCount > 0 {
                     Text(unreadCount > 9 ? "9+" : "\(unreadCount)")
@@ -6443,7 +6443,7 @@ struct MESCNotificationCenterSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     header
 
                     if appModel.isLoadingNotifications && appModel.notifications.isEmpty {
@@ -6941,7 +6941,7 @@ struct ScheduleMassDetailSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     GlassPanel(spacing: 12) {
                         HStack(alignment: .top, spacing: 12) {
                             SymbolTile(symbol: "calendar.badge.clock", tint: MESCColor.gold)
@@ -7085,7 +7085,7 @@ struct ScheduleMassEditorSheet: View {
             MESCBackground()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     header
 
                     if appModel.isLoadingScheduleEditor && appModel.scheduleEditor == nil {
@@ -7503,15 +7503,6 @@ enum MESCGlassIntensity {
         }
     }
 
-    var material: Material {
-        switch self {
-        case .panel:
-            return .ultraThinMaterial
-        case .floating:
-            return .thinMaterial
-        }
-    }
-
     var shadowOpacity: Double {
         switch self {
         case .panel:
@@ -7534,6 +7525,28 @@ enum MESCGlassIntensity {
 extension View {
     @ViewBuilder
     func mescGlass(cornerRadius: CGFloat, intensity: MESCGlassIntensity = .panel) -> some View {
+        // Cards move with the scroll view, so their finish must not continuously sample
+        // and blur the backdrop. The static refraction keeps the glass language intact.
+        self
+            .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
+            .overlay(glassBorder(cornerRadius: cornerRadius))
+            .shadow(
+                color: MESCColor.primaryWine.opacity(intensity.shadowOpacity * 0.72),
+                radius: intensity == .floating ? 10 : 7,
+                x: 0,
+                y: intensity == .floating ? 5 : 4
+            )
+            .shadow(
+                color: Color.white.opacity(intensity == .floating ? 0.18 : 0.12),
+                radius: 0.5,
+                x: -0.5,
+                y: -0.5
+            )
+    }
+
+    @ViewBuilder
+    func mescLiveGlass(cornerRadius: CGFloat, intensity: MESCGlassIntensity = .floating) -> some View {
         if #available(iOS 26.0, *) {
             self
                 .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -7543,16 +7556,10 @@ extension View {
                 )
                 .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
                 .overlay(glassBorder(cornerRadius: cornerRadius))
-                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity), radius: intensity == .floating ? 18 : 14, x: 0, y: intensity == .floating ? 8 : 6)
-                .shadow(color: Color.white.opacity(intensity == .floating ? 0.22 : 0.14), radius: 0.6, x: -0.5, y: -0.5)
+                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity), radius: 10, x: 0, y: 5)
+                .shadow(color: Color.white.opacity(0.20), radius: 0.5, x: -0.5, y: -0.5)
         } else {
-            self
-                .background(intensity.material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .background(intensity.base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .overlay(glassRefraction(cornerRadius: cornerRadius, opacity: intensity.highlightOpacity))
-                .overlay(glassBorder(cornerRadius: cornerRadius))
-                .shadow(color: MESCColor.primaryWine.opacity(intensity.shadowOpacity * 0.82), radius: intensity == .floating ? 16 : 12, x: 0, y: intensity == .floating ? 8 : 6)
-                .shadow(color: Color.white.opacity(intensity == .floating ? 0.20 : 0.12), radius: 0.6, x: -0.5, y: -0.5)
+            mescGlass(cornerRadius: cornerRadius, intensity: intensity)
         }
     }
 
