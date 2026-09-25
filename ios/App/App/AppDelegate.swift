@@ -1,5 +1,4 @@
 import UIKit
-import Capacitor
 import UserNotifications
 
 @UIApplicationMain
@@ -38,27 +37,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        guard url.path.hasPrefix("/") else { return false }
+        publishNotificationDeepLink(url.path)
+        return true
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+        guard let url = userActivity.webpageURL, url.path.hasPrefix("/") else { return false }
+        publishNotificationDeepLink(url.path)
+        return true
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
-
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
         NotificationCenter.default.post(name: .mescRemoteNotificationDeviceToken, object: token)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
         NotificationCenter.default.post(name: .mescRemoteNotificationRegistrationFailed, object: error.localizedDescription)
     }
 
@@ -81,7 +76,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     private func publishNotificationDeepLink(from userInfo: [AnyHashable: Any]) {
         guard let deepLink = notificationDeepLink(from: userInfo) else { return }
+        publishNotificationDeepLink(deepLink)
+    }
 
+    private func publishNotificationDeepLink(_ deepLink: String) {
         UserDefaults.standard.set(deepLink, forKey: Notification.Name.mescRemoteNotificationDeepLinkStorageKey)
         NotificationCenter.default.post(name: .mescRemoteNotificationOpened, object: deepLink)
     }

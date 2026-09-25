@@ -1,5 +1,8 @@
+import AVKit
 import Foundation
 import LocalAuthentication
+import QuickLook
+import SafariServices
 import Security
 import SwiftUI
 import UIKit
@@ -120,25 +123,33 @@ final class MESCNativeAppModel: ObservableObject {
     @Published var formationOverview: MobileFormationOverviewDTO?
     @Published var formationLessonDetail: MobileFormationLessonDetailDTO?
     @Published var formationAdminStudio: MobileFormationAdminStudioDTO?
+    @Published var formationCertificates: [MobileFormationCertificateDTO] = []
+    @Published var formationLibraryMaterials: [MobileFormationMaterialDTO] = []
     @Published var coordinatorHome: MobileCoordinatorCommunityHomeDTO?
     @Published var coordinatorReadiness: MobileCoordinatorScheduleReadinessDTO?
     @Published var coordinatorMinisters: [MobileCoordinatorMinisterDTO] = []
     @Published var coordinatorQuestionnaireResponses: MobileCoordinatorQuestionnaireResponsesDTO?
     @Published var coordinatorSchedulePreview: MobileCoordinatorSchedulePreviewDTO?
+    @Published var directoryMinisters: [MobileDirectoryMinisterDTO] = []
     @Published var isSavingQuestionnaire = false
     @Published var isLoadingFormationOverview = false
+    @Published var isLoadingFormationResources = false
     @Published var isLoadingFormationLesson = false
+    @Published var isDownloadingFormationFile = false
     @Published var isCompletingFormationLesson = false
     @Published var completingFormationSectionId: String?
     @Published var isLoadingFormationStudio = false
     @Published var isSavingFormationContent = false
     @Published var isLoadingCoordinator = false
     @Published var isLoadingCoordinatorQuestionnaire = false
+    @Published var isMutatingCoordinatorQuestionnaire = false
+    @Published var isLoadingDirectory = false
     @Published var isGeneratingCoordinatorPreview = false
     @Published var isPublishingCoordinatorSchedule = false
     @Published var questionnaireMessage: String?
     @Published var formationMessage: String?
     @Published var coordinatorMessage: String?
+    @Published var directoryMessage: String?
     @Published var scheduleActionMessage: String?
     @Published var isMutatingSchedule = false
     @Published var isLoadingScheduleEditor = false
@@ -174,6 +185,7 @@ final class MESCNativeAppModel: ObservableObject {
     private let client = MESCMobileAPIClient()
     private let sessionStore = MESCNativeSessionStore()
     private var notificationObservers: [NSObjectProtocol] = []
+    private var directoryPhotos: [String: UIImage] = [:]
 
     init() {
         notificationObservers.append(
@@ -456,14 +468,19 @@ final class MESCNativeAppModel: ObservableObject {
         formationOverview = nil
         formationLessonDetail = nil
         formationAdminStudio = nil
+        formationCertificates = []
+        formationLibraryMaterials = []
         coordinatorHome = nil
         coordinatorReadiness = nil
         coordinatorMinisters = []
         coordinatorQuestionnaireResponses = nil
         coordinatorSchedulePreview = nil
+        directoryMinisters = []
+        directoryPhotos = [:]
         questionnaireMessage = nil
         formationMessage = nil
         coordinatorMessage = nil
+        directoryMessage = nil
         scheduleActionMessage = nil
         settingsMessage = nil
         currentDevice = nil
@@ -594,7 +611,10 @@ final class MESCNativeAppModel: ObservableObject {
         }
     }
 
-    func submitQuestionnaire(answers: [MobileQuestionnaireAnswerDTO]) async -> Bool {
+    func submitQuestionnaire(
+        answers: [MobileQuestionnaireAnswerDTO],
+        sharedWithFamilyIds: [String] = []
+    ) async -> Bool {
         guard let accessToken = sessionStore.accessToken else {
             handleSessionFailure(MESCMobileAPIError.unauthenticated)
             return false
@@ -615,7 +635,8 @@ final class MESCNativeAppModel: ObservableObject {
                 communityId: sessionStore.activeCommunityId,
                 deviceId: sessionStore.deviceId,
                 idempotencyKey: UUID().uuidString,
-                responses: answers
+                responses: answers,
+                sharedWithFamilyIds: sharedWithFamilyIds
             )
             questionnaireMessage = "Resposta salva com sucesso."
             try await loadCurrentQuestionnaire(accessToken: accessToken)
@@ -630,7 +651,8 @@ final class MESCNativeAppModel: ObservableObject {
                         communityId: sessionStore.activeCommunityId,
                         deviceId: sessionStore.deviceId,
                         idempotencyKey: UUID().uuidString,
-                        responses: answers
+                        responses: answers,
+                        sharedWithFamilyIds: sharedWithFamilyIds
                     )
                     questionnaireMessage = "Resposta salva com sucesso."
                     try await loadCurrentQuestionnaire(accessToken: accessToken)
@@ -1173,7 +1195,12 @@ final class MESCNativeAppModel: ObservableObject {
             )
             formationLessonDetail = detail.withProgress(response.progress)
             await refreshFormationOverviewAfterProgress(accessToken: accessToken)
-            formationMessage = "Aula concluída com sucesso."
+            if response.certificate != nil {
+                await refreshFormationResources()
+            }
+            formationMessage = response.certificate == nil
+                ? "Aula concluída com sucesso."
+                : "Aula concluída. Seu certificado já está disponível."
             isCompletingFormationLesson = false
             return true
         } catch {
@@ -1188,7 +1215,12 @@ final class MESCNativeAppModel: ObservableObject {
                     )
                     formationLessonDetail = detail.withProgress(response.progress)
                     await refreshFormationOverviewAfterProgress(accessToken: accessToken)
-                    formationMessage = "Aula concluída com sucesso."
+                    if response.certificate != nil {
+                        await refreshFormationResources()
+                    }
+                    formationMessage = response.certificate == nil
+                        ? "Aula concluída com sucesso."
+                        : "Aula concluída. Seu certificado já está disponível."
                     isCompletingFormationLesson = false
                     return true
                 } catch {
@@ -1240,7 +1272,12 @@ final class MESCNativeAppModel: ObservableObject {
             )
             formationLessonDetail = detail.withProgress(response.progress)
             await refreshFormationOverviewAfterProgress(accessToken: accessToken)
-            formationMessage = response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída."
+            if response.certificate != nil {
+                await refreshFormationResources()
+            }
+            formationMessage = response.certificate != nil
+                ? "Aula concluída. Seu certificado já está disponível."
+                : (response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída.")
             completingFormationSectionId = nil
             return true
         } catch {
@@ -1256,7 +1293,12 @@ final class MESCNativeAppModel: ObservableObject {
                     )
                     formationLessonDetail = detail.withProgress(response.progress)
                     await refreshFormationOverviewAfterProgress(accessToken: accessToken)
-                    formationMessage = response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída."
+                    if response.certificate != nil {
+                        await refreshFormationResources()
+                    }
+                    formationMessage = response.certificate != nil
+                        ? "Aula concluída. Seu certificado já está disponível."
+                        : (response.progress.status == "completed" ? "Aula concluída com sucesso." : "Seção concluída.")
                     completingFormationSectionId = nil
                     return true
                 } catch {
@@ -1328,10 +1370,12 @@ final class MESCNativeAppModel: ObservableObject {
 
         do {
             try await loadFormationOverview(accessToken: accessToken)
+            await refreshFormationResources()
         } catch {
             if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
                 do {
                     try await loadFormationOverview(accessToken: refreshedAccessToken)
+                    await refreshFormationResources()
                 } catch {
                     formationMessage = MESCMobileAPIClient.userMessage(for: error)
                 }
@@ -1343,6 +1387,114 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         isLoadingFormationOverview = false
+    }
+
+    func refreshFormationResources() async {
+        guard let accessToken = sessionStore.accessToken else {
+            return
+        }
+
+        isLoadingFormationResources = true
+
+        do {
+            try await loadFormationResources(accessToken: accessToken)
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    try await loadFormationResources(accessToken: refreshedAccessToken)
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingFormationResources = false
+    }
+
+    func downloadFormationMaterial(_ material: MobileFormationMaterialDTO) async -> URL? {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return nil
+        }
+
+        isDownloadingFormationFile = true
+        formationMessage = nil
+        defer { isDownloadingFormationFile = false }
+
+        do {
+            let data = try await client.formationMaterialDownload(
+                materialId: material.id,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            return try writeFormationFile(data, fileName: material.fileName)
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    let data = try await client.formationMaterialDownload(
+                        materialId: material.id,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                    return try writeFormationFile(data, fileName: material.fileName)
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        return nil
+    }
+
+    func downloadFormationCertificate(_ certificate: MobileFormationCertificateDTO) async -> URL? {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return nil
+        }
+
+        isDownloadingFormationFile = true
+        formationMessage = nil
+        defer { isDownloadingFormationFile = false }
+
+        do {
+            let data = try await client.formationCertificatePDF(
+                certificateId: certificate.id,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            return try writeFormationFile(data, fileName: "certificado-\(certificate.certificateNumber).pdf")
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    let data = try await client.formationCertificatePDF(
+                        certificateId: certificate.id,
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                    return try writeFormationFile(data, fileName: "certificado-\(certificate.certificateNumber).pdf")
+                } catch {
+                    formationMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                formationMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        return nil
     }
 
     func createFormationAdminLesson(_ payload: FormationAdminLessonRequestBody) async -> Bool {
@@ -1433,8 +1585,24 @@ final class MESCNativeAppModel: ObservableObject {
         }
     }
 
+    func createFormationAdminMaterial(_ payload: FormationAdminMaterialRequestBody) async -> Bool {
+        await persistFormationContent(
+            successMessage: payload.isPublished == false ? "Material salvo como rascunho." : "Material publicado na biblioteca.",
+            refreshResources: true
+        ) { accessToken, idempotencyKey in
+            _ = try await self.client.createFormationAdminMaterial(
+                payload: payload,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+        }
+    }
+
     private func persistFormationContent(
         successMessage: String,
+        refreshResources: Bool = false,
         operation: @escaping (String, String) async throws -> Void
     ) async -> Bool {
         guard canManageFormation else {
@@ -1454,6 +1622,9 @@ final class MESCNativeAppModel: ObservableObject {
         do {
             try await operation(accessToken, idempotencyKey)
             await refreshFormationOverviewAfterProgress(accessToken: accessToken)
+            if refreshResources {
+                await refreshFormationResources()
+            }
             await loadFormationAdminStudio()
             formationMessage = successMessage
             isSavingFormationContent = false
@@ -1463,6 +1634,9 @@ final class MESCNativeAppModel: ObservableObject {
                 do {
                     try await operation(refreshedAccessToken, idempotencyKey)
                     await refreshFormationOverviewAfterProgress(accessToken: refreshedAccessToken)
+                    if refreshResources {
+                        await refreshFormationResources()
+                    }
                     await loadFormationAdminStudio()
                     formationMessage = successMessage
                     isSavingFormationContent = false
@@ -1479,6 +1653,68 @@ final class MESCNativeAppModel: ObservableObject {
 
         isSavingFormationContent = false
         return false
+    }
+
+    func loadDirectory() async {
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return
+        }
+
+        isLoadingDirectory = true
+        directoryMessage = nil
+
+        do {
+            let response = try await client.directoryMinisters(
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            directoryMinisters = response.ministers
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    let response = try await client.directoryMinisters(
+                        accessToken: refreshedAccessToken,
+                        communityId: sessionStore.activeCommunityId,
+                        deviceId: sessionStore.deviceId
+                    )
+                    directoryMinisters = response.ministers
+                } catch {
+                    directoryMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                directoryMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isLoadingDirectory = false
+    }
+
+    func directoryPhoto(for minister: MobileDirectoryMinisterDTO) async -> UIImage? {
+        guard minister.photoAvailable else { return nil }
+        if let cached = directoryPhotos[minister.id] {
+            return cached
+        }
+        guard let accessToken = sessionStore.accessToken else { return nil }
+
+        do {
+            let data = try await client.directoryMinisterPhoto(
+                ministerId: minister.id,
+                accessToken: accessToken,
+                communityId: sessionStore.activeCommunityId,
+                deviceId: sessionStore.deviceId
+            )
+            let image = UIImage(data: data)
+            if let image {
+                directoryPhotos[minister.id] = image
+            }
+            return image
+        } catch {
+            return nil
+        }
     }
 
     func refreshCoordinator() async {
@@ -1555,6 +1791,111 @@ final class MESCNativeAppModel: ObservableObject {
         }
 
         isLoadingCoordinatorQuestionnaire = false
+    }
+
+    func createCoordinatorQuestionnaire(
+        month: Date,
+        title: String,
+        description: String,
+        deadline: Date
+    ) async -> Bool {
+        let calendar = Calendar(identifier: .gregorian)
+        let components = calendar.dateComponents([.year, .month], from: month)
+        guard let selectedYear = components.year, let selectedMonth = components.month else {
+            coordinatorMessage = "Não foi possível definir o mês do questionário."
+            return false
+        }
+
+        let created = await mutateCoordinatorQuestionnaire { accessToken, idempotencyKey in
+            let response = try await self.client.createCoordinatorQuestionnaire(
+                month: selectedMonth,
+                year: selectedYear,
+                title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : title,
+                description: description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description,
+                deadline: ISO8601DateFormatter().string(from: deadline),
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+            let monthValue = String(format: "%04d-%02d", selectedYear, selectedMonth)
+            return "Questionário criado para \(MESCNativeAppModel.monthLabel(from: monthValue)). \(response.questionnaire.targetCount) ministro(s) serão convidados ao publicar."
+        }
+
+        if created {
+            self.selectedMonth = String(format: "%04d-%02d", selectedYear, selectedMonth)
+            await refreshCoordinator()
+        }
+
+        return created
+    }
+
+    func publishCoordinatorQuestionnaire(questionnaireId: String) async -> Bool {
+        await mutateCoordinatorQuestionnaire { accessToken, idempotencyKey in
+            let response = try await self.client.publishCoordinatorQuestionnaire(
+                questionnaireId: questionnaireId,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+            return "Questionário publicado e \(response.notificationsQueued ?? 0) aviso(s) preparado(s)."
+        }
+    }
+
+    func closeCoordinatorQuestionnaire(questionnaireId: String) async -> Bool {
+        await mutateCoordinatorQuestionnaire { accessToken, idempotencyKey in
+            let response = try await self.client.closeCoordinatorQuestionnaire(
+                questionnaireId: questionnaireId,
+                accessToken: accessToken,
+                communityId: self.sessionStore.activeCommunityId,
+                deviceId: self.sessionStore.deviceId,
+                idempotencyKey: idempotencyKey
+            )
+            return "Questionário encerrado com \(response.questionnaire.responseCount) resposta(s)."
+        }
+    }
+
+    private func mutateCoordinatorQuestionnaire(
+        operation: @escaping (String, String) async throws -> String
+    ) async -> Bool {
+        guard canManageCommunity else {
+            coordinatorMessage = "Acesso restrito à coordenação."
+            return false
+        }
+        guard let accessToken = sessionStore.accessToken else {
+            handleSessionFailure(MESCMobileAPIError.unauthenticated)
+            return false
+        }
+
+        isMutatingCoordinatorQuestionnaire = true
+        coordinatorMessage = nil
+        let idempotencyKey = UUID().uuidString
+
+        do {
+            coordinatorMessage = try await operation(accessToken, idempotencyKey)
+            await refreshCoordinator()
+            isMutatingCoordinatorQuestionnaire = false
+            return true
+        } catch {
+            if Self.isAuthenticationFailure(error), await refreshSession(), let refreshedAccessToken = sessionStore.accessToken {
+                do {
+                    coordinatorMessage = try await operation(refreshedAccessToken, idempotencyKey)
+                    await refreshCoordinator()
+                    isMutatingCoordinatorQuestionnaire = false
+                    return true
+                } catch {
+                    coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+                }
+            } else if Self.isAuthenticationFailure(error) {
+                handleSessionFailure(error)
+            } else {
+                coordinatorMessage = MESCMobileAPIClient.userMessage(for: error)
+            }
+        }
+
+        isMutatingCoordinatorQuestionnaire = false
+        return false
     }
 
     func generateCoordinatorSchedulePreview() async {
@@ -1846,6 +2187,33 @@ final class MESCNativeAppModel: ObservableObject {
             deviceId: sessionStore.deviceId
         )
         formationOverview = response.overview
+    }
+
+    private func loadFormationResources(accessToken: String) async throws {
+        async let certificatesResponse = client.formationCertificates(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId
+        )
+        async let libraryResponse = client.formationLibrary(
+            accessToken: accessToken,
+            communityId: sessionStore.activeCommunityId,
+            deviceId: sessionStore.deviceId
+        )
+
+        formationCertificates = try await certificatesResponse.certificates
+        formationLibraryMaterials = try await libraryResponse.materials
+    }
+
+    private func writeFormationFile(_ data: Data, fileName: String) throws -> URL {
+        let sanitizedName = fileName
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:"))
+            .joined(separator: "-")
+        let fallbackName = sanitizedName.isEmpty ? "formacao.bin" : sanitizedName
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mesc-\(UUID().uuidString)-\(fallbackName)")
+        try data.write(to: fileURL, options: .atomic)
+        return fileURL
     }
 
     private func refreshFormationOverviewAfterProgress(accessToken: String) async {
@@ -2402,6 +2770,29 @@ final class MESCNativeAppModel: ObservableObject {
         String(value.prefix(5))
     }
 
+    static func scheduleHasPassed(date: String, time: String, now: Date = Date()) -> Bool {
+        let dateParts = date.split(separator: "-").compactMap { Int($0) }
+        let timeParts = time.split(separator: ":").compactMap { Int($0) }
+
+        guard dateParts.count == 3, timeParts.count >= 2 else {
+            return false
+        }
+
+        var components = DateComponents()
+        components.calendar = Calendar.current
+        components.timeZone = .current
+        components.year = dateParts[0]
+        components.month = dateParts[1]
+        components.day = dateParts[2]
+        components.hour = timeParts[0]
+        components.minute = timeParts[1]
+
+        guard let scheduleDate = Calendar.current.date(from: components) else {
+            return false
+        }
+        return scheduleDate < now
+    }
+
     static func scheduleTitle(type: String) -> String {
         switch type.lowercased() {
         case "missa", "mass", "schedule":
@@ -2415,12 +2806,12 @@ final class MESCNativeAppModel: ObservableObject {
 
     nonisolated static func positionLabel(_ position: Int?) -> String {
         guard let position, position > 0 else { return "Ministro" }
-        return "P\(position)"
+        return "Posição \(position)"
     }
 
     nonisolated static func positionDisplayLabel(_ position: Int?) -> String {
         guard let position, position > 0 else { return "Ministro" }
-        return "P\(position) - \(positionDescription(position))"
+        return "Posição \(position) · \(positionDescription(position))"
     }
 
     nonisolated static func positionDescription(_ position: Int) -> String {
@@ -2882,27 +3273,22 @@ struct MissionScreen: View {
                             .foregroundStyle(MESCColor.textPrimary)
                     }
 
-                    HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(MESCNativeAppModel.positionLabel(mission.position))
-                            .font(.system(size: 42, weight: .bold, design: .rounded))
+                            .font(MESCFont.title2)
                             .foregroundStyle(MESCColor.accent)
-                            .frame(minWidth: 66, alignment: .leading)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let position = mission.position {
-                                Text(MESCNativeAppModel.positionDescription(position))
-                                    .font(MESCFont.cardTitle)
-                                    .foregroundStyle(MESCColor.textPrimary)
-                            } else {
-                                Text("Posição na escala")
-                                    .font(MESCFont.cardTitle)
-                                    .foregroundStyle(MESCColor.textPrimary)
-                            }
-                            Text("Sua função nesta missa")
-                                .font(MESCFont.caption)
-                                .foregroundStyle(MESCColor.textSecondary)
+                        if let position = mission.position {
+                            Text(MESCNativeAppModel.positionDescription(position))
+                                .font(MESCFont.cardTitle)
+                                .foregroundStyle(MESCColor.textPrimary)
+                        } else {
+                            Text("Função na escala")
+                                .font(MESCFont.cardTitle)
+                                .foregroundStyle(MESCColor.textPrimary)
                         }
-                        Spacer(minLength: 0)
+                        Text("Sua função nesta missa")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
                     }
 
                     Divider()
@@ -3047,6 +3433,7 @@ struct QuestionnaireSheet: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @Environment(\.dismiss) private var dismiss
     @State private var answers: [String: QuestionnaireDraftAnswer] = [:]
+    @State private var sharedWithFamilyIds: Set<String> = []
     @State private var localMessage: String?
 
     var body: some View {
@@ -3068,11 +3455,15 @@ struct QuestionnaireSheet: View {
                                 .mescGlass(cornerRadius: 16)
                         }
 
-                        ForEach(questionnaire.questions) { question in
+                        ForEach(visibleQuestions(for: questionnaire)) { question in
                             QuestionnaireQuestionCard(
                                 question: question,
                                 draft: binding(for: question)
                             )
+                        }
+
+                        if !questionnaire.familyMembers.isEmpty {
+                            familySharing(questionnaire)
                         }
 
                         if let message = localMessage ?? appModel.questionnaireMessage {
@@ -3098,6 +3489,10 @@ struct QuestionnaireSheet: View {
                 EmptyState(title: "Nenhum questionário aberto", detail: "Quando a coordenação publicar um questionário, ele aparecerá aqui.")
                     .padding(24)
             }
+        }
+        .task(id: appModel.activeQuestionnaire?.id) {
+            guard let questionnaire = appModel.activeQuestionnaire else { return }
+            hydrateAnswers(from: questionnaire)
         }
     }
 
@@ -3153,7 +3548,10 @@ struct QuestionnaireSheet: View {
         }
 
         localMessage = nil
-        let success = await appModel.submitQuestionnaire(answers: result.answers)
+        let success = await appModel.submitQuestionnaire(
+            answers: result.answers,
+            sharedWithFamilyIds: Array(sharedWithFamilyIds)
+        )
         if success {
             localMessage = "Resposta salva com sucesso."
         }
@@ -3162,7 +3560,7 @@ struct QuestionnaireSheet: View {
     private func makePayload(for questionnaire: MobileQuestionnaireDTO) -> (answers: [MobileQuestionnaireAnswerDTO], validationMessage: String?) {
         var payload: [MobileQuestionnaireAnswerDTO] = []
 
-        for question in questionnaire.questions {
+        for question in visibleQuestions(for: questionnaire) {
             let draft = answers[question.id] ?? QuestionnaireDraftAnswer()
             if question.required == true, draft.isEmpty(for: question) {
                 return ([], "Responda a pergunta obrigatória: \(question.title)")
@@ -3177,6 +3575,79 @@ struct QuestionnaireSheet: View {
         }
 
         return (payload, nil)
+    }
+
+    private func visibleQuestions(for questionnaire: MobileQuestionnaireDTO) -> [MobileQuestionnaireQuestionDTO] {
+        questionnaire.questions.filter(isVisible)
+    }
+
+    private func familySharing(_ questionnaire: MobileQuestionnaireDTO) -> some View {
+        GlassPanel(spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Compartilhar disponibilidade", systemImage: "person.2")
+                    .font(MESCFont.cardTitle)
+                    .foregroundStyle(MESCColor.textPrimary)
+                Text("Use apenas quando a resposta também representar um familiar vinculado nesta comunidade. A resposta própria dele sempre prevalece.")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ForEach(questionnaire.familyMembers) { member in
+                    Toggle(member.displayName, isOn: Binding(
+                        get: { sharedWithFamilyIds.contains(member.id) },
+                        set: { enabled in
+                            if enabled {
+                                sharedWithFamilyIds.insert(member.id)
+                            } else {
+                                sharedWithFamilyIds.remove(member.id)
+                            }
+                        }
+                    ))
+                    .font(MESCFont.body)
+                    .tint(MESCColor.accent)
+                }
+            }
+        }
+    }
+
+    private func isVisible(_ question: MobileQuestionnaireQuestionDTO) -> Bool {
+        guard let metadata = question.metadata?.objectValue,
+              let dependsOn = metadata["dependsOn"]?.stringValue else {
+            return true
+        }
+
+        let expected = expectedValues(from: metadata["enabledWhen"] ?? metadata["showIf"])
+        guard !expected.isEmpty else { return true }
+
+        if expected.contains(answers[dependsOn]?.comparisonValue ?? "") {
+            return true
+        }
+
+        guard let alternativeDependsOn = metadata["alternativeDependsOn"]?.stringValue,
+              let alternativeExpected = metadata["alternativeShowIf"]?.stringValue else {
+            return false
+        }
+
+        return answers[alternativeDependsOn]?.comparisonValue == alternativeExpected
+    }
+
+    private func expectedValues(from value: JSONValue?) -> Set<String> {
+        if let value = value?.stringValue {
+            return [value]
+        }
+        return Set(value?.arrayValue?.compactMap(\.stringValue) ?? [])
+    }
+
+    private func hydrateAnswers(from questionnaire: MobileQuestionnaireDTO) {
+        guard answers.isEmpty, let response = questionnaire.response else { return }
+        sharedWithFamilyIds = Set(response.sharedWithFamilyIds)
+        guard !response.answers.isEmpty else { return }
+        let questionsById = Dictionary(uniqueKeysWithValues: questionnaire.questions.map { ($0.id, $0) })
+
+        answers = Dictionary(uniqueKeysWithValues: response.answers.compactMap { answer in
+            guard let question = questionsById[answer.questionId] else { return nil }
+            return (question.id, QuestionnaireDraftAnswer(answer: answer.answer, for: question))
+        })
     }
 }
 
@@ -3319,16 +3790,24 @@ struct SubstitutionCenterSheet: View {
         appModel.user?.id ?? ""
     }
 
+    private var currentSubstitutions: [MobileSubstitutionDTO] {
+        appModel.substitutions.filter { !isPastSchedule($0) }
+    }
+
+    private var previousSubstitutions: [MobileSubstitutionDTO] {
+        appModel.substitutions.filter(isPastSchedule)
+    }
+
     private var openRequests: [MobileSubstitutionDTO] {
-        appModel.substitutions.filter(canClaim)
+        currentSubstitutions.filter(canClaim)
     }
 
     private var myRequests: [MobileSubstitutionDTO] {
-        appModel.substitutions.filter { $0.requesterId == currentUserId }
+        currentSubstitutions.filter { $0.requesterId == currentUserId }
     }
 
     private var acceptedRequests: [MobileSubstitutionDTO] {
-        appModel.substitutions.filter {
+        currentSubstitutions.filter {
             $0.substituteId == currentUserId && $0.requesterId != currentUserId
         }
     }
@@ -3345,8 +3824,16 @@ struct SubstitutionCenterSheet: View {
         compactedGroups(acceptedRequests)
     }
 
-    private var allGroups: [SubstitutionRequestGroup] {
+    private var currentGroups: [SubstitutionRequestGroup] {
         openRequestGroups + myRequestGroups + acceptedRequestGroups
+    }
+
+    private var previousRequestGroups: [SubstitutionRequestGroup] {
+        compactedGroups(previousSubstitutions, ascending: false)
+    }
+
+    private var allGroups: [SubstitutionRequestGroup] {
+        currentGroups + previousRequestGroups
     }
 
     private var allGroupIDs: Set<String> {
@@ -3361,85 +3848,7 @@ struct SubstitutionCenterSheet: View {
         ZStack {
             MESCBackground()
 
-            ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    header
-
-                    if appModel.isLoadingSubstitutions && appModel.substitutions.isEmpty {
-                        ProgressView()
-                            .tint(MESCColor.accent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 48)
-                    } else {
-                        if let message = appModel.substitutionMessage {
-                            Label(message, systemImage: "exclamationmark.triangle")
-                                .font(MESCFont.caption)
-                                .foregroundStyle(MESCColor.primaryWine)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 4)
-                        }
-
-                        if !openRequests.isEmpty {
-                            SectionTitle(title: "Pedidos abertos", symbol: "person.2.badge.gearshape")
-                                .padding(.horizontal, 4)
-
-                            ForEach(openRequestGroups) { group in
-                                SubstitutionRequestGroupCard(group: group, isExpanded: expansionBinding(for: group)) { substitution in
-                                    SubstitutionRow(
-                                        substitution: substitution,
-                                        isOwnRequest: false,
-                                        canClaim: true
-                                    ) {
-                                        substitutionToClaim = substitution
-                                    }
-                                }
-                            }
-                        }
-
-                        if !myRequests.isEmpty {
-                            SectionTitle(title: "Meus pedidos", symbol: "clock.arrow.circlepath")
-                                .padding(.horizontal, 4)
-
-                            ForEach(myRequestGroups) { group in
-                                SubstitutionRequestGroupCard(group: group, isExpanded: expansionBinding(for: group)) { substitution in
-                                    SubstitutionRow(
-                                        substitution: substitution,
-                                        isOwnRequest: true,
-                                        canClaim: false
-                                    )
-                                }
-                            }
-                        }
-
-                        if !acceptedRequests.isEmpty {
-                            SectionTitle(title: "Escalas que assumi", symbol: "checkmark.circle")
-                                .padding(.horizontal, 4)
-
-                            ForEach(acceptedRequestGroups) { group in
-                                SubstitutionRequestGroupCard(group: group, isExpanded: expansionBinding(for: group)) { substitution in
-                                    SubstitutionRow(
-                                        substitution: substitution,
-                                        isOwnRequest: false,
-                                        canClaim: false
-                                    )
-                                }
-                            }
-                        }
-
-                        if appModel.substitutions.isEmpty {
-                            GlassPanel(spacing: 10) {
-                                EmptyState(
-                                    title: "Nenhuma substituição por enquanto",
-                                    detail: "Quando um ministro pedir ajuda na sua comunidade, o pedido aparecerá aqui."
-                                )
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 22)
-                .padding(.bottom, 34)
-            }
+            substitutionList
         }
         .task {
             await appModel.loadSubstitutions()
@@ -3452,6 +3861,159 @@ struct SubstitutionCenterSheet: View {
             SubstitutionClaimSheet(substitution: substitution)
                 .environmentObject(appModel)
         }
+    }
+
+    @ViewBuilder
+    private var substitutionList: some View {
+        if #available(iOS 16.0, *) {
+            substitutionListBody.scrollContentBackground(.hidden)
+        } else {
+            substitutionListBody
+        }
+    }
+
+    private var substitutionListBody: some View {
+        List {
+            header.mescListRow(top: 22, bottom: 8)
+
+            if appModel.isLoadingSubstitutions && appModel.substitutions.isEmpty {
+                ProgressView()
+                    .tint(MESCColor.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 48)
+                    .mescListRow()
+            } else {
+                if let message = appModel.substitutionMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.primaryWine)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 4, bottom: 2)
+                }
+
+                if !currentSubstitutions.isEmpty {
+                    SectionTitle(title: "Atuais", symbol: "clock")
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 10, bottom: 2)
+                } else if !previousSubstitutions.isEmpty {
+                    GlassPanel(spacing: 8) {
+                        SectionTitle(title: "Nenhuma troca atual", symbol: "checkmark.circle")
+                        Text("Os pedidos de missas já realizadas permanecem no histórico abaixo.")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    .mescListRow()
+                }
+
+                if !openRequests.isEmpty {
+                    SectionTitle(title: "Pedidos abertos", symbol: "person.2.badge.gearshape")
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 8, bottom: 2)
+
+                    ForEach(openRequestGroups) { group in
+                        SubstitutionRequestGroupHeader(group: group, isExpanded: expansionBinding(for: group))
+                            .mescListRow(top: 4, bottom: 4)
+
+                        if expandedGroupIDs.contains(group.id) {
+                            ForEach(group.requests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: false,
+                                    canClaim: true
+                                ) {
+                                    substitutionToClaim = substitution
+                                }
+                                .mescListRow(top: 2, bottom: 6)
+                            }
+                        }
+                    }
+                }
+
+                if !myRequests.isEmpty {
+                    SectionTitle(title: "Meus pedidos", symbol: "clock.arrow.circlepath")
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 10, bottom: 2)
+
+                    ForEach(myRequestGroups) { group in
+                        SubstitutionRequestGroupHeader(group: group, isExpanded: expansionBinding(for: group))
+                            .mescListRow(top: 4, bottom: 4)
+
+                        if expandedGroupIDs.contains(group.id) {
+                            ForEach(group.requests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: true,
+                                    canClaim: false
+                                )
+                                .mescListRow(top: 2, bottom: 6)
+                            }
+                        }
+                    }
+                }
+
+                if !acceptedRequests.isEmpty {
+                    SectionTitle(title: "Escalas que assumi", symbol: "checkmark.circle")
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 10, bottom: 2)
+
+                    ForEach(acceptedRequestGroups) { group in
+                        SubstitutionRequestGroupHeader(group: group, isExpanded: expansionBinding(for: group))
+                            .mescListRow(top: 4, bottom: 4)
+
+                        if expandedGroupIDs.contains(group.id) {
+                            ForEach(group.requests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: false,
+                                    canClaim: false
+                                )
+                                .mescListRow(top: 2, bottom: 6)
+                            }
+                        }
+                    }
+                }
+
+                if !previousSubstitutions.isEmpty {
+                    SectionTitle(title: "Anteriores", symbol: "clock.arrow.circlepath")
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 12, bottom: 2)
+                    Text("Trocas de missas já realizadas, da mais recente para a mais antiga.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 0, bottom: 4)
+
+                    ForEach(previousRequestGroups) { group in
+                        SubstitutionRequestGroupHeader(group: group, isExpanded: expansionBinding(for: group))
+                            .mescListRow(top: 4, bottom: 4)
+
+                        if expandedGroupIDs.contains(group.id) {
+                            ForEach(group.requests) { substitution in
+                                SubstitutionRow(
+                                    substitution: substitution,
+                                    isOwnRequest: substitution.requesterId == currentUserId,
+                                    canClaim: false
+                                )
+                                .mescListRow(top: 2, bottom: 6)
+                            }
+                        }
+                    }
+                }
+
+                if appModel.substitutions.isEmpty {
+                    GlassPanel(spacing: 10) {
+                        EmptyState(
+                            title: "Nenhuma substituição por enquanto",
+                            detail: "Quando um ministro pedir ajuda na sua comunidade, o pedido aparecerá aqui."
+                        )
+                    }
+                    .mescListRow()
+                }
+            }
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
     }
 
     private var header: some View {
@@ -3488,7 +4050,10 @@ struct SubstitutionCenterSheet: View {
         return isOpen && substitution.requesterId != currentUserId
     }
 
-    private func compactedGroups(_ substitutions: [MobileSubstitutionDTO]) -> [SubstitutionRequestGroup] {
+    private func compactedGroups(
+        _ substitutions: [MobileSubstitutionDTO],
+        ascending: Bool = true
+    ) -> [SubstitutionRequestGroup] {
         let grouped = Dictionary(grouping: substitutions) { substitution in
             "\(substitution.schedule.date)|\(substitution.schedule.time)"
         }
@@ -3504,8 +4069,18 @@ struct SubstitutionCenterSheet: View {
         }
         .sorted {
             let dateComparison = $0.date.localizedCompare($1.date)
-            return dateComparison == .orderedSame ? $0.time < $1.time : dateComparison == .orderedAscending
+            if dateComparison == .orderedSame {
+                return ascending ? $0.time < $1.time : $0.time > $1.time
+            }
+            return ascending ? dateComparison == .orderedAscending : dateComparison == .orderedDescending
         }
+    }
+
+    private func isPastSchedule(_ substitution: MobileSubstitutionDTO) -> Bool {
+        MESCNativeAppModel.scheduleHasPassed(
+            date: substitution.schedule.date,
+            time: substitution.schedule.time
+        )
     }
 
     private func expansionBinding(for group: SubstitutionRequestGroup) -> Binding<Bool> {
@@ -3522,8 +4097,9 @@ struct SubstitutionCenterSheet: View {
     }
 
     private func configureInitialGroupExpansion() {
+        expandedGroupIDs.formIntersection(allGroupIDs)
         guard !hasConfiguredInitialExpansion else { return }
-        expandedGroupIDs = Set(allGroups.filter { $0.requests.count == 1 }.map(\.id))
+        expandedGroupIDs = Set(currentGroups.filter { $0.requests.count == 1 }.map(\.id))
         hasConfiguredInitialExpansion = true
     }
 
@@ -3545,57 +4121,48 @@ struct SubstitutionRequestGroup: Identifiable {
     let requests: [MobileSubstitutionDTO]
 }
 
-struct SubstitutionRequestGroupCard<Content: View>: View {
+struct SubstitutionRequestGroupHeader: View {
     let group: SubstitutionRequestGroup
-    @ViewBuilder let content: (MobileSubstitutionDTO) -> Content
     @Binding private var isExpanded: Bool
 
     init(
         group: SubstitutionRequestGroup,
-        isExpanded: Binding<Bool>,
-        @ViewBuilder content: @escaping (MobileSubstitutionDTO) -> Content
+        isExpanded: Binding<Bool>
     ) {
         self.group = group
-        self.content = content
         _isExpanded = isExpanded
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    SymbolTile(symbol: "calendar.badge.clock", tint: MESCColor.gold)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(MESCNativeAppModel.scheduleDateTitle(date: group.date))
-                            .font(MESCFont.body.weight(.semibold))
-                        Text("às \(MESCNativeAppModel.timeLabel(group.time))")
-                            .font(MESCFont.caption)
-                            .foregroundStyle(MESCColor.textSecondary)
-                    }
-                    Spacer()
-                    Text(group.requests.count == 1 ? "1 pedido" : "\(group.requests.count) pedidos")
-                        .font(MESCFont.caption.weight(.semibold))
-                        .foregroundStyle(MESCColor.accent)
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(MESCColor.accent)
-                }
-                .padding(15)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .mescGlass(cornerRadius: 20)
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isExpanded.toggle()
             }
-            .buttonStyle(.plain)
-
-            if isExpanded {
-                ForEach(group.requests) { request in
-                    content(request)
+        } label: {
+            HStack(spacing: 12) {
+                SymbolTile(symbol: "calendar.badge.clock", tint: MESCColor.gold)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(MESCNativeAppModel.scheduleDateTitle(date: group.date))
+                        .font(MESCFont.body.weight(.semibold))
+                    Text("às \(MESCNativeAppModel.timeLabel(group.time))")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
                 }
+                Spacer()
+                Text(group.requests.count == 1 ? "1 pedido" : "\(group.requests.count) pedidos")
+                    .font(MESCFont.caption.weight(.semibold))
+                    .foregroundStyle(MESCColor.accent)
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MESCColor.accent)
             }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .mescGlass(cornerRadius: 20)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(MESCNativeAppModel.scheduleDateTitle(date: group.date)), às \(MESCNativeAppModel.timeLabel(group.time))")
+        .accessibilityValue(isExpanded ? "Expandido" : "Recolhido")
     }
 }
 
@@ -3830,6 +4397,52 @@ struct QuestionnaireQuestionCard: View {
                         }
                     }
                 }
+            case "time_selection":
+                VStack(spacing: 10) {
+                    ForEach(question.options ?? [], id: \.self) { option in
+                        ChoiceRow(title: option, isSelected: draft.multi.contains(option)) {
+                            var value = draft
+                            if value.multi.contains(option) {
+                                value.multi.remove(option)
+                            } else {
+                                value.multi.insert(option)
+                            }
+                            draft = value
+                        }
+                    }
+                }
+            case "yes_no_with_options":
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(question.options ?? [], id: \.self) { option in
+                        ChoiceRow(title: option, isSelected: draft.single == option) {
+                            draft.single = option
+                            if option.localizedCaseInsensitiveCompare("Não") == .orderedSame {
+                                draft.conditionalOptions.removeAll()
+                            }
+                        }
+                    }
+
+                    if shouldShowConditionalOptions, !conditionalOptions.isEmpty {
+                        Divider()
+                            .opacity(0.6)
+
+                        Text("Selecione os horários ou dias que se aplicam")
+                            .font(MESCFont.caption.weight(.semibold))
+                            .foregroundStyle(MESCColor.textSecondary)
+
+                        ForEach(conditionalOptions, id: \.self) { option in
+                            ChoiceRow(title: option, isSelected: draft.conditionalOptions.contains(option)) {
+                                var value = draft
+                                if value.conditionalOptions.contains(option) {
+                                    value.conditionalOptions.remove(option)
+                                } else {
+                                    value.conditionalOptions.insert(option)
+                                }
+                                draft = value
+                            }
+                        }
+                    }
+                }
             case "boolean", "switch":
                 Toggle(isOn: Binding(
                     get: { draft.bool ?? false },
@@ -3840,9 +4453,10 @@ struct QuestionnaireQuestionCard: View {
                 }
                 .tint(MESCColor.accent)
             case "text", "textarea", "long_text":
-                TextField("Digite sua resposta", text: $draft.text)
+                TextEditor(text: $draft.text)
                     .font(MESCFont.body)
-                    .padding(14)
+                    .frame(minHeight: 112)
+                    .padding(10)
                     .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -3864,6 +4478,10 @@ struct QuestionnaireQuestionCard: View {
         switch question.type.lowercased() {
         case "checkbox", "multiple_select", "multi_select":
             return "Selecione uma ou mais opções"
+        case "time_selection":
+            return "Selecione os horários disponíveis"
+        case "yes_no_with_options":
+            return "Informe sua disponibilidade"
         case "boolean", "switch":
             return "Ative se a resposta for sim"
         case "text", "textarea", "long_text":
@@ -3871,6 +4489,17 @@ struct QuestionnaireQuestionCard: View {
         default:
             return "Selecione uma opção"
         }
+    }
+
+    private var conditionalOptions: [String] {
+        question.metadata?.objectValue?["conditionalOptions"]?.arrayValue?.compactMap(\.stringValue) ?? []
+    }
+
+    private var shouldShowConditionalOptions: Bool {
+        guard let answer = draft.single?.trimmingCharacters(in: .whitespacesAndNewlines), !answer.isEmpty else {
+            return false
+        }
+        return answer.localizedCaseInsensitiveCompare("Não") != .orderedSame
     }
 }
 
@@ -3906,10 +4535,37 @@ struct QuestionnaireDraftAnswer: Equatable {
     var multi: Set<String> = []
     var text = ""
     var bool: Bool?
+    var conditionalOptions: Set<String> = []
+
+    init() {}
+
+    init(answer: JSONValue, for question: MobileQuestionnaireQuestionDTO) {
+        switch question.type.lowercased() {
+        case "checkbox", "multiple_select", "multi_select", "time_selection":
+            multi = Set(answer.arrayValue?.compactMap(\.stringValue) ?? [])
+        case "boolean", "switch":
+            bool = answer.boolValue
+        case "text", "textarea", "long_text":
+            text = answer.stringValue ?? ""
+        case "yes_no_with_options":
+            if let object = answer.objectValue {
+                single = object["answer"]?.stringValue
+                conditionalOptions = Set(object["selectedOptions"]?.arrayValue?.compactMap(\.stringValue) ?? [])
+            } else {
+                single = answer.stringValue
+            }
+        default:
+            single = answer.stringValue
+        }
+    }
+
+    var comparisonValue: String? {
+        single ?? (bool == true ? "Sim" : bool == false ? "Não" : nil)
+    }
 
     func isEmpty(for question: MobileQuestionnaireQuestionDTO) -> Bool {
         switch question.type.lowercased() {
-        case "checkbox", "multiple_select", "multi_select":
+        case "checkbox", "multiple_select", "multi_select", "time_selection":
             return multi.isEmpty
         case "boolean", "switch":
             return bool == nil
@@ -3922,8 +4578,13 @@ struct QuestionnaireDraftAnswer: Equatable {
 
     func answerValue(for question: MobileQuestionnaireQuestionDTO) -> JSONValue {
         switch question.type.lowercased() {
-        case "checkbox", "multiple_select", "multi_select":
+        case "checkbox", "multiple_select", "multi_select", "time_selection":
             return .array(multi.sorted().map { .string($0) })
+        case "yes_no_with_options":
+            return .object([
+                "answer": .string(single ?? ""),
+                "selectedOptions": .array(conditionalOptions.sorted().map { .string($0) }),
+            ])
         case "boolean", "switch":
             return .bool(bool ?? false)
         case "text", "textarea", "long_text":
@@ -3952,10 +4613,17 @@ enum ScheduleMode: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .mine: return "Seus turnos"
-        case .month: return "Mês atual"
-        case .full: return "Lista oficial"
+        case .month: return "Calendário da comunidade"
+        case .full: return "Lista oficial do mês"
         }
     }
+}
+
+private struct ScheduleDetailDestination: Identifiable {
+    let mission: ScheduleMission
+    let dayTitle: String
+
+    var id: String { mission.id }
 }
 
 struct SchedulesScreen: View {
@@ -3965,7 +4633,7 @@ struct SchedulesScreen: View {
     @State private var substitutionTarget: SubstitutionTarget?
     @State private var isSubstitutionCenterPresented = false
     @State private var shareFile: ShareFile?
-    @State private var scheduleDetail: ScheduleMission?
+    @State private var scheduleDetail: ScheduleDetailDestination?
 
     var body: some View {
         let days = appModel.scheduleDays(for: mode)
@@ -4003,35 +4671,49 @@ struct SchedulesScreen: View {
                     }
                 }
 
-                CalendarMonthGrid(
-                    monthDate: appModel.currentMonthStartDate,
-                    days: days,
-                    selectedDay: selectedDay,
-                    onSelect: { selectedDayNumber = $0.dayNumber }
+                if mode != .full {
+                    CalendarMonthGrid(
+                        monthDate: appModel.currentMonthStartDate,
+                        days: days,
+                        selectedDay: selectedDay,
+                        onSelect: { selectedDayNumber = $0.dayNumber }
+                    )
+                }
+            }
+
+            if mode == .full {
+                ScheduleOfficialList(days: days) { mission, day in
+                    scheduleDetail = ScheduleDetailDestination(
+                        mission: mission,
+                        dayTitle: day.formattedTitle
+                    )
+                }
+            } else {
+                ScheduleDayPanel(
+                    day: selectedDay,
+                    mode: mode,
+                    onConfirm: { mission in
+                        Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
+                    },
+                    onRequestSubstitution: { mission in
+                        substitutionTarget = SubstitutionTarget(
+                            id: mission.id,
+                            scheduleId: mission.scheduleId ?? mission.id,
+                            title: "\(selectedDay.formattedTitle) às \(mission.time)",
+                            subtitle: "\(mission.title) - \(mission.community)"
+                        )
+                    },
+                    onOpenDetails: { mission in
+                        scheduleDetail = ScheduleDetailDestination(
+                            mission: mission,
+                            dayTitle: selectedDay.formattedTitle
+                        )
+                    }
                 )
             }
 
-            ScheduleDayPanel(
-                day: selectedDay,
-                mode: mode,
-                onConfirm: { mission in
-                    Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
-                },
-                onRequestSubstitution: { mission in
-                    substitutionTarget = SubstitutionTarget(
-                        id: mission.id,
-                        scheduleId: mission.scheduleId ?? mission.id,
-                        title: "\(selectedDay.formattedTitle) às \(mission.time)",
-                        subtitle: "\(mission.title) - \(mission.community)"
-                    )
-                },
-                onOpenDetails: { mission in
-                    scheduleDetail = mission
-                }
-            )
-
             SubstitutionCenterLink(
-                openCount: appModel.substitutions.filter { $0.status == "available" && $0.requesterId != appModel.user?.id }.count
+                openCount: currentOpenSubstitutionCount
             ) {
                 isSubstitutionCenterPresented = true
             }
@@ -4066,19 +4748,19 @@ struct SchedulesScreen: View {
         .sheet(item: $shareFile) { file in
             ActivityView(activityItems: [file.url])
         }
-        .sheet(item: $scheduleDetail) { mission in
+        .sheet(item: $scheduleDetail) { destination in
             ScheduleMassDetailSheet(
-                mission: mission,
-                dayTitle: selectedDay.formattedTitle,
-                onConfirm: mission.canConfirm && mission.isCurrentUser ? {
-                    Task { await appModel.confirmSchedule(scheduleId: mission.scheduleId ?? mission.id) }
+                mission: destination.mission,
+                dayTitle: destination.dayTitle,
+                onConfirm: destination.mission.canConfirm && destination.mission.isCurrentUser ? {
+                    Task { await appModel.confirmSchedule(scheduleId: destination.mission.scheduleId ?? destination.mission.id) }
                 } : nil,
-                onRequestSubstitution: mission.canRequestSubstitution && mission.isCurrentUser ? {
+                onRequestSubstitution: destination.mission.canRequestSubstitution && destination.mission.isCurrentUser ? {
                     substitutionTarget = SubstitutionTarget(
-                        id: mission.id,
-                        scheduleId: mission.scheduleId ?? mission.id,
-                        title: "\(selectedDay.formattedTitle) às \(mission.time)",
-                        subtitle: "\(mission.title) - \(mission.community)"
+                        id: destination.mission.id,
+                        scheduleId: destination.mission.scheduleId ?? destination.mission.id,
+                        title: "\(destination.dayTitle) às \(destination.mission.time)",
+                        subtitle: "\(destination.mission.title) - \(destination.mission.community)"
                     )
                 } : nil
             )
@@ -4102,6 +4784,18 @@ struct SchedulesScreen: View {
         }
     }
 
+    private var currentOpenSubstitutionCount: Int {
+        appModel.substitutions.filter { substitution in
+            let isOpen = substitution.status == "available" || (substitution.status == "pending" && substitution.substituteId == nil)
+            return isOpen
+                && substitution.requesterId != appModel.user?.id
+                && !MESCNativeAppModel.scheduleHasPassed(
+                    date: substitution.schedule.date,
+                    time: substitution.schedule.time
+                )
+        }.count
+    }
+
     private func suggestedDayNumber(from days: [ScheduleDay]) -> Int {
         if let firstWithMission = days.first(where: { !$0.missions.isEmpty }) {
             return firstWithMission.dayNumber
@@ -4113,6 +4807,42 @@ struct SchedulesScreen: View {
         guard appModel.isSubstitutionCenterPresentationRequested else { return }
         appModel.isSubstitutionCenterPresentationRequested = false
         isSubstitutionCenterPresented = true
+    }
+}
+
+struct ScheduleOfficialList: View {
+    let days: [ScheduleDay]
+    let onOpenDetails: (ScheduleMission, ScheduleDay) -> Void
+
+    private var publishedDays: [ScheduleDay] {
+        days.filter { !$0.missions.isEmpty }
+    }
+
+    var body: some View {
+        if publishedDays.isEmpty {
+            EmptyState(
+                title: "Nenhuma escala publicada",
+                detail: "Quando a coordenação publicar a escala deste mês, ela aparecerá aqui."
+            )
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle(title: "Escala oficial", symbol: "list.bullet.rectangle")
+                ForEach(publishedDays) { day in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(day.formattedTitle)
+                            .font(MESCFont.subheadline.weight(.semibold))
+                            .foregroundStyle(MESCColor.textPrimary)
+                            .padding(.horizontal, 4)
+
+                        ForEach(day.missions) { mission in
+                            ScheduleMissionRow(mission: mission) {
+                                onOpenDetails(mission, day)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -4238,34 +4968,40 @@ struct CalendarMonthGrid: View {
 struct FormationScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @State private var isLessonPresented = false
-    @State private var isVideoLibraryPresented = false
+    @State private var isFormationResourcesPresented = false
     @State private var isStudioPresented = false
     @State private var selectedModule: FormationModuleSelection?
 
     var body: some View {
-        MESCScrollScreen(title: "Formação", subtitle: "Caminho de preparo e serviço") {
+        MESCListScreen(title: "Formação", subtitle: "Caminho de preparo e serviço") {
             if let overview = appModel.formationOverview, overview.summary.totalLessons > 0 {
                 FormationOverviewPanel(
                     overview: overview,
                     isLoadingLesson: appModel.isLoadingFormationLesson,
                     onOpenLesson: openLesson
                 )
+                .mescListRow(top: 8, bottom: 6)
 
                 FormationActionStrip(
                     videoCount: appModel.formationVideoLessons.count,
+                    materialCount: appModel.formationLibraryMaterials.count,
+                    certificateCount: appModel.formationCertificates.count,
                     canManageFormation: appModel.canManageFormation,
-                    onOpenVideos: { isVideoLibraryPresented = true },
+                    onOpenResources: { isFormationResourcesPresented = true },
                     onOpenStudio: { isStudioPresented = true }
                 )
+                .mescListRow(top: 6, bottom: 10)
 
                 ForEach(overview.tracks) { track in
-                    FormationTrackPanel(
-                        track: track,
-                        onOpenLesson: openLesson,
-                        onOpenModule: { module in
+                    FormationTrackHeader(track: track)
+                        .mescListRow(top: 8, bottom: 4)
+
+                    ForEach(track.modules) { module in
+                        FormationModuleListRow(module: module) {
                             selectedModule = FormationModuleSelection(trackTitle: track.title, module: module)
                         }
-                    )
+                        .mescListRow(top: 2, bottom: 6)
+                    }
                 }
             } else {
                 GlassPanel(spacing: 14) {
@@ -4287,6 +5023,7 @@ struct FormationScreen: View {
                         }
                     }
                 }
+                .mescListRow(top: 8, bottom: 6)
             }
 
             if let message = appModel.formationMessage {
@@ -4294,6 +5031,7 @@ struct FormationScreen: View {
                     .font(MESCFont.caption)
                     .foregroundStyle(message.contains("sucesso") ? MESCColor.accent : MESCColor.primaryWine)
                     .fixedSize(horizontal: false, vertical: true)
+                    .mescListRow(top: 4, bottom: 12)
             }
         }
         .sheet(isPresented: $isLessonPresented, onDismiss: {
@@ -4302,8 +5040,8 @@ struct FormationScreen: View {
             FormationLessonSheet()
                 .environmentObject(appModel)
         }
-        .sheet(isPresented: $isVideoLibraryPresented) {
-            FormationVideoLibrarySheet(onOpenLesson: openLesson)
+        .sheet(isPresented: $isFormationResourcesPresented) {
+            FormationResourcesSheet(onOpenLesson: openLesson)
                 .environmentObject(appModel)
         }
         .sheet(isPresented: $isStudioPresented) {
@@ -4404,18 +5142,26 @@ struct FormationOverviewPanel: View {
 
 struct FormationActionStrip: View {
     let videoCount: Int
+    let materialCount: Int
+    let certificateCount: Int
     let canManageFormation: Bool
-    let onOpenVideos: () -> Void
+    let onOpenResources: () -> Void
     let onOpenStudio: () -> Void
+
+    private var resourceSummary: String {
+        let resourceCount = videoCount + materialCount
+        let resourceLabel = resourceCount == 1 ? "1 recurso" : "\(resourceCount) recursos"
+        return certificateCount > 0 ? "\(resourceLabel) · \(certificateCount) certificado(s)" : resourceLabel
+    }
 
     var body: some View {
         HStack(spacing: 10) {
             FormationActionButton(
-                title: videoCount == 1 ? "1 vídeo" : "\(videoCount) vídeos",
-                subtitle: "Biblioteca",
-                symbol: "play.rectangle",
+                title: "Biblioteca",
+                subtitle: resourceSummary,
+                symbol: "books.vertical",
                 tint: MESCColor.accent,
-                action: onOpenVideos
+                action: onOpenResources
             )
 
             if canManageFormation {
@@ -4459,13 +5205,11 @@ struct FormationActionButton: View {
     }
 }
 
-struct FormationTrackPanel: View {
+struct FormationTrackHeader: View {
     let track: MobileFormationTrackDTO
-    let onOpenLesson: (MobileFormationLessonDTO) -> Void
-    let onOpenModule: (MobileFormationModuleDTO) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        GlassPanel(spacing: 10) {
             SectionTitle(title: track.title, symbol: trackSymbol)
             if let description = track.description {
                 Text(description)
@@ -4482,14 +5226,6 @@ struct FormationTrackPanel: View {
             .foregroundStyle(MESCColor.textSecondary)
             ProgressView(value: Double(track.stats.progressPercentage), total: 100)
                 .tint(MESCColor.accent)
-
-            ForEach(track.modules) { module in
-                FormationModuleRow(
-                    module: module,
-                    onOpenLesson: onOpenLesson,
-                    onOpenModule: { onOpenModule(module) }
-                )
-            }
         }
     }
 
@@ -4505,78 +5241,39 @@ struct FormationTrackPanel: View {
     }
 }
 
-struct FormationModuleRow: View {
+struct FormationModuleListRow: View {
     let module: MobileFormationModuleDTO
-    let onOpenLesson: (MobileFormationLessonDTO) -> Void
     let onOpenModule: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(action: onOpenModule) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(module.title)
-                            .font(MESCFont.body.weight(.semibold))
-                        Text("\(module.stats.completedLessons)/\(module.stats.totalLessons) aulas concluídas")
-                            .font(MESCFont.caption)
-                            .foregroundStyle(MESCColor.textSecondary)
-                    }
-                    Spacer()
-                    Image(systemName: module.videoUrl == nil ? "chevron.right" : "play.rectangle")
-                        .foregroundStyle(MESCColor.accent)
+        Button(action: onOpenModule) {
+            HStack(spacing: 12) {
+                SymbolTile(
+                    symbol: module.videoUrl == nil ? "book.closed" : "play.rectangle",
+                    tint: module.stats.progressPercentage == 100 ? MESCColor.gold : MESCColor.accent
+                )
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(module.title)
+                        .font(MESCFont.body.weight(.semibold))
+                        .foregroundStyle(MESCColor.textPrimary)
+                        .multilineTextAlignment(.leading)
+                    Text("\(module.stats.completedLessons) de \(module.stats.totalLessons) aulas concluídas")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    ProgressView(value: Double(module.stats.progressPercentage), total: 100)
+                        .tint(MESCColor.gold)
                 }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(MESCColor.textSecondary)
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Abre as aulas deste módulo")
-
-            ProgressView(value: Double(module.stats.progressPercentage), total: 100)
-                .tint(MESCColor.gold)
-
-            ForEach(module.lessons) { lesson in
-                Button {
-                    onOpenLesson(lesson)
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: lesson.progress?.status == "completed" ? "checkmark.circle.fill" : "play.circle")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(lesson.progress?.status == "completed" ? MESCColor.gold : MESCColor.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(lesson.title)
-                                .font(MESCFont.subheadline.weight(.semibold))
-                                .foregroundStyle(MESCColor.textPrimary)
-                                .lineLimit(2)
-                            Text("\(statusTitle(for: lesson)) - Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " - \($0) min" } ?? "")")
-                                .font(MESCFont.caption2)
-                                .foregroundStyle(statusTint(for: lesson))
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(MESCColor.textSecondary)
-                    }
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .mescGlass(cornerRadius: 18)
         }
-        .padding(14)
-        .mescGlass(cornerRadius: 18)
-    }
-
-    private func statusTitle(for lesson: MobileFormationLessonDTO) -> String {
-        switch lesson.progress?.status {
-        case "completed": return "Concluída"
-        case "in_progress": return "Em andamento"
-        default: return "Não iniciada"
-        }
-    }
-
-    private func statusTint(for lesson: MobileFormationLessonDTO) -> Color {
-        switch lesson.progress?.status {
-        case "completed": return MESCColor.accent
-        case "in_progress": return MESCColor.gold
-        default: return MESCColor.textSecondary
-        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Abre as aulas deste módulo")
     }
 }
 
@@ -4590,72 +5287,86 @@ struct FormationModuleSheet: View {
         ZStack {
             MESCBackground()
 
-            ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    GlassPanel(spacing: 12) {
-                        HStack(alignment: .top, spacing: 12) {
-                            SymbolTile(symbol: module.videoUrl == nil ? "book.closed" : "play.rectangle", tint: MESCColor.gold)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(trackTitle)
-                                    .font(MESCFont.caption)
-                                    .foregroundStyle(MESCColor.accent)
-                                Text(module.title)
-                                    .font(MESCFont.title2)
-                                    .foregroundStyle(MESCColor.textPrimary)
-                                Text("\(module.stats.completedLessons) de \(module.stats.totalLessons) aulas concluídas")
-                                    .font(MESCFont.caption)
-                                    .foregroundStyle(MESCColor.textSecondary)
-                            }
-                            Spacer()
-                            MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar módulo") {
-                                dismiss()
-                            }
-                        }
+            lessonsList
+        }
+    }
 
-                        if let description = module.description, !description.isEmpty {
-                            Text(description)
-                                .font(MESCFont.body)
-                                .foregroundStyle(MESCColor.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+    @ViewBuilder
+    private var lessonsList: some View {
+        if #available(iOS 16.0, *) {
+            lessonsListBody.scrollContentBackground(.hidden)
+        } else {
+            lessonsListBody
+        }
+    }
+
+    private var lessonsListBody: some View {
+        List {
+            GlassPanel(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    SymbolTile(symbol: module.videoUrl == nil ? "book.closed" : "play.rectangle", tint: MESCColor.gold)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(trackTitle)
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.accent)
+                        Text(module.title)
+                            .font(MESCFont.title2)
+                            .foregroundStyle(MESCColor.textPrimary)
+                        Text("\(module.stats.completedLessons) de \(module.stats.totalLessons) aulas concluídas")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
                     }
-
-                    ForEach(module.lessons) { lesson in
-                        Button {
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                onOpenLesson(lesson)
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                SymbolTile(
-                                    symbol: lesson.progress?.status == "completed" ? "checkmark.seal.fill" : "play.circle.fill",
-                                    tint: lesson.progress?.status == "completed" ? MESCColor.gold : MESCColor.accent
-                                )
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(lesson.title)
-                                        .font(MESCFont.body.weight(.semibold))
-                                        .foregroundStyle(MESCColor.textPrimary)
-                                    Text(lessonDetail(lesson))
-                                        .font(MESCFont.caption)
-                                        .foregroundStyle(MESCColor.textSecondary)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(MESCColor.textSecondary)
-                            }
-                            .padding(14)
-                            .mescGlass(cornerRadius: 18)
-                        }
-                        .buttonStyle(.plain)
+                    Spacer()
+                    MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar módulo") {
+                        dismiss()
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 22)
-                .padding(.bottom, 34)
+
+                if let description = module.description, !description.isEmpty {
+                    Text(description)
+                        .font(MESCFont.body)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .mescListRow(top: 22, bottom: 8)
+
+            ForEach(module.lessons) { lesson in
+                Button {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        onOpenLesson(lesson)
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        SymbolTile(
+                            symbol: lesson.progress?.status == "completed" ? "checkmark.seal.fill" : "play.circle.fill",
+                            tint: lesson.progress?.status == "completed" ? MESCColor.gold : MESCColor.accent
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(lesson.title)
+                                .font(MESCFont.body.weight(.semibold))
+                                .foregroundStyle(MESCColor.textPrimary)
+                                .multilineTextAlignment(.leading)
+                            Text(lessonDetail(lesson))
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.textSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .mescGlass(cornerRadius: 18)
+                }
+                .buttonStyle(.plain)
+                .mescListRow(top: 3, bottom: 5)
             }
         }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
     }
 
     private func lessonDetail(_ lesson: MobileFormationLessonDTO) -> String {
@@ -4672,6 +5383,9 @@ struct FormationModuleSheet: View {
 struct FormationLessonSheet: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @Environment(\.dismiss) private var dismiss
+    @State private var mediaTarget: FormationMediaTarget?
+    @State private var quizTarget: FormationQuizDefinition?
+    @State private var quizResults: [String: FormationQuizResult] = [:]
 
     var body: some View {
         ZStack {
@@ -4690,14 +5404,20 @@ struct FormationLessonSheet: View {
                                 .padding(.horizontal, 4)
                         }
 
-                        if let videoUrl = detail.lesson.videoUrl, let url = URL(string: videoUrl), !videoUrl.isEmpty {
-                            Link(destination: url) {
+                        if let videoUrl = detail.lesson.videoUrl, let target = FormationMediaTarget(
+                            title: detail.lesson.title,
+                            urlString: videoUrl
+                        ) {
+                            Button {
+                                mediaTarget = target
+                            } label: {
                                 Label("Abrir vídeo da aula", systemImage: "play.rectangle.fill")
                                     .font(MESCFont.body.weight(.semibold))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(14)
                                     .mescGlass(cornerRadius: 16)
                             }
+                            .buttonStyle(.plain)
                             .foregroundStyle(MESCColor.accent)
                         }
 
@@ -4707,10 +5427,15 @@ struct FormationLessonSheet: View {
                                 isCompleted: detail.progress.completedSections?.contains(section.id) == true || detail.progress.status == "completed",
                                 isCompleting: appModel.completingFormationSectionId == section.id,
                                 isProgressMutationInFlight: appModel.isCompletingFormationLesson || appModel.completingFormationSectionId != nil,
-                                isLessonCompleted: detail.progress.status == "completed"
-                            ) {
-                                Task { await appModel.completeFormationLessonSection(sectionId: section.id) }
-                            }
+                                isLessonCompleted: detail.progress.status == "completed",
+                                quiz: FormationQuizDefinition(section: section),
+                                quizResult: FormationQuizDefinition(section: section).flatMap { quizResults[$0.id] },
+                                onComplete: {
+                                    Task { await appModel.completeFormationLessonSection(sectionId: section.id) }
+                                },
+                                onOpenMedia: { mediaTarget = $0 },
+                                onOpenQuiz: { quizTarget = $0 }
+                            )
                         }
 
                         if detail.sections.isEmpty {
@@ -4724,13 +5449,33 @@ struct FormationLessonSheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
 
+                        if !quizRequirementSatisfied(for: detail) {
+                            Label(
+                                "Conclua o quiz de avaliação para marcar esta aula como concluída.",
+                                systemImage: "questionmark.circle"
+                            )
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.gold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .mescGlass(cornerRadius: 16)
+                        }
+
                         MESCPrimaryButton(
                             title: completeButtonTitle(for: detail),
                             symbol: detail.progress.status == "completed" ? "checkmark.seal.fill" : "checkmark.circle"
                         ) {
                             Task { await appModel.completeCurrentFormationLesson() }
                         }
-                        .disabled(appModel.isCompletingFormationLesson || appModel.completingFormationSectionId != nil || detail.progress.status == "completed")
+                        .disabled(
+                            appModel.isCompletingFormationLesson
+                                || appModel.completingFormationSectionId != nil
+                                || detail.progress.status == "completed"
+                                || !quizRequirementSatisfied(for: detail)
+                        )
+
+                        lessonNavigation(for: detail)
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 20)
@@ -4740,6 +5485,17 @@ struct FormationLessonSheet: View {
                 EmptyState(title: "Aula não carregada", detail: "Toque em uma aula novamente.")
                     .padding(24)
             }
+        }
+        .sheet(item: $mediaTarget) { target in
+            FormationMediaSheet(target: target)
+        }
+        .sheet(item: $quizTarget) { quiz in
+            FormationQuizSheet(quiz: quiz) { result in
+                quizResults[quiz.id] = result
+            }
+        }
+        .onChange(of: appModel.formationLessonDetail?.id) { _ in
+            quizResults = [:]
         }
     }
 
@@ -4797,81 +5553,368 @@ struct FormationLessonSheet: View {
             return "Não iniciada"
         }
     }
+
+    private func quizRequirementSatisfied(for detail: MobileFormationLessonDetailDTO) -> Bool {
+        let quizzes = detail.sections.compactMap(FormationQuizDefinition.init(section:))
+        return quizzes.allSatisfy { quizResults[$0.id]?.passed == true }
+    }
+
+    @ViewBuilder
+    private func lessonNavigation(for detail: MobileFormationLessonDetailDTO) -> some View {
+        let lessons = moduleLessons(for: detail)
+        let currentIndex = lessons.firstIndex(where: { $0.id == detail.lesson.id })
+        let previous = currentIndex.flatMap { $0 > 0 ? lessons[$0 - 1] : nil }
+        let next = currentIndex.flatMap { $0 < lessons.count - 1 ? lessons[$0 + 1] : nil }
+
+        if previous != nil || next != nil {
+            HStack(spacing: 10) {
+                MESCSecondaryButton(title: "Anterior", symbol: "chevron.left") {
+                    if let previous {
+                        openLesson(previous)
+                    }
+                }
+                .disabled(previous == nil || appModel.isLoadingFormationLesson)
+                .opacity(previous == nil ? 0.55 : 1)
+
+                MESCSecondaryButton(title: "Próxima", symbol: "chevron.right") {
+                    if let next {
+                        openLesson(next)
+                    }
+                }
+                .disabled(next == nil || appModel.isLoadingFormationLesson)
+                .opacity(next == nil ? 0.55 : 1)
+            }
+        }
+    }
+
+    private func moduleLessons(for detail: MobileFormationLessonDetailDTO) -> [MobileFormationLessonDTO] {
+        appModel.formationOverview?
+            .tracks
+            .flatMap(\.modules)
+            .first(where: { $0.id == detail.lesson.moduleId })?
+            .lessons
+            .sorted { $0.lessonNumber < $1.lessonNumber } ?? []
+    }
+
+    private func openLesson(_ lesson: MobileFormationLessonDTO) {
+        Task {
+            _ = await appModel.openFormationLesson(lesson)
+        }
+    }
 }
 
-struct FormationVideoLibrarySheet: View {
+private enum FormationResourceTab: String, CaseIterable, Identifiable {
+    case videos
+    case materials
+    case certificates
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .videos: return "Vídeos"
+        case .materials: return "Materiais"
+        case .certificates: return "Certificados"
+        }
+    }
+}
+
+private struct FormationPreviewFile: Identifiable {
+    let url: URL
+
+    var id: String { url.absoluteString }
+}
+
+struct FormationResourcesSheet: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @Environment(\.dismiss) private var dismiss
     let onOpenLesson: (MobileFormationLessonDTO) -> Void
+    @State private var selectedTab: FormationResourceTab = .videos
+    @State private var openingResourceId: String?
+    @State private var previewFile: FormationPreviewFile?
 
     var body: some View {
         ZStack {
             MESCBackground()
 
-            ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    GlassPanel(spacing: 12) {
-                        HStack(alignment: .top, spacing: 12) {
-                            SymbolTile(symbol: "play.rectangle", tint: MESCColor.gold)
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Formação")
-                                    .font(MESCFont.caption)
-                                    .foregroundStyle(MESCColor.accent)
-                                Text("Vídeos disponíveis")
-                                    .font(MESCFont.title2)
-                                Text("Conteúdos publicados pela coordenação para estudo no app.")
-                                    .font(MESCFont.body)
-                                    .foregroundStyle(MESCColor.textSecondary)
-                            }
-                            Spacer()
-                            Button {
-                                dismiss()
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(MESCColor.textPrimary)
-                                    .frame(width: 34, height: 34)
-                                    .background(MESCColor.surface.opacity(0.72), in: Circle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+            resourcesList
+        }
+        .sheet(item: $previewFile) { file in
+            FormationFilePreview(fileURL: file.url)
+                .ignoresSafeArea()
+        }
+        .task {
+            await appModel.refreshFormationResources()
+            selectFirstAvailableTabIfNeeded()
+        }
+    }
 
-                    if appModel.formationVideoLessons.isEmpty {
-                        EmptyState(title: "Nenhum vídeo publicado", detail: "Quando a coordenação incluir vídeos nas aulas, eles aparecerão aqui.")
-                    } else {
-                        ForEach(appModel.formationVideoLessons) { lesson in
-                            Button {
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                    onOpenLesson(lesson)
-                                }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    SymbolTile(symbol: "play.fill", tint: MESCColor.accent)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(lesson.title)
-                                            .font(MESCFont.body.weight(.semibold))
-                                            .foregroundStyle(MESCColor.textPrimary)
-                                        Text("Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " - \($0) min" } ?? "")")
-                                            .font(MESCFont.caption)
-                                            .foregroundStyle(MESCColor.textSecondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(MESCColor.textSecondary)
-                                }
-                                .padding(14)
-                                .mescGlass(cornerRadius: 18)
-                            }
-                            .buttonStyle(.plain)
+    @ViewBuilder
+    private var resourcesList: some View {
+        if #available(iOS 16.0, *) {
+            resourcesListBody.scrollContentBackground(.hidden)
+        } else {
+            resourcesListBody
+        }
+    }
+
+    private var resourcesListBody: some View {
+        List {
+            GlassPanel(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    SymbolTile(symbol: "books.vertical", tint: MESCColor.gold)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Formação")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.accent)
+                        Text("Biblioteca")
+                            .font(MESCFont.title2)
+                        Text("Vídeos, materiais e certificados do seu caminho de formação.")
+                            .font(MESCFont.body)
+                            .foregroundStyle(MESCColor.textSecondary)
+                    }
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(MESCColor.textPrimary)
+                            .frame(width: 34, height: 34)
+                            .background(MESCColor.surface.opacity(0.72), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .mescListRow(top: 22, bottom: 8)
+
+            Picker("Conteúdo", selection: $selectedTab) {
+                ForEach(FormationResourceTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .mescListRow(top: 4, bottom: 8)
+
+            switch selectedTab {
+            case .videos:
+                videoRows
+            case .materials:
+                materialRows
+            case .certificates:
+                certificateRows
+            }
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
+    }
+
+    @ViewBuilder
+    private var videoRows: some View {
+        if appModel.formationVideoLessons.isEmpty {
+            EmptyState(title: "Nenhum vídeo publicado", detail: "Os vídeos incluídos pela coordenação nas aulas aparecerão aqui.")
+                .mescListRow()
+        } else {
+            ForEach(appModel.formationVideoLessons) { lesson in
+                Button {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        onOpenLesson(lesson)
+                    }
+                } label: {
+                    FormationResourceRow(
+                        symbol: "play.fill",
+                        tint: MESCColor.accent,
+                        title: lesson.title,
+                        detail: "Aula \(lesson.lessonNumber)\(lesson.estimatedDuration.map { " · \($0) min" } ?? "")"
+                    )
+                }
+                .buttonStyle(.plain)
+                .mescListRow(top: 3, bottom: 5)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var materialRows: some View {
+        if appModel.isLoadingFormationResources, appModel.formationLibraryMaterials.isEmpty {
+            ProgressView("Carregando materiais")
+                .tint(MESCColor.accent)
+                .mescListRow()
+        } else if appModel.formationLibraryMaterials.isEmpty {
+            EmptyState(title: "Nenhum material publicado", detail: "Quando a coordenação publicar um guia ou material de apoio, ele aparecerá aqui.")
+                .mescListRow()
+        } else {
+            ForEach(appModel.formationLibraryMaterials) { material in
+                Button {
+                    open(material: material)
+                } label: {
+                    FormationResourceRow(
+                        symbol: materialSymbol(material.type),
+                        tint: MESCColor.gold,
+                        title: material.title,
+                        detail: materialDetail(material)
+                    )
+                    .overlay(alignment: .trailing) {
+                        if openingResourceId == material.id {
+                            ProgressView()
+                                .tint(MESCColor.accent)
+                                .padding(.trailing, 30)
                         }
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 22)
-                .padding(.bottom, 34)
+                .buttonStyle(.plain)
+                .disabled(openingResourceId != nil)
+                .mescListRow(top: 3, bottom: 5)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var certificateRows: some View {
+        if appModel.isLoadingFormationResources, appModel.formationCertificates.isEmpty {
+            ProgressView("Carregando certificados")
+                .tint(MESCColor.accent)
+                .mescListRow()
+        } else if appModel.formationCertificates.isEmpty {
+            EmptyState(title: "Nenhum certificado emitido", detail: "Ao concluir uma trilha certificável, seu documento aparecerá aqui.")
+                .mescListRow()
+        } else {
+            ForEach(appModel.formationCertificates) { certificate in
+                Button {
+                    open(certificate: certificate)
+                } label: {
+                    FormationResourceRow(
+                        symbol: "checkmark.seal",
+                        tint: MESCColor.accent,
+                        title: certificate.trackTitle,
+                        detail: "Emitido em \(certificateDate(certificate.issuedAt))"
+                    )
+                    .overlay(alignment: .trailing) {
+                        if openingResourceId == certificate.id {
+                            ProgressView()
+                                .tint(MESCColor.accent)
+                                .padding(.trailing, 30)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(openingResourceId != nil)
+                .mescListRow(top: 3, bottom: 5)
+            }
+        }
+    }
+
+    private func selectFirstAvailableTabIfNeeded() {
+        if !appModel.formationVideoLessons.isEmpty { return }
+        if !appModel.formationLibraryMaterials.isEmpty {
+            selectedTab = .materials
+        } else if !appModel.formationCertificates.isEmpty {
+            selectedTab = .certificates
+        }
+    }
+
+    private func open(material: MobileFormationMaterialDTO) {
+        openingResourceId = material.id
+        Task {
+            let fileURL = await appModel.downloadFormationMaterial(material)
+            previewFile = fileURL.map(FormationPreviewFile.init)
+            openingResourceId = nil
+        }
+    }
+
+    private func open(certificate: MobileFormationCertificateDTO) {
+        openingResourceId = certificate.id
+        Task {
+            let fileURL = await appModel.downloadFormationCertificate(certificate)
+            previewFile = fileURL.map(FormationPreviewFile.init)
+            openingResourceId = nil
+        }
+    }
+
+    private func materialSymbol(_ type: String) -> String {
+        switch type.lowercased() {
+        case "video": return "play.rectangle"
+        case "audio": return "waveform"
+        case "image": return "photo"
+        case "presentation": return "rectangle.on.rectangle"
+        case "pdf": return "doc.richtext"
+        default: return "doc.text"
+        }
+    }
+
+    private func materialDetail(_ material: MobileFormationMaterialDTO) -> String {
+        let category = material.category?.capitalized ?? "Material de apoio"
+        guard material.fileSize > 0 else { return category }
+        return "\(category) · \(ByteCountFormatter.string(fromByteCount: Int64(material.fileSize), countStyle: .file))"
+    }
+
+    private func certificateDate(_ value: String) -> String {
+        guard let date = ISO8601DateFormatter().date(from: value) else {
+            return String(value.prefix(10))
+        }
+        return date.formatted(.dateTime.day().month(.wide).year())
+    }
+}
+
+private struct FormationResourceRow: View {
+    let symbol: String
+    let tint: Color
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            SymbolTile(symbol: symbol, tint: tint)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                    .multilineTextAlignment(.leading)
+                Text(detail)
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(MESCColor.textSecondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .mescGlass(cornerRadius: 18)
+    }
+}
+
+private struct FormationFilePreview: UIViewControllerRepresentable {
+    let fileURL: URL
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(fileURL: fileURL)
+    }
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: QLPreviewController, context: Context) {}
+
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        private let fileURL: URL
+
+        init(fileURL: URL) {
+            self.fileURL = fileURL
+        }
+
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+            1
+        }
+
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            fileURL as NSURL
         }
     }
 }
@@ -4886,6 +5929,13 @@ struct FormationAdminStudioSheet: View {
     @State private var videoUrl = ""
     @State private var durationText = ""
     @State private var isActive = true
+    @State private var materialTitle = ""
+    @State private var materialDescription = ""
+    @State private var materialURL = ""
+    @State private var materialTags = ""
+    @State private var materialType = "document"
+    @State private var materialCategory = "pratica"
+    @State private var isMaterialPublished = true
     @State private var selectedLessonForEditing: MobileFormationAdminLessonDTO?
 
     var body: some View {
@@ -4899,6 +5949,7 @@ struct FormationAdminStudioSheet: View {
                     if let studio = appModel.formationAdminStudio {
                         summary(studio)
                         lessonForm
+                        materialForm
                         recentLessons(studio)
                     } else if appModel.isLoadingFormationStudio {
                         GlassPanel(spacing: 12) {
@@ -4947,7 +5998,7 @@ struct FormationAdminStudioSheet: View {
                         .foregroundStyle(MESCColor.accent)
                     Text("Estúdio de formação")
                         .font(MESCFont.title2)
-                    Text("Publique aulas, conteúdo e vídeos sem sair do app.")
+                    Text("Publique aulas, vídeos e materiais de apoio sem sair do app.")
                         .font(MESCFont.body)
                         .foregroundStyle(MESCColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -5052,6 +6103,78 @@ struct FormationAdminStudioSheet: View {
         }
     }
 
+    private var materialForm: some View {
+        GlassPanel(spacing: 14) {
+            SectionTitle(title: "Material de apoio", symbol: "doc.badge.plus")
+            Text("Publique uma URL de documento, vídeo ou referência para a biblioteca privada dos ministros.")
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            adminField("Título do material", text: $materialTitle, placeholder: "Ex.: Checklist para a distribuição")
+            adminField("Descrição", text: $materialDescription, placeholder: "Quando e como usar este material")
+
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Tipo")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    Picker("Tipo", selection: $materialType) {
+                        Text("Documento").tag("document")
+                        Text("PDF").tag("pdf")
+                        Text("Vídeo").tag("video")
+                        Text("Áudio").tag("audio")
+                        Text("Apresentação").tag("presentation")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Área")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    Picker("Área", selection: $materialCategory) {
+                        Text("Prática").tag("pratica")
+                        Text("Liturgia").tag("liturgia")
+                        Text("Espiritualidade").tag("espiritualidade")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
+
+            adminField("URL do material", text: $materialURL, placeholder: "https://...", keyboard: .URL)
+            adminField("Marcadores", text: $materialTags, placeholder: "Ex.: altar, checklist, domingo")
+
+            Toggle(isOn: $isMaterialPublished) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Publicar agora")
+                        .font(MESCFont.body.weight(.semibold))
+                    Text("O material aparece na biblioteca e avisa os ministros da comunidade.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                }
+            }
+            .tint(MESCColor.accent)
+            .padding(12)
+            .mescGlass(cornerRadius: 16)
+
+            MESCSecondaryButton(
+                title: appModel.isSavingFormationContent ? "Publicando..." : "Publicar material",
+                symbol: "paperplane"
+            ) {
+                Task { await submitMaterial() }
+            }
+            .disabled(appModel.isSavingFormationContent || trimmed(materialTitle).count < 3 || trimmed(materialURL).isEmpty)
+            .opacity(appModel.isSavingFormationContent || trimmed(materialTitle).count < 3 || trimmed(materialURL).isEmpty ? 0.55 : 1)
+        }
+    }
+
     private func recentLessons(_ studio: MobileFormationAdminStudioDTO) -> some View {
         GlassPanel(spacing: 12) {
             SectionTitle(title: "Aulas recentes", symbol: "clock.arrow.circlepath")
@@ -5096,8 +6219,8 @@ struct FormationAdminStudioSheet: View {
             TextField(placeholder, text: text)
                 .font(MESCFont.body)
                 .keyboardType(keyboard)
-                .textInputAutocapitalization(label == "URL do vídeo" ? .never : .sentences)
-                .autocorrectionDisabled(label == "URL do vídeo")
+                .textInputAutocapitalization(label.contains("URL") ? .never : .sentences)
+                .autocorrectionDisabled(label.contains("URL"))
                 .padding(14)
                 .background(MESCColor.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
@@ -5132,6 +6255,34 @@ struct FormationAdminStudioSheet: View {
         }
     }
 
+    private func submitMaterial() async {
+        let tags = materialTags
+            .split(separator: ",")
+            .map { trimmed(String($0)) }
+            .filter { !$0.isEmpty }
+        let payload = FormationAdminMaterialRequestBody(
+            title: trimmed(materialTitle),
+            description: nilIfEmpty(materialDescription),
+            type: materialType,
+            category: materialCategory,
+            trackId: nil,
+            externalUrl: trimmed(materialURL),
+            tags: tags,
+            isPublished: isMaterialPublished
+        )
+
+        let didSave = await appModel.createFormationAdminMaterial(payload)
+        if didSave {
+            materialTitle = ""
+            materialDescription = ""
+            materialURL = ""
+            materialTags = ""
+            materialType = "document"
+            materialCategory = "pratica"
+            isMaterialPublished = true
+        }
+    }
+
     private func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -5145,6 +6296,10 @@ struct FormationAdminStudioSheet: View {
 struct FormationAdminLessonListRow: View {
     let lesson: MobileFormationAdminLessonDTO
     let onOpen: () -> Void
+
+    private var isEditable: Bool {
+        lesson.isEditable ?? true
+    }
 
     var body: some View {
         Button(action: onOpen) {
@@ -5167,9 +6322,14 @@ struct FormationAdminLessonListRow: View {
                     Text(lesson.isActive ? "Publicada" : "Rascunho")
                         .font(MESCFont.caption2.weight(.semibold))
                         .foregroundStyle(lesson.isActive ? MESCColor.accent : MESCColor.textSecondary)
+                    if !isEditable {
+                        Text("Formação oficial")
+                            .font(MESCFont.caption2.weight(.semibold))
+                            .foregroundStyle(MESCColor.gold)
+                    }
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: isEditable ? "chevron.right" : "lock.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(MESCColor.textSecondary)
             }
@@ -5177,7 +6337,8 @@ struct FormationAdminLessonListRow: View {
             .mescGlass(cornerRadius: 16)
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Edita esta aula ou adiciona conteúdo")
+        .disabled(!isEditable)
+        .accessibilityHint(isEditable ? "Edita esta aula ou adiciona conteúdo" : "Conteúdo oficial disponível somente para consulta")
     }
 }
 
@@ -5390,7 +6551,11 @@ struct FormationLessonSectionCard: View {
     let isCompleting: Bool
     let isProgressMutationInFlight: Bool
     let isLessonCompleted: Bool
+    let quiz: FormationQuizDefinition?
+    let quizResult: FormationQuizResult?
     let onComplete: () -> Void
+    let onOpenMedia: (FormationMediaTarget) -> Void
+    let onOpenQuiz: (FormationQuizDefinition) -> Void
 
     var body: some View {
         GlassPanel(spacing: 10) {
@@ -5415,10 +6580,13 @@ struct FormationLessonSectionCard: View {
                 if let minutes = section.estimatedMinutes {
                     Label("\(minutes) min", systemImage: "clock")
                 }
-                if let videoUrl = section.videoUrl, let url = URL(string: videoUrl), !videoUrl.isEmpty {
-                    Link(destination: url) {
+                if let target = FormationMediaTarget(title: section.title, urlString: section.videoUrl) {
+                    Button {
+                        onOpenMedia(target)
+                    } label: {
                         Label("Vídeo", systemImage: "play.rectangle")
                     }
+                    .buttonStyle(.plain)
                 }
                 if let documentUrl = section.documentUrl, let url = URL(string: documentUrl), !documentUrl.isEmpty {
                     Link(destination: url) {
@@ -5429,7 +6597,9 @@ struct FormationLessonSectionCard: View {
             .font(MESCFont.caption)
             .foregroundStyle(MESCColor.accent)
 
-            if !isCompleted {
+            if let quiz {
+                quizAction(quiz)
+            } else if !isCompleted {
                 Button(action: onComplete) {
                     Label(isCompleting ? "Concluindo..." : "Marcar seção como concluída", systemImage: isCompleting ? "hourglass" : "checkmark.circle")
                         .font(MESCFont.caption.weight(.semibold))
@@ -5441,6 +6611,43 @@ struct FormationLessonSectionCard: View {
                 .foregroundStyle(MESCColor.accent)
                 .disabled(isProgressMutationInFlight || isLessonCompleted)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func quizAction(_ quiz: FormationQuizDefinition) -> some View {
+        if let quizResult {
+            HStack(spacing: 9) {
+                Image(systemName: quizResult.passed ? "checkmark.seal.fill" : "arrow.clockwise.circle")
+                    .foregroundStyle(quizResult.passed ? MESCColor.accent : MESCColor.gold)
+                Text(quizResult.passed ? "Quiz concluído: \(quizResult.score)%" : "Quiz: \(quizResult.score)% - reveja e tente novamente")
+                    .font(MESCFont.caption.weight(.semibold))
+                    .foregroundStyle(quizResult.passed ? MESCColor.accent : MESCColor.textSecondary)
+                Spacer(minLength: 4)
+                if !quizResult.passed {
+                    Button("Refazer") {
+                        onOpenQuiz(quiz)
+                    }
+                    .font(MESCFont.caption.weight(.semibold))
+                    .foregroundStyle(MESCColor.accent)
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(11)
+            .background(MESCColor.surface.opacity(0.58), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            Button {
+                onOpenQuiz(quiz)
+            } label: {
+                Label("Iniciar quiz de avaliação", systemImage: "questionmark.circle")
+                    .font(MESCFont.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(MESCColor.surface.opacity(0.58), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(MESCColor.accent)
+            .disabled(isLessonCompleted)
         }
     }
 
@@ -5458,10 +6665,610 @@ struct FormationLessonSectionCard: View {
     }
 }
 
+struct FormationMediaTarget: Identifiable {
+    let title: String
+    let url: URL
+
+    var id: String { url.absoluteString }
+
+    init?(title: String, urlString: String?) {
+        guard let urlString, !urlString.isEmpty, let url = URL(string: urlString) else {
+            return nil
+        }
+        self.title = title
+        self.url = url
+    }
+
+    var supportsNativePlayback: Bool {
+        switch url.pathExtension.lowercased() {
+        case "m3u8", "mp4", "m4v", "mov":
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+private struct FormationMediaSheet: View {
+    let target: FormationMediaTarget
+
+    var body: some View {
+        if target.supportsNativePlayback {
+            FormationNativeVideoPlayerSheet(target: target)
+        } else {
+            FormationBrowserVideoSheet(target: target)
+        }
+    }
+}
+
+private struct FormationNativeVideoPlayerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let target: FormationMediaTarget
+    @State private var player: AVPlayer
+
+    init(target: FormationMediaTarget) {
+        self.target = target
+        _player = State(initialValue: AVPlayer(url: target.url))
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text(target.title)
+                        .font(MESCFont.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                            .background(Color.white.opacity(0.16), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Fechar vídeo")
+                }
+                .padding(18)
+
+                VideoPlayer(player: player)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+
+                Spacer()
+            }
+        }
+        .onAppear { player.play() }
+        .onDisappear { player.pause() }
+    }
+}
+
+private struct FormationBrowserVideoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let target: FormationMediaTarget
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            FormationSafariView(url: target.url)
+                .ignoresSafeArea()
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 16)
+            .padding(.trailing, 16)
+            .accessibilityLabel("Fechar vídeo")
+        }
+    }
+}
+
+private struct FormationSafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+}
+
+struct FormationQuizDefinition: Identifiable {
+    let id: String
+    let title: String
+    let description: String?
+    let passingScore: Int
+    let questions: [FormationQuizQuestion]
+
+    init?(section: MobileFormationLessonSectionDTO) {
+        guard section.contentType?.lowercased() == "quiz",
+              let payload = section.quizData?.mescObject,
+              let rawQuestions = payload["questions"]?.mescArray else {
+            return nil
+        }
+
+        let questions = rawQuestions.compactMap(FormationQuizQuestion.init(payload:))
+        guard !questions.isEmpty else { return nil }
+
+        id = section.id
+        title = payload["title"]?.mescString ?? section.title
+        description = payload["description"]?.mescString
+        passingScore = min(max(payload["passingScore"]?.mescInt ?? 70, 0), 100)
+        self.questions = questions
+    }
+}
+
+struct FormationQuizQuestion: Identifiable {
+    let id: String
+    let title: String
+    let options: [String]
+    let correctAnswerIndex: Int
+    let explanation: String?
+
+    init?(payload: JSONValue) {
+        guard let object = payload.mescObject,
+              let options = object["options"]?.mescArray?.compactMap(\.mescString),
+              !options.isEmpty else {
+            return nil
+        }
+
+        let rawAnswer = object["correctAnswer"] ?? object["correctOptionIndex"]
+        let answerIndex: Int?
+        if let index = rawAnswer?.mescInt {
+            answerIndex = index
+        } else if let answer = rawAnswer?.mescString {
+            answerIndex = Int(answer) ?? options.firstIndex(of: answer)
+        } else {
+            answerIndex = nil
+        }
+
+        guard let answerIndex, options.indices.contains(answerIndex) else { return nil }
+
+        id = object["id"]?.mescString ?? UUID().uuidString
+        title = object["question"]?.mescString ?? object["prompt"]?.mescString ?? object["title"]?.mescString ?? "Pergunta"
+        self.options = options
+        correctAnswerIndex = answerIndex
+        explanation = object["explanation"]?.mescString
+    }
+}
+
+struct FormationQuizResult: Equatable {
+    let score: Int
+    let passed: Bool
+}
+
+private struct FormationQuizSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let quiz: FormationQuizDefinition
+    let onFinished: (FormationQuizResult) -> Void
+    @State private var currentIndex = 0
+    @State private var selectedAnswers: [Int]
+    @State private var result: FormationQuizResult?
+
+    init(quiz: FormationQuizDefinition, onFinished: @escaping (FormationQuizResult) -> Void) {
+        self.quiz = quiz
+        self.onFinished = onFinished
+        _selectedAnswers = State(initialValue: Array(repeating: -1, count: quiz.questions.count))
+    }
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            if let result {
+                quizResult(result)
+            } else {
+                quizQuestion
+            }
+        }
+    }
+
+    private var quizQuestion: some View {
+        let question = quiz.questions[currentIndex]
+        return ScrollView(showsIndicators: false) {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                GlassPanel(spacing: 10) {
+                    HStack(alignment: .top, spacing: 12) {
+                        SymbolTile(symbol: "questionmark.circle", tint: MESCColor.gold)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(quiz.title)
+                                .font(MESCFont.title2)
+                            if let description = quiz.description, !description.isEmpty {
+                                Text(description)
+                                    .font(MESCFont.caption)
+                                    .foregroundStyle(MESCColor.textSecondary)
+                            }
+                            Text("Questão \(currentIndex + 1) de \(quiz.questions.count) · mínimo \(quiz.passingScore)%")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.accent)
+                        }
+                        Spacer()
+                        MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar quiz") {
+                            dismiss()
+                        }
+                    }
+                    ProgressView(value: Double(currentIndex + 1), total: Double(quiz.questions.count))
+                        .tint(MESCColor.gold)
+                }
+
+                GlassPanel(spacing: 14) {
+                    Text(question.title)
+                        .font(MESCFont.cardTitle)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
+                        ChoiceRow(title: option, isSelected: selectedAnswers[currentIndex] == index) {
+                            selectedAnswers[currentIndex] = index
+                        }
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    MESCSecondaryButton(title: "Anterior", symbol: "chevron.left") {
+                        currentIndex = max(currentIndex - 1, 0)
+                    }
+                    .disabled(currentIndex == 0)
+                    .opacity(currentIndex == 0 ? 0.55 : 1)
+
+                    MESCPrimaryButton(
+                        title: currentIndex == quiz.questions.count - 1 ? "Finalizar" : "Próxima",
+                        symbol: currentIndex == quiz.questions.count - 1 ? "checkmark.circle" : "chevron.right"
+                    ) {
+                        advance()
+                    }
+                    .disabled(selectedAnswers[currentIndex] < 0)
+                    .opacity(selectedAnswers[currentIndex] < 0 ? 0.55 : 1)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+            .padding(.bottom, 34)
+        }
+    }
+
+    private func quizResult(_ result: FormationQuizResult) -> some View {
+        VStack(spacing: 18) {
+            Spacer()
+            SymbolTile(
+                symbol: result.passed ? "checkmark.seal.fill" : "arrow.clockwise.circle.fill",
+                tint: result.passed ? MESCColor.accent : MESCColor.gold
+            )
+            Text(result.passed ? "Quiz concluído" : "Vamos revisar")
+                .font(MESCFont.title2)
+            Text("Você acertou \(result.score)% das questões.")
+                .font(MESCFont.body)
+                .foregroundStyle(MESCColor.textSecondary)
+            Text(result.passed ? "A avaliação foi concluída. Agora você pode marcar a aula como realizada." : "A nota mínima é \(quiz.passingScore)%. Revise a aula e faça o quiz novamente.")
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            MESCPrimaryButton(
+                title: result.passed ? "Voltar à aula" : "Tentar novamente",
+                symbol: result.passed ? "arrow.uturn.left" : "arrow.clockwise"
+            ) {
+                if result.passed {
+                    dismiss()
+                } else {
+                    currentIndex = 0
+                    selectedAnswers = Array(repeating: -1, count: quiz.questions.count)
+                    self.result = nil
+                }
+            }
+            .padding(.top, 8)
+            Spacer()
+        }
+        .padding(24)
+    }
+
+    private func advance() {
+        guard selectedAnswers[currentIndex] >= 0 else { return }
+        if currentIndex < quiz.questions.count - 1 {
+            currentIndex += 1
+            return
+        }
+
+        let correctAnswers = zip(quiz.questions, selectedAnswers)
+            .filter { question, answer in question.correctAnswerIndex == answer }
+            .count
+        let score = Int((Double(correctAnswers) / Double(quiz.questions.count) * 100).rounded())
+        let nextResult = FormationQuizResult(score: score, passed: score >= quiz.passingScore)
+        result = nextResult
+        onFinished(nextResult)
+    }
+}
+
+extension JSONValue {
+    var mescObject: [String: JSONValue]? {
+        guard case let .object(value) = self else { return nil }
+        return value
+    }
+
+    var mescArray: [JSONValue]? {
+        guard case let .array(value) = self else { return nil }
+        return value
+    }
+
+    var mescString: String? {
+        guard case let .string(value) = self else { return nil }
+        return value
+    }
+
+    var mescInt: Int? {
+        switch self {
+        case let .number(value):
+            return Int(value)
+        case let .string(value):
+            return Int(value)
+        default:
+            return nil
+        }
+    }
+}
+
+struct CoordinatorQuestionnaireManagerSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedMonth = CoordinatorQuestionnaireManagerSheet.defaultReferenceMonth()
+    @State private var title = ""
+    @State private var description = ""
+    @State private var deadline = CoordinatorQuestionnaireManagerSheet.defaultResponseDeadline()
+    @State private var showPublishConfirmation = false
+    @State private var showCloseConfirmation = false
+
+    private var questionnaire: MobileCoordinatorQuestionnaireSummaryDTO? {
+        appModel.coordinatorHome?.questionnaire
+    }
+
+    private var isDraft: Bool { questionnaire?.status == "draft" }
+    private var isPublished: Bool { questionnaire?.status == "published" }
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                MESCBackground()
+
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        GlassPanel(spacing: 12) {
+                            SectionTitle(title: "Disponibilidade", symbol: "list.clipboard")
+                            Text("Prepare o questionário mensal, publique o convite aos ministros e encerre-o antes da escala definitiva.")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        if let questionnaire {
+                            questionnaireStatus(questionnaire)
+                        } else {
+                            creationForm
+                        }
+
+                        actionPanel
+
+                        if let message = appModel.coordinatorMessage {
+                            Label(message, systemImage: "info.circle")
+                                .font(MESCFont.caption)
+                                .foregroundStyle(MESCColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(14)
+                                .mescGlass(cornerRadius: 16)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 34)
+                }
+            }
+            .navigationTitle("Questionário")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Concluir") { dismiss() }
+                }
+            }
+            .confirmationDialog("Publicar questionário?", isPresented: $showPublishConfirmation, titleVisibility: .visible) {
+                Button("Publicar") {
+                    guard let questionnaire else { return }
+                    Task { _ = await appModel.publishCoordinatorQuestionnaire(questionnaireId: questionnaire.id) }
+                }
+            } message: {
+                Text("Os ministros da comunidade receberão um aviso para informar a disponibilidade.")
+            }
+            .confirmationDialog("Encerrar questionário?", isPresented: $showCloseConfirmation, titleVisibility: .visible) {
+                Button("Encerrar", role: .destructive) {
+                    guard let questionnaire else { return }
+                    Task { _ = await appModel.closeCoordinatorQuestionnaire(questionnaireId: questionnaire.id) }
+                }
+            } message: {
+                Text("Após o encerramento, novas respostas não poderão ser enviadas e a escala poderá ser publicada.")
+            }
+            .onAppear {
+                if questionnaire == nil {
+                    selectedMonth = Self.defaultReferenceMonth()
+                    deadline = Self.defaultResponseDeadline()
+                }
+            }
+        }
+        .navigationViewStyle(.stack)
+    }
+
+    private var creationForm: some View {
+        GlassPanel(spacing: 14) {
+            Picker("Mês da disponibilidade", selection: $selectedMonth) {
+                ForEach(referenceMonthOptions, id: \.self) { month in
+                    Text(Self.referenceMonthLabel(month)).tag(month)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Text("A disponibilidade é organizada por mês, sem data específica.")
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Título opcional")
+                    .font(MESCFont.caption.weight(.semibold))
+                TextField("Disponibilidade do mês", text: $title)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Mensagem aos ministros")
+                    .font(MESCFont.caption.weight(.semibold))
+                TextField("Orientação opcional", text: $description)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Prazo para responder")
+                    .font(MESCFont.caption.weight(.semibold))
+                Text(Self.deadlineLabel(deadline))
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.accent)
+                Text("Calculado para cinco dias úteis antes do fim do mês atual.")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+        }
+    }
+
+    private var referenceMonthOptions: [Date] {
+        let calendar = Self.operatingCalendar
+        return (0..<12).compactMap { offset in
+            calendar.date(byAdding: .month, value: offset, to: Self.defaultReferenceMonth())
+        }
+    }
+
+    private static var operatingCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo") ?? .current
+        return calendar
+    }
+
+    private static func defaultReferenceMonth(from now: Date = Date()) -> Date {
+        let calendar = operatingCalendar
+        let components = calendar.dateComponents([.year, .month], from: now)
+        guard let currentMonth = calendar.date(from: components) else { return now }
+        return calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
+    }
+
+    private static func defaultResponseDeadline(from now: Date = Date()) -> Date {
+        let calendar = operatingCalendar
+        let components = calendar.dateComponents([.year, .month], from: now)
+        guard let startOfMonth = calendar.date(from: components),
+              var cursor = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)
+        else { return now }
+
+        var businessDays = 0
+        while businessDays < 5 {
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = previousDay
+            let weekday = calendar.component(.weekday, from: cursor)
+            if weekday != 1 && weekday != 7 {
+                businessDays += 1
+            }
+        }
+
+        return calendar.date(bySettingHour: 23, minute: 59, second: 59, of: cursor) ?? cursor
+    }
+
+    private static func referenceMonthLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = operatingCalendar
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: date).capitalized
+    }
+
+    private static func deadlineLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = operatingCalendar
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateStyle = .long
+        return formatter.string(from: date)
+    }
+
+    private func questionnaireStatus(_ questionnaire: MobileCoordinatorQuestionnaireSummaryDTO) -> some View {
+        GlassPanel(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                SymbolTile(
+                    symbol: questionnaire.status == "closed" ? "checkmark.seal.fill" : questionnaire.status == "published" ? "paperplane.fill" : "doc.text.fill",
+                    tint: questionnaire.status == "published" ? MESCColor.accent : MESCColor.gold
+                )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(questionnaire.title)
+                        .font(MESCFont.cardTitle)
+                    Text(MESCNativeAppModel.monthLabel(from: String(format: "%04d-%02d", questionnaire.year, questionnaire.month)))
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    Text(questionnaire.status == "draft" ? "Rascunho pronto para revisão" : questionnaire.status == "published" ? "Aguardando respostas dos ministros" : "Encerrado para elaboração da escala")
+                        .font(MESCFont.caption.weight(.semibold))
+                        .foregroundStyle(questionnaire.status == "published" ? MESCColor.accent : MESCColor.gold)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                StatusPill(title: "\(questionnaire.responses)/\(questionnaire.target)", symbol: "person.2", tint: MESCColor.accent)
+                StatusPill(title: "\(questionnaire.responseRate)%", symbol: "chart.bar", tint: MESCColor.gold)
+            }
+        }
+    }
+
+    private var actionPanel: some View {
+        GlassPanel(spacing: 12) {
+            if appModel.isMutatingCoordinatorQuestionnaire {
+                HStack(spacing: 10) {
+                    ProgressView().tint(MESCColor.accent)
+                    Text("Salvando questionário...")
+                        .font(MESCFont.body.weight(.semibold))
+                }
+            } else if questionnaire == nil {
+                MESCPrimaryButton(title: "Criar rascunho", symbol: "plus.circle.fill") {
+                    Task {
+                        _ = await appModel.createCoordinatorQuestionnaire(
+                            month: selectedMonth,
+                            title: title,
+                            description: description,
+                            deadline: deadline
+                        )
+                    }
+                }
+            } else if isDraft {
+                MESCPrimaryButton(title: "Publicar para ministros", symbol: "paperplane.fill") {
+                    showPublishConfirmation = true
+                }
+            } else if isPublished {
+                MESCPrimaryButton(title: "Encerrar questionário", symbol: "checkmark.seal.fill") {
+                    showCloseConfirmation = true
+                }
+            } else {
+                Label("Questionário encerrado e pronto para a escala", systemImage: "checkmark.circle.fill")
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+}
+
 struct CoordinatorScreen: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @State private var replaceExisting = false
     @State private var showPublishConfirmation = false
+    @State private var isQuestionnaireManagerPresented = false
 
     var body: some View {
         MESCScrollScreen(
@@ -5513,6 +7320,10 @@ struct CoordinatorScreen: View {
                 ? "A escala existente deste mês será substituída. A ação será registrada e os ministros receberão um aviso."
                 : "A escala será publicada para os ministros da comunidade e a ação será registrada.")
         }
+        .sheet(isPresented: $isQuestionnaireManagerPresented) {
+            CoordinatorQuestionnaireManagerSheet()
+                .environmentObject(appModel)
+        }
     }
 
     private func communitySummary(_ home: MobileCoordinatorCommunityHomeDTO) -> some View {
@@ -5546,13 +7357,30 @@ struct CoordinatorScreen: View {
 
     private func questionnairePanel(_ home: MobileCoordinatorCommunityHomeDTO) -> some View {
         GlassPanel(spacing: 13) {
-            SectionTitle(title: "Questionário", symbol: "list.clipboard")
+            HStack {
+                SectionTitle(title: "Questionário", symbol: "list.clipboard")
+                Spacer()
+                Button {
+                    isQuestionnaireManagerPresented = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(MESCColor.accent)
+                        .frame(width: 34, height: 34)
+                        .mescGlass(cornerRadius: 11)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Gerenciar questionário")
+            }
 
             if let questionnaire = home.questionnaire {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(questionnaire.title)
                             .font(MESCFont.body.weight(.semibold))
+                        Text(questionnaire.status == "draft" ? "Rascunho" : questionnaire.status == "closed" ? "Encerrado" : "Publicado")
+                            .font(MESCFont.caption.weight(.semibold))
+                            .foregroundStyle(questionnaire.status == "published" ? MESCColor.accent : MESCColor.gold)
                         Text("\(questionnaire.responses) de \(questionnaire.target) respostas, \(questionnaire.responseRate)% concluído")
                             .font(MESCFont.caption)
                             .foregroundStyle(MESCColor.textSecondary)
@@ -5582,7 +7410,10 @@ struct CoordinatorScreen: View {
                     }
                 }
             } else {
-                EmptyState(title: "Sem questionário ativo", detail: "Quando a coordenação publicar um questionário, as respostas aparecerão aqui.")
+                EmptyState(title: "Sem questionário neste mês", detail: "Use os controles do cabeçalho para preparar a disponibilidade da comunidade.")
+                MESCSecondaryButton(title: "Criar questionário", symbol: "plus.circle") {
+                    isQuestionnaireManagerPresented = true
+                }
             }
         }
     }
@@ -6349,9 +8180,71 @@ struct MESCScrollScreen<Content: View>: View {
     }
 }
 
+struct MESCListScreen<Content: View>: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    let title: String
+    let subtitle: String
+    @ViewBuilder let content: Content
+    @State private var isCommunityIdentityPresented = false
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                MESCBackground()
+                list
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    MESCNotificationBell(unreadCount: appModel.unreadNotificationsCount) {
+                        appModel.isNotificationCenterPresented = true
+                    }
+
+                    Button {
+                        isCommunityIdentityPresented = true
+                    } label: {
+                        MESCLogoMark(size: 34, cornerRadius: 12, focalMark: true)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Identidade e comunidade ativa do MESC")
+                }
+            }
+        }
+        .navigationViewStyle(.stack)
+        .sheet(isPresented: $isCommunityIdentityPresented) {
+            MESCCommunityIdentitySheet()
+                .environmentObject(appModel)
+        }
+    }
+
+    @ViewBuilder
+    private var list: some View {
+        if #available(iOS 16.0, *) {
+            listBody.scrollContentBackground(.hidden)
+        } else {
+            listBody
+        }
+    }
+
+    private var listBody: some View {
+        List {
+            Text(subtitle)
+                .font(MESCFont.subheadline.weight(.semibold))
+                .foregroundStyle(MESCColor.accent)
+                .mescListRow(top: 8, bottom: 8)
+
+            content
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
+    }
+}
+
 struct MESCCommunityIdentitySheet: View {
     @EnvironmentObject private var appModel: MESCNativeAppModel
     @Environment(\.dismiss) private var dismiss
+    @State private var isDirectoryPresented = false
 
     var body: some View {
         ZStack {
@@ -6392,6 +8285,10 @@ struct MESCCommunityIdentitySheet: View {
                     }
                 }
 
+                MESCSecondaryButton(title: "Ministros da comunidade", symbol: "person.2") {
+                    isDirectoryPresented = true
+                }
+
                 MESCSecondaryButton(title: "Atualizar informações", symbol: "arrow.clockwise") {
                     Task { await appModel.reload() }
                 }
@@ -6400,6 +8297,293 @@ struct MESCCommunityIdentitySheet: View {
             }
             .padding(22)
         }
+        .sheet(isPresented: $isDirectoryPresented) {
+            MinistersDirectorySheet()
+                .environmentObject(appModel)
+        }
+    }
+}
+
+struct MinistersDirectorySheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    @State private var selectedRole = "Todos"
+    @State private var selectedMinister: MobileDirectoryMinisterDTO?
+
+    private var roleFilters: [String] {
+        ["Todos"] + Array(Set(appModel.directoryMinisters.map(\.role))).sorted()
+    }
+
+    private var filteredMinisters: [MobileDirectoryMinisterDTO] {
+        appModel.directoryMinisters.filter { minister in
+            let matchesRole = selectedRole == "Todos" || minister.role == selectedRole
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let matchesQuery = query.isEmpty || minister.displayName.localizedCaseInsensitiveContains(query)
+            return matchesRole && matchesQuery
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                MESCBackground()
+                directoryList
+            }
+            .navigationTitle("Ministros")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        ForEach(roleFilters, id: \.self) { role in
+                            Button {
+                                selectedRole = role
+                            } label: {
+                                if selectedRole == role {
+                                    Label(roleTitle(role), systemImage: "checkmark")
+                                } else {
+                                    Text(roleTitle(role))
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Filtrar", systemImage: "line.3.horizontal.decrease.circle")
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(MESCColor.accent)
+                    }
+                    .accessibilityLabel("Fechar diretório")
+                }
+            }
+        }
+        .navigationViewStyle(.stack)
+        .searchable(text: $searchText, prompt: "Buscar ministro")
+        .task {
+            guard appModel.directoryMinisters.isEmpty, !appModel.isLoadingDirectory else { return }
+            await appModel.loadDirectory()
+        }
+        .refreshable {
+            await appModel.loadDirectory()
+        }
+        .sheet(item: $selectedMinister) { minister in
+            MinisterDirectoryDetailSheet(minister: minister)
+                .environmentObject(appModel)
+        }
+    }
+
+    @ViewBuilder
+    private var directoryList: some View {
+        if #available(iOS 16.0, *) {
+            directoryListBody.scrollContentBackground(.hidden)
+        } else {
+            directoryListBody
+        }
+    }
+
+    private var directoryListBody: some View {
+        List {
+            Text("Pessoas que servem na comunidade ativa. Informações de contato permanecem protegidas.")
+                .font(MESCFont.caption)
+                .foregroundStyle(MESCColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .mescListRow(top: 16, bottom: 10)
+
+            if let message = appModel.directoryMessage {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.primaryWine)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .mescListRow(top: 4, bottom: 8)
+            }
+
+            if appModel.isLoadingDirectory && appModel.directoryMinisters.isEmpty {
+                ProgressView()
+                    .tint(MESCColor.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 44)
+                    .mescListRow()
+            } else if filteredMinisters.isEmpty {
+                EmptyState(
+                    title: searchText.isEmpty ? "Nenhum ministro encontrado" : "Nenhum resultado",
+                    detail: searchText.isEmpty
+                        ? "Quando houver ministros ativos nesta comunidade, eles aparecerão aqui."
+                        : "Tente buscar por outro nome."
+                )
+                .mescListRow()
+            } else {
+                ForEach(filteredMinisters) { minister in
+                    Button {
+                        selectedMinister = minister
+                    } label: {
+                        MinisterDirectoryRow(minister: minister)
+                    }
+                    .buttonStyle(.plain)
+                    .mescListRow(top: 3, bottom: 3)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
+    }
+
+    private func roleTitle(_ role: String) -> String {
+        switch role {
+        case "coordenador", "coordenador_comunidade": return "Coordenação"
+        case "coordenador_paroquial": return "Coordenação paroquial"
+        case "gestor", "reitor": return "Gestão"
+        case "Todos": return "Todos"
+        default: return "Ministro"
+        }
+    }
+}
+
+private struct MinisterDirectoryRow: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    let minister: MobileDirectoryMinisterDTO
+    @State private var image: UIImage?
+
+    var body: some View {
+        HStack(spacing: 13) {
+            DirectoryMinisterAvatar(image: image, name: minister.displayName, size: 48)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(minister.displayName)
+                    .font(MESCFont.body.weight(.semibold))
+                    .foregroundStyle(MESCColor.textPrimary)
+                    .lineLimit(1)
+                Text(roleTitle)
+                    .font(MESCFont.caption)
+                    .foregroundStyle(MESCColor.textSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(MESCColor.accent)
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .task(id: minister.id) {
+            guard image == nil else { return }
+            image = await appModel.directoryPhoto(for: minister)
+        }
+    }
+
+    private var roleTitle: String {
+        switch minister.role {
+        case "coordenador", "coordenador_comunidade": return "Coordenação da comunidade"
+        case "coordenador_paroquial": return "Coordenação paroquial"
+        case "gestor", "reitor": return "Gestão pastoral"
+        default: return "Ministro extraordinário da comunhão"
+        }
+    }
+}
+
+private struct MinisterDirectoryDetailSheet: View {
+    @EnvironmentObject private var appModel: MESCNativeAppModel
+    @Environment(\.dismiss) private var dismiss
+    let minister: MobileDirectoryMinisterDTO
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            MESCBackground()
+
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("Ministro da comunidade")
+                        .font(MESCFont.cardTitle)
+                    Spacer()
+                    MESCIconButton(symbol: "xmark", accessibilityLabel: "Fechar perfil do ministro") {
+                        dismiss()
+                    }
+                }
+
+                HStack(spacing: 16) {
+                    DirectoryMinisterAvatar(image: image, name: minister.displayName, size: 82)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(minister.displayName)
+                            .font(MESCFont.title2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(roleTitle)
+                            .font(MESCFont.callout)
+                            .foregroundStyle(MESCColor.accent)
+                    }
+                }
+
+                GlassPanel(spacing: 8) {
+                    SectionTitle(title: "Comunidade", symbol: "building.columns")
+                    Text(appModel.activeCommunity?.name ?? "Comunidade ativa")
+                        .font(MESCFont.body)
+                        .foregroundStyle(MESCColor.textSecondary)
+                    Text("Dados pessoais e formas de contato são compartilhados apenas quando a coordenação autorizar.")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+            .padding(22)
+        }
+        .task(id: minister.id) {
+            guard image == nil else { return }
+            image = await appModel.directoryPhoto(for: minister)
+        }
+    }
+
+    private var roleTitle: String {
+        switch minister.role {
+        case "coordenador", "coordenador_comunidade": return "Coordenação da comunidade"
+        case "coordenador_paroquial": return "Coordenação paroquial"
+        case "gestor", "reitor": return "Gestão pastoral"
+        default: return "Ministro extraordinário da comunhão"
+        }
+    }
+}
+
+private struct DirectoryMinisterAvatar: View {
+    let image: UIImage?
+    let name: String
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Circle()
+                    .fill(MESCColor.primaryWine.opacity(0.88))
+                    .overlay(
+                        Text(initials)
+                            .font(.system(size: size * 0.32, weight: .bold))
+                            .foregroundStyle(.white)
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(MESCColor.gold.opacity(0.45), lineWidth: 1))
+    }
+
+    private var initials: String {
+        name
+            .split(separator: " ")
+            .prefix(2)
+            .compactMap { $0.first }
+            .map(String.init)
+            .joined()
+            .uppercased()
     }
 }
 
@@ -6442,72 +8626,7 @@ struct MESCNotificationCenterSheet: View {
         ZStack {
             MESCBackground()
 
-            ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    header
-
-                    if appModel.isLoadingNotifications && appModel.notifications.isEmpty {
-                        ProgressView()
-                            .tint(MESCColor.accent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 44)
-                    } else if appModel.notifications.isEmpty {
-                        GlassPanel(spacing: 10) {
-                            VStack(spacing: 10) {
-                                Image(systemName: "bell.slash")
-                                    .font(.system(size: 28, weight: .semibold))
-                                    .foregroundStyle(MESCColor.gold)
-                                Text("Nenhum aviso por enquanto")
-                                    .font(MESCFont.body.weight(.semibold))
-                                Text("Questionários, escalas, substituições e formações aparecerão aqui.")
-                                    .font(MESCFont.caption)
-                                    .foregroundStyle(MESCColor.textSecondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 18)
-                        }
-                    } else {
-                        if appModel.unreadNotificationsCount > 0 {
-                            MESCSecondaryButton(
-                                title: appModel.isMarkingAllNotificationsRead ? "Marcando..." : "Marcar todas como lidas",
-                                symbol: "checkmark.circle"
-                            ) {
-                                Task { await appModel.markAllNotificationsRead() }
-                            }
-                            .disabled(appModel.isMarkingAllNotificationsRead)
-                        }
-
-                        if let message = appModel.notificationMessage {
-                            Label(message, systemImage: "exclamationmark.triangle")
-                                .font(MESCFont.caption)
-                                .foregroundStyle(MESCColor.primaryWine)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 4)
-                        }
-
-                        ForEach(appModel.notifications) { notification in
-                            Button {
-                                Task {
-                                    _ = await appModel.markNotificationRead(notification)
-                                    dismiss()
-                                    onOpenDeepLink(notification.deepLink)
-                                }
-                            } label: {
-                                MESCNotificationRow(
-                                    notification: notification,
-                                    isMarkingRead: appModel.markingNotificationId == notification.id
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(appModel.markingNotificationId == notification.id)
-                        }
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 22)
-                .padding(.bottom, 34)
-            }
+            notificationsList
         }
         .task {
             await appModel.loadNotifications()
@@ -6515,6 +8634,86 @@ struct MESCNotificationCenterSheet: View {
         .refreshable {
             await appModel.loadNotifications()
         }
+    }
+
+    @ViewBuilder
+    private var notificationsList: some View {
+        if #available(iOS 16.0, *) {
+            notificationsListBody.scrollContentBackground(.hidden)
+        } else {
+            notificationsListBody
+        }
+    }
+
+    private var notificationsListBody: some View {
+        List {
+            header.mescListRow(top: 22, bottom: 8)
+
+            if appModel.isLoadingNotifications && appModel.notifications.isEmpty {
+                ProgressView()
+                    .tint(MESCColor.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 44)
+                    .mescListRow()
+            } else if appModel.notifications.isEmpty {
+                GlassPanel(spacing: 10) {
+                    VStack(spacing: 10) {
+                        Image(systemName: "bell.slash")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(MESCColor.gold)
+                        Text("Nenhum aviso por enquanto")
+                            .font(MESCFont.body.weight(.semibold))
+                        Text("Questionários, escalas, substituições e formações aparecerão aqui.")
+                            .font(MESCFont.caption)
+                            .foregroundStyle(MESCColor.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                }
+                .mescListRow()
+            } else {
+                if appModel.unreadNotificationsCount > 0 {
+                    MESCSecondaryButton(
+                        title: appModel.isMarkingAllNotificationsRead ? "Marcando..." : "Marcar todas como lidas",
+                        symbol: "checkmark.circle"
+                    ) {
+                        Task { await appModel.markAllNotificationsRead() }
+                    }
+                    .disabled(appModel.isMarkingAllNotificationsRead)
+                    .mescListRow(top: 4, bottom: 6)
+                }
+
+                if let message = appModel.notificationMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(MESCFont.caption)
+                        .foregroundStyle(MESCColor.primaryWine)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                        .mescListRow(top: 2, bottom: 4)
+                }
+
+                ForEach(appModel.notifications) { notification in
+                    Button {
+                        Task {
+                            _ = await appModel.markNotificationRead(notification)
+                            dismiss()
+                            onOpenDeepLink(notification.deepLink)
+                        }
+                    } label: {
+                        MESCNotificationRow(
+                            notification: notification,
+                            isMarkingRead: appModel.markingNotificationId == notification.id
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(appModel.markingNotificationId == notification.id)
+                    .mescListRow(top: 3, bottom: 5)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
     }
 
     private var header: some View {
@@ -6902,7 +9101,7 @@ struct ScheduleMissionRow: View {
                         .lineLimit(1)
 
                     if mission.isCurrentUser {
-                        Label("Sua posição: \(mission.role)", systemImage: "person.text.rectangle")
+                        Label(mission.role, systemImage: "person.text.rectangle")
                             .font(MESCFont.caption.weight(.semibold))
                             .foregroundStyle(MESCColor.accent)
                     } else {
@@ -7003,7 +9202,7 @@ struct ScheduleMassDetailSheet: View {
                     if mission.canEditMass, let scheduleId = mission.scheduleId, !scheduleId.hasPrefix("adoration-") {
                         GlassPanel(spacing: 10) {
                             SectionTitle(title: "Organizar a missa", symbol: "slider.horizontal.3")
-                            Text("Como P1 ou P2 desta missa, você pode ajustar os ministros e as vagas desta equipe.")
+                            Text("Nas posições 1 ou 2 desta missa, você pode ajustar os ministros e as vagas desta equipe.")
                                 .font(MESCFont.body)
                                 .foregroundStyle(MESCColor.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -7047,16 +9246,10 @@ struct SchedulePositionRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("P\(position.position)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(MESCColor.accent)
-                .frame(width: 38, height: 32)
-                .background(MESCColor.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
             VStack(alignment: .leading, spacing: 3) {
-                Text(MESCNativeAppModel.positionDescription(position.position))
+                Text(MESCNativeAppModel.positionDisplayLabel(position.position))
                     .font(MESCFont.caption)
-                    .foregroundStyle(MESCColor.textSecondary)
+                    .foregroundStyle(MESCColor.accent)
                 Text(position.isVacant ? "Vaga disponível" : position.displayName)
                     .font(MESCFont.body.weight(position.isCurrentUser ? .bold : .semibold))
                     .foregroundStyle(position.isVacant ? MESCColor.textSecondary : MESCColor.textPrimary)
@@ -7166,17 +9359,11 @@ struct ScheduleMassEditorSheet: View {
         editor: MobileScheduleEditorDTO
     ) -> some View {
         HStack(alignment: .center, spacing: 10) {
-            Text("P\(assignment.position)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(MESCColor.accent)
-                .frame(width: 36, height: 32)
-                .background(MESCColor.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
             VStack(alignment: .leading, spacing: 2) {
-                Text(MESCNativeAppModel.positionDescription(assignment.position))
+                Text(MESCNativeAppModel.positionDisplayLabel(assignment.position))
                     .font(MESCFont.caption)
-                    .foregroundStyle(MESCColor.textSecondary)
-                Picker("P\(assignment.position)", selection: selectionBinding(for: assignment)) {
+                    .foregroundStyle(MESCColor.accent)
+                Picker("Ministro para \(MESCNativeAppModel.positionDisplayLabel(assignment.position))", selection: selectionBinding(for: assignment)) {
                     Text("Vaga disponível").tag("")
                     ForEach(editor.ministers) { minister in
                         Text(minister.displayName).tag(minister.id)
@@ -7523,6 +9710,12 @@ enum MESCGlassIntensity {
 }
 
 extension View {
+    func mescListRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
+        listRowInsets(EdgeInsets(top: top, leading: 18, bottom: bottom, trailing: 18))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
     @ViewBuilder
     func mescGlass(cornerRadius: CGFloat, intensity: MESCGlassIntensity = .panel) -> some View {
         // Cards move with the scroll view, so their finish must not continuously sample
@@ -7825,6 +10018,28 @@ enum JSONValue: Codable, Equatable {
     }
 }
 
+private extension JSONValue {
+    var stringValue: String? {
+        guard case let .string(value) = self else { return nil }
+        return value
+    }
+
+    var boolValue: Bool? {
+        guard case let .bool(value) = self else { return nil }
+        return value
+    }
+
+    var arrayValue: [JSONValue]? {
+        guard case let .array(value) = self else { return nil }
+        return value
+    }
+
+    var objectValue: [String: JSONValue]? {
+        guard case let .object(value) = self else { return nil }
+        return value
+    }
+}
+
 struct MobileMissionHomeDTO: Codable {
     let success: Bool
     let user: MobileUserDTO
@@ -8016,6 +10231,7 @@ struct MobileQuestionnaireDTO: Codable, Identifiable {
     let questions: [MobileQuestionnaireQuestionDTO]
     let deadline: String?
     let responseStatus: String
+    let familyMembers: [MobileQuestionnaireFamilyMemberDTO]
     let response: MobileQuestionnaireExistingResponseDTO?
 
     enum CodingKeys: String, CodingKey {
@@ -8028,6 +10244,7 @@ struct MobileQuestionnaireDTO: Codable, Identifiable {
         case questions
         case deadline
         case responseStatus
+        case familyMembers
         case response
     }
 
@@ -8042,8 +10259,14 @@ struct MobileQuestionnaireDTO: Codable, Identifiable {
         questions = (try? container.decode([MobileQuestionnaireQuestionDTO].self, forKey: .questions)) ?? []
         deadline = try container.decodeIfPresent(String.self, forKey: .deadline)
         responseStatus = try container.decode(String.self, forKey: .responseStatus)
+        familyMembers = try container.decodeIfPresent([MobileQuestionnaireFamilyMemberDTO].self, forKey: .familyMembers) ?? []
         response = try container.decodeIfPresent(MobileQuestionnaireExistingResponseDTO.self, forKey: .response)
     }
+}
+
+struct MobileQuestionnaireFamilyMemberDTO: Codable, Identifiable {
+    let id: String
+    let displayName: String
 }
 
 struct MobileQuestionnaireQuestionDTO: Codable, Identifiable {
@@ -8053,13 +10276,66 @@ struct MobileQuestionnaireQuestionDTO: Codable, Identifiable {
     let options: [String]?
     let required: Bool?
     let metadata: JSONValue?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case title
+        case question
+        case options
+        case required
+        case metadata
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        type = try container.decodeIfPresent(String.self, forKey: .type) ?? "multiple_choice"
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+            ?? container.decodeIfPresent(String.self, forKey: .question)
+            ?? "Pergunta"
+        options = try container.decodeIfPresent([String].self, forKey: .options)
+        required = try container.decodeIfPresent(Bool.self, forKey: .required)
+        metadata = try container.decodeIfPresent(JSONValue.self, forKey: .metadata)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(type, forKey: .type)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(options, forKey: .options)
+        try container.encodeIfPresent(required, forKey: .required)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
+    }
 }
 
 struct MobileQuestionnaireExistingResponseDTO: Codable {
     let id: String
     let responses: JSONValue?
+    let answers: [MobileQuestionnaireAnswerDTO]
+    let sharedWithFamilyIds: [String]
     let submittedAt: String?
     let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case responses
+        case answers
+        case sharedWithFamilyIds
+        case submittedAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        responses = try container.decodeIfPresent(JSONValue.self, forKey: .responses)
+        answers = try container.decodeIfPresent([MobileQuestionnaireAnswerDTO].self, forKey: .answers) ?? []
+        sharedWithFamilyIds = try container.decodeIfPresent([String].self, forKey: .sharedWithFamilyIds) ?? []
+        submittedAt = try container.decodeIfPresent(String.self, forKey: .submittedAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
 }
 
 struct MobileQuestionnaireAnswerDTO: Codable, Equatable {
@@ -8184,6 +10460,51 @@ struct MobileFormationOverviewResponseDTO: Codable {
     let overview: MobileFormationOverviewDTO
 }
 
+struct MobileFormationCertificatesResponseDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let certificates: [MobileFormationCertificateDTO]
+}
+
+struct MobileFormationCertificateDTO: Codable, Identifiable {
+    let id: String
+    let trackId: String
+    let certificateNumber: String
+    let trackTitle: String
+    let trackCategory: String
+    let totalLessons: Int
+    let totalHours: Int
+    let issuedAt: String
+    let validUntil: String?
+    let verificationCode: String
+}
+
+struct MobileFormationLibraryResponseDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let materials: [MobileFormationMaterialDTO]
+}
+
+struct MobileFormationAdminMaterialResponseDTO: Codable {
+    let success: Bool
+    let material: MobileFormationMaterialDTO
+}
+
+struct MobileFormationMaterialDTO: Codable, Identifiable {
+    let id: String
+    let title: String
+    let description: String?
+    let type: String
+    let category: String?
+    let trackId: String?
+    let fileName: String
+    let fileSize: Int
+    let mimeType: String
+    let tags: [String]
+    let source: String
+    let updatedAt: String?
+}
+
 struct MobileFormationOverviewDTO: Codable {
     let tracks: [MobileFormationTrackDTO]
     let summary: MobileFormationSummaryDTO
@@ -8303,6 +10624,7 @@ struct MobileFormationProgressDTO: Codable {
 struct MobileFormationLessonCompleteResponseDTO: Codable {
     let success: Bool
     let progress: MobileFormationProgressDTO
+    let certificate: MobileFormationCertificateDTO?
 }
 
 struct MobileFormationAdminStudioResponseDTO: Codable {
@@ -8351,6 +10673,7 @@ struct MobileFormationAdminLessonDTO: Codable, Identifiable {
     let id: String
     let moduleId: String
     let trackId: String?
+    let isEditable: Bool?
     let title: String
     let description: String?
     let orderIndex: Int
@@ -8391,6 +10714,7 @@ struct MobileCoordinatorQuestionnaireSummaryDTO: Codable, Identifiable {
     let title: String
     let month: Int
     let year: Int
+    let status: String
     let responses: Int
     let pending: Int
     let target: Int
@@ -8491,6 +10815,19 @@ struct MobileCoordinatorMinistersResponseDTO: Codable {
     let ministers: [MobileCoordinatorMinisterDTO]
 }
 
+struct MobileDirectoryMinisterDTO: Codable, Identifiable {
+    let id: String
+    let displayName: String
+    let role: String
+    let photoAvailable: Bool
+}
+
+struct MobileDirectoryMinistersResponseDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let ministers: [MobileDirectoryMinisterDTO]
+}
+
 struct MobileCoordinatorQuestionnaireTargetDTO: Codable, Identifiable {
     let id: String
     let name: String
@@ -8523,6 +10860,28 @@ struct MobileCoordinatorQuestionnaireResponsesDTO: Codable {
     let questionnaire: MobileCoordinatorQuestionnaireResponsesQuestionnaireDTO
     let summary: MobileCoordinatorQuestionnaireResponseSummaryDTO
     let ministers: [MobileCoordinatorQuestionnaireTargetDTO]
+}
+
+struct MobileCoordinatorQuestionnaireLifecycleDTO: Codable, Identifiable {
+    let id: String
+    let title: String
+    let description: String?
+    let month: Int
+    let year: Int
+    let status: String
+    let deadline: String?
+    let questionCount: Int
+    let targetCount: Int
+    let responseCount: Int
+    let pendingCount: Int
+    let responseRate: Int
+}
+
+struct MobileCoordinatorQuestionnaireLifecycleResponseDTO: Codable {
+    let success: Bool
+    let community: MobileCommunityDTO
+    let questionnaire: MobileCoordinatorQuestionnaireLifecycleDTO
+    let notificationsQueued: Int?
 }
 
 struct MobileCoordinatorSchedulePreviewSummaryDTO: Codable {
@@ -8751,6 +11110,67 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func createCoordinatorQuestionnaire(
+        month: Int,
+        year: Int,
+        title: String?,
+        description: String?,
+        deadline: String?,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileCoordinatorQuestionnaireLifecycleResponseDTO {
+        try await authenticatedPost(
+            "admin/questionnaires",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: CoordinatorQuestionnaireCreateRequestBody(
+                month: month,
+                year: year,
+                title: title,
+                description: description,
+                deadline: deadline
+            )
+        )
+    }
+
+    func publishCoordinatorQuestionnaire(
+        questionnaireId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileCoordinatorQuestionnaireLifecycleResponseDTO {
+        try await authenticatedPost(
+            "admin/questionnaires/\(questionnaireId)/publish",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: EmptyRequestBody()
+        )
+    }
+
+    func closeCoordinatorQuestionnaire(
+        questionnaireId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileCoordinatorQuestionnaireLifecycleResponseDTO {
+        try await authenticatedPost(
+            "admin/questionnaires/\(questionnaireId)/close",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: EmptyRequestBody()
+        )
+    }
+
     func coordinatorSchedulePreview(
         month: String,
         accessToken: String,
@@ -8807,7 +11227,8 @@ final class MESCMobileAPIClient {
         communityId: String?,
         deviceId: String,
         idempotencyKey: String,
-        responses: [MobileQuestionnaireAnswerDTO]
+        responses: [MobileQuestionnaireAnswerDTO],
+        sharedWithFamilyIds: [String]
     ) async throws -> MobileQuestionnaireSubmitResponseDTO {
         try await authenticatedPost(
             "questionnaires/\(questionnaireId)/response",
@@ -8815,7 +11236,10 @@ final class MESCMobileAPIClient {
             communityId: communityId,
             deviceId: deviceId,
             idempotencyKey: idempotencyKey,
-            body: QuestionnaireSubmitRequestBody(responses: responses)
+            body: QuestionnaireSubmitRequestBody(
+                responses: responses,
+                sharedWithFamilyIds: sharedWithFamilyIds
+            )
         )
     }
 
@@ -8830,6 +11254,64 @@ final class MESCMobileAPIClient {
             communityId: communityId,
             deviceId: deviceId
         )
+    }
+
+    func formationCertificates(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileFormationCertificatesResponseDTO {
+        try await get(
+            "formation/certificates",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func formationLibrary(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileFormationLibraryResponseDTO {
+        try await get(
+            "formation/library",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func formationCertificatePDF(
+        certificateId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> Data {
+        var request = try makeRequest(path: "formation/certificates/\(certificateId)/pdf")
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        return try await sendData(request)
+    }
+
+    func formationMaterialDownload(
+        materialId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> Data {
+        var request = try makeRequest(path: "formation/library/\(materialId)/download")
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        return try await sendData(request)
     }
 
     func formationLesson(
@@ -8949,6 +11431,23 @@ final class MESCMobileAPIClient {
         )
     }
 
+    func createFormationAdminMaterial(
+        payload: FormationAdminMaterialRequestBody,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String,
+        idempotencyKey: String
+    ) async throws -> MobileFormationAdminMaterialResponseDTO {
+        try await authenticatedPost(
+            "formation/admin/materials",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId,
+            idempotencyKey: idempotencyKey,
+            body: payload
+        )
+    }
+
     func confirmSchedule(
         scheduleId: String,
         accessToken: String,
@@ -9053,6 +11552,35 @@ final class MESCMobileAPIClient {
         deviceId: String
     ) async throws -> Data {
         var request = try makeRequest(path: "profile/photo")
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        if let communityId {
+            request.setValue(communityId, forHTTPHeaderField: "X-Community-Id")
+        }
+        return try await sendData(request)
+    }
+
+    func directoryMinisters(
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> MobileDirectoryMinistersResponseDTO {
+        try await get(
+            "directory/ministers",
+            accessToken: accessToken,
+            communityId: communityId,
+            deviceId: deviceId
+        )
+    }
+
+    func directoryMinisterPhoto(
+        ministerId: String,
+        accessToken: String,
+        communityId: String?,
+        deviceId: String
+    ) async throws -> Data {
+        var request = try makeRequest(path: "directory/ministers/\(ministerId)/photo")
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
@@ -9399,6 +11927,7 @@ private struct RefreshRequestBody: Encodable {
 
 private struct QuestionnaireSubmitRequestBody: Encodable {
     let responses: [MobileQuestionnaireAnswerDTO]
+    let sharedWithFamilyIds: [String]
 }
 
 private struct ScheduleConfirmRequestBody: Encodable {
@@ -9464,6 +11993,17 @@ struct FormationAdminSectionRequestBody: Encodable {
     let isRequired: Bool?
 }
 
+struct FormationAdminMaterialRequestBody: Encodable {
+    let title: String
+    let description: String?
+    let type: String
+    let category: String?
+    let trackId: String?
+    let externalUrl: String
+    let tags: [String]
+    let isPublished: Bool?
+}
+
 private struct CoordinatorSchedulePreviewRequestBody: Encodable {
     let month: String
 }
@@ -9471,6 +12011,14 @@ private struct CoordinatorSchedulePreviewRequestBody: Encodable {
 private struct CoordinatorSchedulePublishRequestBody: Encodable {
     let month: String
     let replaceExisting: Bool
+}
+
+private struct CoordinatorQuestionnaireCreateRequestBody: Encodable {
+    let month: Int
+    let year: Int
+    let title: String?
+    let description: String?
+    let deadline: String?
 }
 
 private struct DeviceUpdateRequestBody: Encodable {
@@ -9704,7 +12252,7 @@ enum ScheduleFixtures {
                     time: "08:00",
                     title: "Missa Dominical",
                     community: "Santuário",
-                    role: "P1: Auxiliar 1",
+                    role: "Posição 1 · Auxiliar 1",
                     ministers: ["Ana Maria", "Carlos Roberto", "Fatima Lima", "Jose Paulo"],
                     confirmationStatus: nil,
                     canConfirm: false,
@@ -9735,7 +12283,7 @@ enum ScheduleFixtures {
                     time: "10:00",
                     title: "Missa da Comunidade",
                     community: "São Judas",
-                    role: "P2: Patena",
+                    role: "Posição 2 · Auxiliar 2",
                     ministers: ["Ana Maria", "Lucia Helena", "Roberto Alves"],
                     confirmationStatus: nil,
                     canConfirm: false,
@@ -9752,7 +12300,7 @@ enum ScheduleFixtures {
                     time: "08:00",
                     title: "Missa Dominical",
                     community: "Santuário",
-                    role: "P1: Auxiliar 2",
+                    role: "Posição 1 · Auxiliar 1",
                     ministers: ["Ana Maria", "Beatriz Souza", "Miguel Rocha", "Clara Dias"],
                     confirmationStatus: nil,
                     canConfirm: false,
@@ -9769,7 +12317,7 @@ enum ScheduleFixtures {
                     time: "19:30",
                     title: "Missa Votiva",
                     community: "Santuário",
-                    role: "P3: Apoio",
+                    role: "Posição 3 · Recolher 1",
                     ministers: ["Ana Maria", "Ricardo Nunes", "Helena Prado"],
                     confirmationStatus: nil,
                     canConfirm: false,
