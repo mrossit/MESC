@@ -1,10 +1,11 @@
 import express from "express";
+import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "http";
 import { seedMobileP0Demo } from "../../scripts/seed-mobile-p0-demo";
 import { db } from "../../server/db";
-import { schedules, substitutionRequests } from "../../shared/schema";
+import { questionnaires, schedules, substitutionRequests } from "../../shared/schema";
 import {
   getMobileP0DemoData,
   MOBILE_P0_DEMO_IDS,
@@ -549,5 +550,77 @@ describeWithLocalDatabase("mobile API community scope integration", () => {
     });
     expect(removed.status).toBe(200);
     expect(removed.body.photoUrl).toBeNull();
+  });
+
+  it("creates the next-month questionnaire through the native coordinator contract", async () => {
+    const beforeCreation = new Date();
+    const createKey = randomUUID();
+    let questionnaireId: string | null = null;
+
+    try {
+      const created = await mobilePost("/admin/questionnaires", {
+        userId: MOBILE_P0_DEMO_IDS.coordinatorA,
+        idempotencyKey: createKey,
+        body: {
+          title: "Disponibilidade mensal",
+          description: "Informe os horarios em que pode servir.",
+        },
+      });
+
+      expect(created.status).toBe(201);
+      expect(created.body.success).toBe(true);
+      expect(created.body.questionnaire.status).toBe("draft");
+      expect(created.body.questionnaire.targetCount).toBeGreaterThan(0);
+      questionnaireId = created.body.questionnaire.id;
+
+      const brazilParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "numeric",
+      }).formatToParts(beforeCreation);
+      const currentYear = Number(brazilParts.find((part) => part.type === "year")?.value);
+      const currentMonth = Number(brazilParts.find((part) => part.type === "month")?.value);
+      const expectedYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+      const expectedMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+
+      expect(created.body.questionnaire).toMatchObject({
+        year: expectedYear,
+        month: expectedMonth,
+      });
+
+      const deadlineCursor = new Date(Date.UTC(currentYear, currentMonth, 0));
+      let businessDays = 0;
+      while (businessDays < 5) {
+        deadlineCursor.setUTCDate(deadlineCursor.getUTCDate() - 1);
+        if (![0, 6].includes(deadlineCursor.getUTCDay())) businessDays += 1;
+      }
+      const expectedDeadline = new Date(
+        `${deadlineCursor.toISOString().slice(0, 10)}T23:59:59.999-03:00`,
+      ).toISOString();
+      expect(created.body.questionnaire.deadline).toBe(expectedDeadline);
+
+      const replay = await mobilePost("/admin/questionnaires", {
+        userId: MOBILE_P0_DEMO_IDS.coordinatorA,
+        idempotencyKey: createKey,
+        body: {
+          title: "Disponibilidade mensal",
+          description: "Informe os horarios em que pode servir.",
+        },
+      });
+      expect(replay.status).toBe(201);
+      expect(replay.body).toEqual(created.body);
+
+      const updated = await mobilePatch(`/admin/questionnaires/${questionnaireId}`, {
+        userId: MOBILE_P0_DEMO_IDS.coordinatorA,
+        idempotencyKey: randomUUID(),
+        body: { description: "Disponibilidade para a proxima escala." },
+      });
+      expect(updated.status).toBe(200);
+      expect(updated.body.questionnaire.description).toBe("Disponibilidade para a proxima escala.");
+    } finally {
+      if (questionnaireId) {
+        await db.delete(questionnaires).where(eq(questionnaires.id, questionnaireId));
+      }
+    }
   });
 });

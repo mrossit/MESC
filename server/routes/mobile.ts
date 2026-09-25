@@ -28,6 +28,7 @@ import { logActivity } from "../utils/activityLogger";
 import { createSession } from "./session";
 import { QuestionnaireService } from "../services/questionnaireService";
 import { sanitizeQuestionnaireResponses } from "../utils/questionnaireSanitization";
+import { generateQuestionnaireQuestions } from "../utils/questionnaireGenerator";
 import { scheduleCache } from "../services/scheduleCache";
 import { canRearrangeMassSchedule } from "../utils/scheduleAuthorization";
 import { trackSubstitutionFulfillment, trackSubstitutionRequest } from "../services/reliabilityScoreService";
@@ -161,6 +162,38 @@ const optionalTrimmedText = (maxLength: number) =>
   );
 
 const optionalUrlText = optionalTrimmedText(512);
+
+const coordinatorQuestionnaireCreateSchema = z.object({
+  // Older native builds send month/year while newer clients may send the
+  // portable YYYY-MM reference instead. Supporting both keeps creation
+  // compatible as the native coordinator workflow evolves.
+  referenceMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  month: z.number().int().min(1).max(12).optional(),
+  year: z.number().int().min(2024).max(2050).optional(),
+  title: optionalTrimmedText(255),
+  description: optionalTrimmedText(4_000),
+  deadline: z.string().trim().min(1).max(128).nullable().optional(),
+  questions: z.array(z.record(z.unknown())).min(1).max(200).optional(),
+  targetUserIds: z.array(z.string().trim().min(1).max(255)).max(2_000).optional(),
+}).superRefine((value, context) => {
+  if ((value.month === undefined) !== (value.year === undefined)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe mes e ano juntos",
+      path: value.month === undefined ? ["month"] : ["year"],
+    });
+  }
+});
+
+const coordinatorQuestionnaireUpdateSchema = z.object({
+  title: optionalTrimmedText(255),
+  description: optionalTrimmedText(4_000),
+  deadline: z.string().trim().min(1).max(128).nullable().optional(),
+  questions: z.array(z.record(z.unknown())).min(1).max(200).optional(),
+  targetUserIds: z.array(z.string().trim().min(1).max(255)).max(2_000).optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: "Informe ao menos um campo para atualizar",
+});
 
 const formationAdminLessonCreateSchema = z.object({
   moduleId: z.string().uuid(),
@@ -419,6 +452,24 @@ function toValidDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function toMobileIsoTimestamp(value: unknown): string | null {
+  if (!value) return null;
+
+  if (typeof value === "object" && value !== null && "toISOString" in value) {
+    const toISOString = (value as { toISOString?: unknown }).toISOString;
+    if (typeof toISOString === "function") {
+      try {
+        return toISOString.call(value);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  const parsed = toValidDate(value);
+  return parsed ? parsed.toISOString() : null;
+}
+
 function dbJson(value: unknown) {
   return (process.env.DATABASE_URL ? value : JSON.stringify(value ?? null)) as any;
 }
@@ -486,6 +537,88 @@ function getRequestedMonth(value: unknown) {
     const message = error instanceof Error ? error.message : "Mes invalido. Use o formato YYYY-MM.";
     throw new MobileHttpError(400, message);
   }
+}
+
+function saoPauloCalendarParts(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(now);
+
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    throw new MobileHttpError(500, "Nao foi possivel calcular o mes de referencia");
+  }
+
+  return { year, month };
+}
+
+function defaultQuestionnaireReferenceMonth(now = new Date()) {
+  const { year, month } = saoPauloCalendarParts(now);
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  return {
+    year: nextYear,
+    month: nextMonth,
+    isoMonth: toIsoMonthFromParts(nextYear, nextMonth),
+  };
+}
+
+function defaultQuestionnaireDeadline(now = new Date()) {
+  const { year, month } = saoPauloCalendarParts(now);
+  const cursor = new Date(Date.UTC(year, month, 0));
+  let businessDays = 0;
+
+  // The operating calendar has no parish holiday feed yet. This is therefore
+  // five weekdays before month end, with Saturday and Sunday excluded.
+  while (businessDays < 5) {
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    const weekday = cursor.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) businessDays += 1;
+  }
+
+  const dueDate = cursor.toISOString().slice(0, 10);
+  return new Date(`${dueDate}T23:59:59.999-03:00`);
+}
+
+function resolveCoordinatorQuestionnaireMonth(input: {
+  referenceMonth?: string;
+  month?: number;
+  year?: number;
+}) {
+  if (input.referenceMonth) {
+    const parsed = getRequestedMonth(input.referenceMonth);
+    return {
+      year: parsed.year,
+      month: parsed.month,
+      isoMonth: parsed.isoMonth,
+    };
+  }
+
+  if (input.month !== undefined && input.year !== undefined) {
+    return {
+      year: input.year,
+      month: input.month,
+      isoMonth: toIsoMonthFromParts(input.year, input.month),
+    };
+  }
+
+  return defaultQuestionnaireReferenceMonth();
+}
+
+function resolveCoordinatorQuestionnaireDeadline(value: string | null | undefined) {
+  if (value === undefined || value === null) {
+    return defaultQuestionnaireDeadline();
+  }
+
+  const deadline = toValidDate(value);
+  if (!deadline) {
+    throw new MobileHttpError(400, "Prazo de resposta invalido");
+  }
+
+  return deadline;
 }
 
 function questionnaireMonthKey(year: number, month: number) {
@@ -709,6 +842,183 @@ async function loadMobileQuestionnaireTargetMinisters(input: {
     preferredTimes: normalizeStoredStringArray(minister.preferredTimes),
     dataQuality: toMobileDataQuality(minister),
   }));
+}
+
+async function validateQuestionnaireTargetUserIds(input: {
+  communityId: string;
+  targetUserIds?: string[];
+}) {
+  const targetUserIds = Array.from(new Set(input.targetUserIds ?? []));
+  if (targetUserIds.length === 0) return [];
+
+  const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+    communityId: input.communityId,
+    targetUserIds,
+  });
+
+  if (targetMinisters.length !== targetUserIds.length) {
+    throw new MobileHttpError(400, "A lista de ministros contem pessoas fora da comunidade ou inativas");
+  }
+
+  return targetUserIds;
+}
+
+async function mobileQuestionnaireLifecycle(input: {
+  questionnaire: {
+    id: string;
+    title: string;
+    description: string | null;
+    month: number;
+    year: number;
+    status: string;
+    deadline: Date | string | null;
+    targetUserIds: unknown;
+  };
+  communityId: string;
+}) {
+  const targetUserIds = getQuestionnaireTargetUserIds(input.questionnaire.targetUserIds);
+  const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+    communityId: input.communityId,
+    targetUserIds,
+  });
+  const [responseSummary] = await db
+    .select({ total: count() })
+    .from(questionnaireResponses)
+    .where(and(
+      eq(questionnaireResponses.questionnaireId, input.questionnaire.id),
+      eq(questionnaireResponses.communityId, input.communityId),
+      eq(questionnaireResponses.isDeleted, dbBoolean(false)),
+    ));
+
+  const targetCount = targetMinisters.length;
+  const responseCount = Number(responseSummary?.total ?? 0);
+  const pendingCount = Math.max(targetCount - responseCount, 0);
+
+  return {
+    id: input.questionnaire.id,
+    title: input.questionnaire.title,
+    description: input.questionnaire.description ?? null,
+    month: input.questionnaire.month,
+    year: input.questionnaire.year,
+    status: input.questionnaire.status,
+    deadline: toMobileIsoTimestamp(input.questionnaire.deadline),
+    targetCount,
+    responseCount,
+    pendingCount,
+    responseRate: targetCount > 0 ? Math.round((responseCount / targetCount) * 100) : 0,
+  };
+}
+
+async function queueMobileQuestionnairePublishedNotifications(input: {
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    deadline: Date | string | null;
+    targetUserIds: unknown;
+  };
+  communityId: string;
+}) {
+  const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+    communityId: input.communityId,
+    targetUserIds: getQuestionnaireTargetUserIds(input.questionnaire.targetUserIds),
+  });
+  const recipientIds = targetMinisters.map((minister) => minister.id);
+  if (recipientIds.length === 0) return 0;
+
+  const title = "Novo questionario disponivel";
+  const deadline = toMobileIsoTimestamp(input.questionnaire.deadline);
+  const message = deadline
+    ? `Informe sua disponibilidade para ${toIsoMonthFromParts(input.questionnaire.year, input.questionnaire.month)} ate ${deadline.slice(0, 10)}.`
+    : `Informe sua disponibilidade para ${toIsoMonthFromParts(input.questionnaire.year, input.questionnaire.month)}.`;
+
+  await db.insert(notifications).values(recipientIds.map((userId) => ({
+    ...localUuid(),
+    userId,
+    title,
+    message,
+    type: "announcement" as const,
+    actionUrl: "/questionnaire",
+    data: mobileNotificationData("questionnaire_published", {
+      questionnaireId: input.questionnaire.id,
+      month: input.questionnaire.month,
+      year: input.questionnaire.year,
+    }),
+  })));
+
+  try {
+    await sendPushNotificationToUsers(recipientIds, {
+      title,
+      body: message,
+      url: "/questionnaire",
+      tag: `questionnaire-${input.questionnaire.id}`,
+      data: mobileNotificationData("questionnaire_published", {
+        questionnaireId: input.questionnaire.id,
+        month: input.questionnaire.month,
+        year: input.questionnaire.year,
+      }),
+    });
+  } catch (error) {
+    // The in-app notification is already durable. A transient APNS/FCM error
+    // must not roll back the publication the coordinator just confirmed.
+    console.error("[Mobile API] Falha ao enviar push de questionario:", error);
+  }
+
+  return recipientIds.length;
+}
+
+async function queueMobileQuestionnaireClosedNotifications(input: {
+  questionnaire: {
+    id: string;
+    title: string;
+    month: number;
+    year: number;
+    targetUserIds: unknown;
+  };
+  communityId: string;
+}) {
+  const targetMinisters = await loadMobileQuestionnaireTargetMinisters({
+    communityId: input.communityId,
+    targetUserIds: getQuestionnaireTargetUserIds(input.questionnaire.targetUserIds),
+  });
+  const recipientIds = targetMinisters.map((minister) => minister.id);
+  if (recipientIds.length === 0) return 0;
+
+  const title = "Questionario encerrado";
+  const message = `O questionario de ${toIsoMonthFromParts(input.questionnaire.year, input.questionnaire.month)} foi encerrado. Obrigado por informar sua disponibilidade.`;
+
+  await db.insert(notifications).values(recipientIds.map((userId) => ({
+    ...localUuid(),
+    userId,
+    title,
+    message,
+    type: "announcement" as const,
+    actionUrl: "/questionnaire",
+    data: mobileNotificationData("questionnaire_closed", {
+      questionnaireId: input.questionnaire.id,
+      month: input.questionnaire.month,
+      year: input.questionnaire.year,
+    }),
+  })));
+
+  try {
+    await sendPushNotificationToUsers(recipientIds, {
+      title,
+      body: message,
+      url: "/questionnaire",
+      tag: `questionnaire-closed-${input.questionnaire.id}`,
+      data: mobileNotificationData("questionnaire_closed", {
+        questionnaireId: input.questionnaire.id,
+        month: input.questionnaire.month,
+        year: input.questionnaire.year,
+      }),
+    });
+  } catch (error) {
+    console.error("[Mobile API] Falha ao enviar push de encerramento:", error);
+  }
+
+  return recipientIds.length;
 }
 
 type MobileSubstitutionUserSummary = {
@@ -1035,6 +1345,16 @@ function requireFormationAdmin(user: AuthRequest["user"]) {
 
   if (!isAdmin(user.role)) {
     throw new MobileHttpError(403, "Apenas gestores e coordenadores podem editar formacao");
+  }
+}
+
+function requireQuestionnaireAdmin(user: AuthRequest["user"]) {
+  if (!user) {
+    throw new MobileHttpError(401, "Usuario nao autenticado");
+  }
+
+  if (!isAdmin(user.role)) {
+    throw new MobileHttpError(403, "Acesso restrito a coordenadores");
   }
 }
 
@@ -1942,6 +2262,326 @@ router.get("/privacy/account-deletion-info", authenticateToken, (_req: AuthReque
 });
 
 router.delete("/account", authenticateToken, deleteAccountHandler);
+
+router.post("/admin/questionnaires", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireQuestionnaireAdmin(user);
+
+    const parsed = coordinatorQuestionnaireCreateSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const reference = resolveCoordinatorQuestionnaireMonth(parsed);
+    const deadline = resolveCoordinatorQuestionnaireDeadline(parsed.deadline);
+    const targetUserIds = await validateQuestionnaireTargetUserIds({
+      communityId: activeCommunity.id,
+      targetUserIds: parsed.targetUserIds,
+    });
+    const [existing] = await db
+      .select({ id: questionnaires.id })
+      .from(questionnaires)
+      .where(and(
+        eq(questionnaires.communityId, activeCommunity.id),
+        eq(questionnaires.month, reference.month),
+        eq(questionnaires.year, reference.year),
+        ne(questionnaires.status, "deleted"),
+      ))
+      .limit(1);
+
+    if (existing) {
+      throw new MobileHttpError(409, "Ja existe um questionario para este mes nesta comunidade");
+    }
+
+    const questions = parsed.questions ?? generateQuestionnaireQuestions(reference.month, reference.year);
+    const [created] = await db
+      .insert(questionnaires)
+      .values({
+        ...localUuid(),
+        communityId: activeCommunity.id,
+        title: parsed.title ?? `Questionario ${reference.isoMonth}`,
+        description: parsed.description ?? `Disponibilidade para ${reference.isoMonth}`,
+        month: reference.month,
+        year: reference.year,
+        status: "draft",
+        questions: dbJson(questions),
+        deadline,
+        targetUserIds: dbJson(targetUserIds),
+        notifiedUserIds: dbJson([]),
+        createdById: user!.id,
+        version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    const responseBody = {
+      success: true,
+      community: activeCommunity,
+      questionnaire: await mobileQuestionnaireLifecycle({
+        // SQLite's RETURNING adapter may omit timestamp values. Keep the
+        // value resolved for this mutation in the response contract.
+        questionnaire: { ...created, deadline },
+        communityId: activeCommunity.id,
+      }),
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 201,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.status(201).json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao criar questionario");
+  }
+});
+
+router.patch("/admin/questionnaires/:id", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireQuestionnaireAdmin(user);
+
+    const parsed = coordinatorQuestionnaireUpdateSchema.parse(req.body ?? {});
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: parsed,
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(and(
+        eq(questionnaires.id, req.params.id),
+        eq(questionnaires.communityId, activeCommunity.id),
+        ne(questionnaires.status, "deleted"),
+      ))
+      .limit(1);
+
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+    if (questionnaire.status === "closed") {
+      throw new MobileHttpError(409, "Questionario encerrado nao pode ser editado");
+    }
+
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.title) updates.title = parsed.title;
+    if (parsed.description !== undefined) updates.description = parsed.description;
+    if (parsed.deadline !== undefined) {
+      updates.deadline = resolveCoordinatorQuestionnaireDeadline(parsed.deadline);
+    }
+    if (parsed.questions !== undefined) updates.questions = dbJson(parsed.questions);
+    if (parsed.targetUserIds !== undefined) {
+      updates.targetUserIds = dbJson(await validateQuestionnaireTargetUserIds({
+        communityId: activeCommunity.id,
+        targetUserIds: parsed.targetUserIds,
+      }));
+    }
+
+    const [updated] = await db
+      .update(questionnaires)
+      .set(updates as any)
+      .where(eq(questionnaires.id, questionnaire.id))
+      .returning();
+
+    const responseBody = {
+      success: true,
+      community: activeCommunity,
+      questionnaire: await mobileQuestionnaireLifecycle({
+        questionnaire: updated,
+        communityId: activeCommunity.id,
+      }),
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao atualizar questionario");
+  }
+});
+
+router.post("/admin/questionnaires/:id/publish", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireQuestionnaireAdmin(user);
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: { questionnaireId: req.params.id, action: "publish" },
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(and(
+        eq(questionnaires.id, req.params.id),
+        eq(questionnaires.communityId, activeCommunity.id),
+        ne(questionnaires.status, "deleted"),
+      ))
+      .limit(1);
+
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+    if (questionnaire.status === "closed") {
+      throw new MobileHttpError(409, "Questionario encerrado nao pode ser publicado");
+    }
+
+    const shouldNotify = questionnaire.status !== "published";
+    const [published] = shouldNotify
+      ? await db
+        .update(questionnaires)
+        .set({ status: "published", updatedAt: new Date() })
+        .where(eq(questionnaires.id, questionnaire.id))
+        .returning()
+      : [questionnaire];
+    const notificationsQueued = shouldNotify
+      ? await queueMobileQuestionnairePublishedNotifications({
+        questionnaire: published,
+        communityId: activeCommunity.id,
+      })
+      : 0;
+    const responseBody = {
+      success: true,
+      community: activeCommunity,
+      questionnaire: await mobileQuestionnaireLifecycle({
+        questionnaire: published,
+        communityId: activeCommunity.id,
+      }),
+      notificationsQueued,
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao publicar questionario");
+  }
+});
+
+router.post("/admin/questionnaires/:id/close", authenticateToken, async (req: AuthRequest, res) => {
+  let idempotencyRecordId: string | null = null;
+
+  try {
+    const user = req.user;
+    requireQuestionnaireAdmin(user);
+
+    const activeCommunity = await resolveActiveCommunity(req);
+    const idempotency = await startMobileMutationIdempotency({
+      req,
+      userId: user!.id,
+      communityId: activeCommunity.id,
+      body: { questionnaireId: req.params.id, action: "close" },
+    });
+
+    if (idempotency.kind === "replay") {
+      return res.status(idempotency.responseStatus).json(idempotency.responseBody);
+    }
+
+    idempotencyRecordId = idempotency.recordId;
+    const [questionnaire] = await db
+      .select()
+      .from(questionnaires)
+      .where(and(
+        eq(questionnaires.id, req.params.id),
+        eq(questionnaires.communityId, activeCommunity.id),
+        ne(questionnaires.status, "deleted"),
+      ))
+      .limit(1);
+
+    if (!questionnaire) {
+      throw new MobileHttpError(404, "Questionario nao encontrado");
+    }
+    if (questionnaire.status === "draft") {
+      throw new MobileHttpError(409, "Publique o questionario antes de encerra-lo");
+    }
+
+    const shouldNotify = questionnaire.status !== "closed";
+    const [closed] = shouldNotify
+      ? await db
+        .update(questionnaires)
+        .set({ status: "closed", updatedAt: new Date() })
+        .where(eq(questionnaires.id, questionnaire.id))
+        .returning()
+      : [questionnaire];
+    const notificationsQueued = shouldNotify
+      ? await queueMobileQuestionnaireClosedNotifications({
+        questionnaire: closed,
+        communityId: activeCommunity.id,
+      })
+      : 0;
+    const responseBody = {
+      success: true,
+      community: activeCommunity,
+      questionnaire: await mobileQuestionnaireLifecycle({
+        questionnaire: closed,
+        communityId: activeCommunity.id,
+      }),
+      notificationsQueued,
+    };
+
+    await completeMobileIdempotency({
+      recordId: idempotencyRecordId,
+      responseStatus: 200,
+      responseBody,
+    });
+    idempotencyRecordId = null;
+
+    res.json(responseBody);
+  } catch (error) {
+    await releaseMobileIdempotencyQuietly(idempotencyRecordId);
+    return handleMobileError(res, error, "Erro ao encerrar questionario");
+  }
+});
 
 router.get("/questionnaires/current", authenticateToken, async (req: AuthRequest, res) => {
   try {
