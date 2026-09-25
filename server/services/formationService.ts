@@ -780,7 +780,10 @@ export async function markLessonSectionCompleted(params: {
     meta.progressPercentage = Math.min(100, Math.round((meta.completedSections.length / totalSections) * 100));
   }
 
-  const now = new Date();
+  // `db.execute(sql`...`)` is backed by postgres-js in production, which
+  // expects a serialized timestamp for interpolated parameters rather than a
+  // JavaScript Date instance.
+  const now = new Date().toISOString();
   const status = meta.progressPercentage >= 100 ? "completed" : "in_progress";
   const completedAt = status === "completed" ? now : existing?.completedAt ?? null;
 
@@ -887,7 +890,7 @@ export async function markLessonCompleted(params: {
     progressPercentage: 100,
   };
 
-  const now = new Date();
+  const now = new Date().toISOString();
 
   if (existing) {
     await db.execute(sql`
@@ -979,7 +982,7 @@ export async function upsertLessonProgressEntry(params: {
     meta.progressPercentage = 100;
   }
 
-  const now = new Date();
+  const now = new Date().toISOString();
   const status: NonNullable<ProgressRow["status"]> = finalIsCompleted
     ? "completed"
     : meta.progressPercentage > 0
